@@ -33,12 +33,12 @@ const char* token_type_name(TokenType type)
 
         case TOKEN_AND:           return "TOKEN_AND";
         case TOKEN_ELSE:          return "TOKEN_ELSE";
+        case TOKEN_ELIF:          return "TOKEN_ELIF";
         case TOKEN_FALSE:         return "TOKEN_FALSE";
         case TOKEN_FOR:           return "TOKEN_FOR";
         case TOKEN_FN:            return "TOKEN_FN";
         case TOKEN_IF:            return "TOKEN_IF";
-        case TOKEN_NIL_VALUE:     return "TOKEN_NIL_VALUE";
-        case TOKEN_NIL_TYPE:      return "TOKEN_NIL_TYPE";
+        case TOKEN_NIL:           return "TOKEN_NIL";
         case TOKEN_OR:            return "TOKEN_OR";
         case TOKEN_PRINT:         return "TOKEN_PRINT";
         case TOKEN_RETURN:        return "TOKEN_RETURN";
@@ -215,6 +215,9 @@ Token scanner_scan_token(Scanner* scanner)
         // Literals
         case '#': return scanner_scan_line_comment(scanner);
         case '"': return scanner_scan_string(scanner);
+        default:
+            if (is_digit(c))
+                    return scanner_scan_number(scanner);
     }
 #undef increment_column
 
@@ -335,3 +338,137 @@ Token scanner_scan_line_comment(Scanner* scanner)
     token.length = scanner->current - scanner->start;
     return token;
 }
+
+bool is_digit(char c)
+{
+    switch(c)
+    {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            return true;
+    }
+    return false;
+}
+
+bool is_alpha(char c)
+{
+  return (c >= 'a' && c <= 'z') ||
+         (c >= 'A' && c <= 'Z') ||
+          c == '_';
+}
+
+Token scanner_scan_number(Scanner* scanner)
+{
+    Token token =
+    {
+        .type   = TOKEN_NUMBER,
+        .start  = scanner->start,
+        .line   = scanner->line,
+        .column = scanner->column,
+        .length = 0
+    };
+    char c;
+
+    scanner->column++;
+    while (!scanner_is_at_end(*scanner) && is_digit(c = scanner_peek(*scanner)))
+    {
+        scanner_consume(scanner);
+        scanner->column++;
+    }
+
+    if (c == '.')
+    {
+        scanner->column++;
+        scanner_consume(scanner);
+        while (!scanner_is_at_end(*scanner) && is_digit(c = scanner_peek(*scanner)))
+        {
+            scanner_consume(scanner);
+            scanner->column++;
+        }
+    }
+
+    token.length = scanner->current - scanner->start;
+    return token;
+}
+
+//Token scanner_scan_keyword(Scanner* scanner, const char* keyword, Token* result_token)
+//{
+//    size_t len = strlen(keyword);
+//    if (len == 0)
+//    {
+//        fprintf(stderr, "Can't scan an empty keyword.");
+//        exit(1);
+//    }
+//
+//    for (size_t i = 0; i < 0; ++i)
+//    {
+//    }
+//}
+//
+//Token scanner_scan_identifier(Scanner* scanner) {
+//  while (is_alpha(scanner_peek(*scanner)) || is_digit(scanner_peek(*scanner)) scanner_consume(scanner);
+//  return scanner_make_token(scanner_scan_identifier_type(scanner));
+//}
+//
+//TokenType scanner_scan_identifier_type(Scanner* scanner) {
+//    switch (scanner.start[0]) {
+//        case 'a': return scanner_check_keyword(scanner, 1, 2, "nd"   , TOKEN_AND   );
+//        case 'c': return scanner_check_keyword(scanner, 1, 4, "lass" , TOKEN_CLASS );
+//        case 'i': return scanner_check_keyword(scanner, 1, 1, "f"    , TOKEN_IF    );
+//        case 'n': return scanner_check_keyword(scanner, 1, 2, "il"   , TOKEN_NIL   );
+//        case 'o': return scanner_check_keyword(scanner, 1, 1, "r"    , TOKEN_OR    );
+//        case 'p': return scanner_check_keyword(scanner, 1, 4, "rint" , TOKEN_PRINT );
+//        case 'r': return scanner_check_keyword(scanner, 1, 5, "eturn", TOKEN_RETURN);
+//        case 'w': return scanner_check_keyword(scanner, 1, 4, "hile" , TOKEN_WHILE );
+//        case 't': return scanner_check_keyword(scanner, 1, 4, "rue"  , TOKEN_TRUE );
+//        case 'l': return scanner_check_keyword(scanner, 1, 4, "oop"  , TOKEN_LOOP );
+//        case 'f':
+//            if (scanner.current - scanner.start > 1)
+//            {
+//                switch (scanner.start[1])
+//                {
+//                  case 'a': return scanner_check_keyword(scanner, 2, 3, "lse", TOKEN_FALSE);
+//                  case 'o': return scanner_check_keyword(scanner, 2, 1, "r", TOKEN_FOR);
+//                  case 'n': return TOKEN_FN;
+//                }
+//            }
+//    }
+//    // else and elif are unhandled
+//    //if (scanner.start[0] == 'e' and scanner.start[1] == 'l')
+//    //{
+//    //}
+//
+//    return TOKEN_IDENTIFIER;
+//}
+//
+//TokenType scanner_check_keyword(Scanner* scanner, int start, int length, const char* rest, TokenType type) {
+//  if (scanner.current - scanner.start == start + length
+//     && memcmp(scanner.start + start, rest, length) == 0)
+//  {
+//      scanner->column += 1 + strlen(rest);
+//      return type;
+//  }
+//
+//  scanner->column += 1 + strlen(rest);
+//  return TOKEN_IDENTIFIER;
+//}
+
+//Token scanner_scan_identifier(Scanner* scanner)
+//{
+//    Token token =
+//    {
+//        .type   = TOKEN_IDENTIFIER,
+//        .start  = scanner->start,
+//        .line   = scanner->line,
+//        .column = scanner->column,
+//        .length = 0
+//    };
+//}

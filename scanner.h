@@ -24,8 +24,8 @@ typedef enum
     TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER, TOKEN_COMMENT,
 
     // Keywords.
-    TOKEN_AND, TOKEN_ELSE, TOKEN_FALSE,
-    TOKEN_FOR, TOKEN_FN, TOKEN_IF, TOKEN_NIL_VALUE, TOKEN_NIL_TYPE, TOKEN_OR,
+    TOKEN_AND, TOKEN_ELSE, TOKEN_ELIF, TOKEN_FALSE,
+    TOKEN_FOR, TOKEN_FN, TOKEN_IF, TOKEN_NIL, TOKEN_OR,
     TOKEN_PRINT, TOKEN_RETURN, TOKEN_THIS,
     TOKEN_TRUE, TOKEN_LET, TOKEN_WHILE, TOKEN_LOOP, TOKEN_MATCH,
 
@@ -77,5 +77,9 @@ Token scanner_make_error_token(Scanner scanner, const char* err_msg);
 void scanner_scan_tokens(Scanner* scanner);
 Token scanner_scan_string(Scanner* scanner);
 Token scanner_scan_line_comment(Scanner* scanner);
+
+bool is_digit(char c);
+bool is_alpha(char c);
+Token scanner_scan_number(Scanner* scanner);
 
 #endif
