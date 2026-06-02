@@ -187,9 +187,9 @@ Token scanner_scan_token(Scanner* scanner)
     if (scanner_is_at_end(*scanner)) return scanner_make_token(scanner, TOKEN_EOF, 0, 1);
 
 #define increment_column(col) scanner->column+=(col)
-    char c = scanner_consume(scanner);
     Token rt;     // return_token
     TokenType tt; // token_type
+    char c = scanner_consume(scanner);
     switch (c)
     {
         // Newline
@@ -257,128 +257,128 @@ Token scanner_scan_token(Scanner* scanner)
                 switch (c)
                 {
                     case 'l': // let, loop
-                        if (scanner_match_string(scanner, "et"))
+                        if (scanner_match_string(scanner, "et", 1))
                             rt = scanner_make_token(scanner, TOKEN_LET, 0, 2);
-                        else if (scanner_match_string(scanner, "oop"))
+                        else if (scanner_match_string(scanner, "oop", 1))
                             rt = scanner_make_token(scanner, TOKEN_LOOP, 0, 3);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 't': // type, true
-                        if (scanner_match_string(scanner, "ype"))
+                        if (scanner_match_string(scanner, "ype", 1))
                             rt = scanner_make_token(scanner, TOKEN_TYPE, 0, 3);
-                        else if (scanner_match_string(scanner, "rue"))
+                        else if (scanner_match_string(scanner, "rue", 1))
                             rt = scanner_make_token(scanner, TOKEN_TRUE, 0, 3);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'e': // effect, end, elif, else
-                        if (scanner_match_string(scanner, "ffect"))
+                        if (scanner_match_string(scanner, "ffect", 1))
                             rt = scanner_make_token(scanner, TOKEN_EFFECT, 0, 5);
-                        else if (scanner_match_string(scanner, "nd"))
+                        else if (scanner_match_string(scanner, "nd", 1))
                             rt = scanner_make_token(scanner, TOKEN_END, 0, 2);
-                        else if (scanner_match_string(scanner, "lif"))
+                        else if (scanner_match_string(scanner, "lif", 1))
                             rt = scanner_make_token(scanner, TOKEN_ELIF, 0, 3);
-                        else if (scanner_match_string(scanner, "lse"))
+                        else if (scanner_match_string(scanner, "lse", 1))
                             rt = scanner_make_token(scanner, TOKEN_ELSE, 0, 3);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'n': // nil
-                        if (scanner_match_string(scanner, "il"))
+                        if (scanner_match_string(scanner, "il", 1))
                             rt = scanner_make_token(scanner, TOKEN_NIL, 0, 2);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'f': // false, for, fn
-                        if (scanner_match_string(scanner, "alse"))
+                        if (scanner_match_string(scanner, "alse", 1))
                             rt = scanner_make_token(scanner, TOKEN_FALSE, 0, 4);
-                        else if (scanner_match_string(scanner, "or"))
+                        else if (scanner_match_string(scanner, "or", 1))
                             rt = scanner_make_token(scanner, TOKEN_FOR, 0, 2);
-                        else if (scanner_match_string(scanner, "n"))
+                        else if (scanner_match_string(scanner, "n", 1))
                             rt = scanner_make_token(scanner, TOKEN_FN, 0, 1);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'a': // and
-                        if (scanner_match_string(scanner, "nd"))
+                        if (scanner_match_string(scanner, "nd", 1))
                             rt = scanner_make_token(scanner, TOKEN_AND, 0, 2);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'o': // or
-                        if (scanner_match_string(scanner, "r"))
+                        if (scanner_match_string(scanner, "r", 1))
                             rt = scanner_make_token(scanner, TOKEN_OR, 0, 1);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'd': // do
-                        if (scanner_match_string(scanner, "o"))
+                        if (scanner_match_string(scanner, "o", 1))
                             rt = scanner_make_token(scanner, TOKEN_DO, 0, 1);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'i': // if, in
-                        if (scanner_match_string(scanner, "f"))
+                        if (scanner_match_string(scanner, "f", 1))
                             rt = scanner_make_token(scanner, TOKEN_IF, 0, 1);
-                        else if (scanner_match_string(scanner, "n"))
+                        else if (scanner_match_string(scanner, "n", 1))
                             rt = scanner_make_token(scanner, TOKEN_IN, 0, 1);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'w': // while
-                        if (scanner_match_string(scanner, "hile"))
+                        if (scanner_match_string(scanner, "hile", 1))
                             rt = scanner_make_token(scanner, TOKEN_WHILE, 0, 4);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'b': // break
-                        if (scanner_match_string(scanner, "reak"))
+                        if (scanner_match_string(scanner, "reak", 1))
                             rt = scanner_make_token(scanner, TOKEN_BREAK, 0, 4);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'c': // ctl
-                        if (scanner_match_string(scanner, "tl"))
+                        if (scanner_match_string(scanner, "tl", 1))
                             rt = scanner_make_token(scanner, TOKEN_CTL, 0, 2);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'r': // return
-                        if (scanner_match_string(scanner, "eturn"))
+                        if (scanner_match_string(scanner, "eturn", 1))
                             rt = scanner_make_token(scanner, TOKEN_RETURN, 0, 5);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'm': // match
-                        if (scanner_match_string(scanner, "atch"))
+                        if (scanner_match_string(scanner, "atch", 1))
                             rt = scanner_make_token(scanner, TOKEN_MATCH, 0, 4);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'h': // handle
-                        if (scanner_match_string(scanner, "andle"))
+                        if (scanner_match_string(scanner, "andle", 1))
                             rt = scanner_make_token(scanner, TOKEN_HANDLE, 0, 5);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
 
                     case 'p': // print
-                        if (scanner_match_string(scanner, "rint"))
+                        if (scanner_match_string(scanner, "rint", 1))
                             rt = scanner_make_token(scanner, TOKEN_PRINT, 0, 4);
                         else
                             rt = scanner_scan_identifier(scanner);
@@ -588,19 +588,19 @@ Token scanner_scan_number(Scanner* scanner)
     return token;
 }
 
-bool scanner_match_string(Scanner* scanner, const char* str)
+bool scanner_match_string(Scanner* scanner, const char* str, int32_t already_scanned)
 {
     int32_t len = strlen(str);
     if (len == 0) return false;
 
     for (size_t i = 0; i < strlen(str); ++i)
     {
-        char c = str[0];
+        char c = str[i];
         if (c == scanner_peek(*scanner))
             scanner_consume(scanner);
         else
         {
-            scanner->current = scanner->start;
+            scanner->current = scanner->start + already_scanned;
             return false;
         }
     }

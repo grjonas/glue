@@ -93,7 +93,7 @@ bool is_digit(char c);
 bool is_alpha(char c);
 Token scanner_scan_number(Scanner* scanner);
 
-bool scanner_match_string(Scanner* scanner, const char* str);
+bool scanner_match_string(Scanner* scanner, const char* str, int32_t already_scanned);
 bool is_identifier_middle(char c);
 bool is_identifier_end(char c);
 Token scanner_scan_identifier(Scanner* scanner);
