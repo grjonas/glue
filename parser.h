@@ -49,7 +49,7 @@
 
 typedef enum
 {
-    EXPR_TYPE_UNKNOWN
+    TYPE_UNKNOWN
 }
 ExprType;
 
@@ -88,15 +88,13 @@ typedef enum
 }
 ExprOpType;
 
-//#define IS_EXPR_OP(e) ( IS_ATOM(e) || IS_OPERATOR(e) )
-
 typedef struct
 {
     ExprOpType  op_type ;
     int32_t     args    ;
     ExprType    type    ;
-    const char* literal ; // for function or variable names
-    int32_t literal_size;
+
+    const char* literal ;
     int32_t line;
     int32_t column;
     int32_t length;
@@ -105,30 +103,25 @@ ExprOp;
 
 typedef struct
 {
+    const char* txt;
+    Token* tokens;
+
     int32_t start;
     int32_t end;
     int32_t current;
-    //Stmt*   stmts;
-}
-ParserInfo;
-
-typedef struct
-{
-    const char* txt;
-    Token* tokens;
-    ParserInfo info;
 }
 Parser;
 
 Parser init_parser(Scanner scanner);
 Parser free_parser(Scanner scanner);
 
-//Parser parser_parse_let(Parser parser);
+Token parser_peek(Parser* parser);
+Token parser_next(Parser* parser);
 
-ExprOp* parser_parse_expr(Parser parser);
-ExprOp* parser_parse_expr_inner(Parser parser, int8_t minimum_binding_power);
+ExprOp* parser_parse_expr(Parser* parser);
+//ExprOp* parser_parse_expr_inner(Parser parser, int8_t minimum_binding_power);
 
-void infix_binding_power(ExprOpType op, int8_t* left, int8_t* right);
-void prefix_binding_power(ExprOp op, int8_t* right);
+//void infix_binding_power(ExprOpType op, int8_t* left, int8_t* right);
+//void prefix_binding_power(ExprOp op, int8_t* right);
 
 #endif
