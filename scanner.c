@@ -14,6 +14,7 @@ const char* token_type_name(TokenType type)
         case TOKEN_MINUS:         return "TOKEN_MINUS";
         case TOKEN_PLUS:          return "TOKEN_PLUS";
         case TOKEN_STAR:          return "TOKEN_STAR";
+        case TOKEN_PERCENT:       return "TOKEN_PERCENT";
         case TOKEN_PIPE:          return "TOKEN_PIPE";
         case TOKEN_COMMA:         return "TOKEN_COMMA";
         case TOKEN_SEMICOLON:     return "TOKEN_SEMICOLON";
@@ -49,6 +50,7 @@ const char* token_type_name(TokenType type)
         case TOKEN_NIL:           return "TOKEN_NIL";
         case TOKEN_TRUE:          return "TOKEN_TRUE";
         case TOKEN_FALSE:         return "TOKEN_FALSE";
+        case TOKEN_NOT:           return "TOKEN_NOT";
         case TOKEN_AND:           return "TOKEN_AND";
         case TOKEN_OR:            return "TOKEN_OR";
         case TOKEN_DO:            return "TOKEN_DO";
@@ -61,6 +63,7 @@ const char* token_type_name(TokenType type)
         case TOKEN_IN:            return "TOKEN_IN";
         case TOKEN_BREAK:         return "TOKEN_BREAK";
         case TOKEN_LOOP:          return "TOKEN_LOOP";
+        case TOKEN_CONTINUE:      return "TOKEN_CONTINUE";
         case TOKEN_CTL:           return "TOKEN_CTL";
         case TOKEN_FN:            return "TOKEN_FN";
         case TOKEN_RETURN:        return "TOKEN_RETURN";
@@ -106,7 +109,7 @@ char* read_file(const char* filename)
     }
     memset(file_contents, 0, file_size + 1);
 
-    size_t read_bytes = fread(file_contents,  sizeof(char),  file_size,  file);
+    fread(file_contents,  sizeof(char),  file_size,  file);
 
     fclose(file);
     return file_contents;
@@ -188,7 +191,6 @@ Token scanner_scan_token(Scanner* scanner)
 
 #define increment_column(col) scanner->column+=(col)
     Token rt;     // return_token
-    TokenType tt; // token_type
     char c = scanner_consume(scanner);
     switch (c)
     {
@@ -208,6 +210,7 @@ Token scanner_scan_token(Scanner* scanner)
         case '-': return scanner_make_token(scanner, TOKEN_MINUS       , 0, 1);
         case '+': return scanner_make_token(scanner, TOKEN_PLUS        , 0, 1);
         case '*': return scanner_make_token(scanner, TOKEN_STAR        , 0, 1);
+        case '%': return scanner_make_token(scanner, TOKEN_PERCENT     , 0, 1);
         case '|': return scanner_make_token(scanner, TOKEN_PIPE        , 0, 1);
         case ',': return scanner_make_token(scanner, TOKEN_COMMA       , 0, 1);
         case ';': return scanner_make_token(scanner, TOKEN_SEMICOLON   , 0, 1);
@@ -290,6 +293,8 @@ Token scanner_scan_token(Scanner* scanner)
                     case 'n': // nil
                         if (scanner_match_string(scanner, "il", 1))
                             rt = scanner_make_token(scanner, TOKEN_NIL, 0, 2);
+                        else if (scanner_match_string(scanner, "ot", 1))
+                            rt = scanner_make_token(scanner, TOKEN_NOT, 0, 2);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
@@ -349,9 +354,11 @@ Token scanner_scan_token(Scanner* scanner)
                             rt = scanner_scan_identifier(scanner);
                         break;
 
-                    case 'c': // ctl
+                    case 'c': // ctl, continue
                         if (scanner_match_string(scanner, "tl", 1))
                             rt = scanner_make_token(scanner, TOKEN_CTL, 0, 2);
+                        else if (scanner_match_string(scanner, "ontinue", 1))
+                            rt = scanner_make_token(scanner, TOKEN_CONTINUE, 0, 7);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
@@ -633,7 +640,6 @@ Token scanner_scan_identifier(Scanner* scanner)
         .column = scanner->column,
         .length = 0
     };
-    char c;
 
     // Perfectly valid identifier name.
     //_------1212121212-?

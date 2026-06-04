@@ -32,4 +32,6 @@ do
     end
     | ctl throw(msg); print(msg)
     end
+
+    loop continue
 end
