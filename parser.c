@@ -39,19 +39,22 @@ Token parser_next(Parser* parser)
     return token;
 }
 
-// LHS_OP_TYPE_ATOM,
-// LHS_OP_TYPE_PREFIX,
-// LHS_OP_TYPE_PARENS
-#define MAKE_OP_FROM_TOKEN(token, oper_type, expr_type) (ExprOp){\
+ExprOp* parser_parse_expr(Parser* parser)
+{
+    return parser_parse_expr_inner(parser, 0);
+}
+
+#define MAKE_OP_FROM_TOKEN(token, oper_type, argsn, expr_type) (ExprOp){\
         .op_type = (oper_type),\
         .type = (expr_type),\
+        .args = (argsn),\
         .literal = (token).start,\
         .line = (token).line,\
         .column = (token).column,\
         .length = (token).length\
     } 
 // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
+ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
 {
     ExprOp* expr = NULL;
     Token token;
@@ -66,11 +69,15 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
     LhsOpType lot;
     switch (token.type)
     {
-        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER , TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
-        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
-        case TOKEN_MINUS     : op  = MAKE_OP_FROM_TOKEN(token, OP_NEG    , TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
+        // Atoms
+        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER    , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER   , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        case TOKEN_STRING    : lhs = MAKE_OP_FROM_TOKEN(token, OP_STRING    , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        case TOKEN_IDENTIFIER: lhs = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        // Ops
+        case TOKEN_MINUS     : op  = MAKE_OP_FROM_TOKEN(token, OP_NEG    , 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
+        // Special
         case TOKEN_LEFT_PAREN: lot = LHS_OP_TYPE_PARENS; break;
-        //case TOKEN_IDENTIFIER: expr = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); break;
         default:
             fprintf(stderr, "Parser line %d: Could not find atomic expression.\n", __LINE__);
             exit(1);
@@ -83,7 +90,7 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
 
         case LHS_OP_TYPE_PREFIX:
             prefix_binding_power(op.op_type, &right_binding_power);
-            rhs = parser_parse_expr(parser, right_binding_power);
+            rhs = parser_parse_expr_inner(parser, right_binding_power);
 
             arrput(expr, op);
             rhs_len = arrlen(rhs);
@@ -101,7 +108,7 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
                 fprintf(stderr, "Parser line %d: Nothing found in parentheses.\n", __LINE__);
                 exit(1);
             }
-            rhs = parser_parse_expr(parser, 0);
+            rhs = parser_parse_expr_inner(parser, 0);
 
             rhs_len = arrlen(rhs);
             for (size_t i = 0; i < rhs_len; ++i)
@@ -123,14 +130,84 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
         token = parser_peek(parser);
         switch (token.type)
         {
-            case TOKEN_PLUS : op = MAKE_OP_FROM_TOKEN(token, OP_ADD, TYPE_UNKNOWN); break;
-            case TOKEN_STAR : op = MAKE_OP_FROM_TOKEN(token, OP_MUL, TYPE_UNKNOWN); break;
+            case TOKEN_PLUS       : op = MAKE_OP_FROM_TOKEN(token, OP_ADD   , 2, TYPE_UNKNOWN); break;
+            case TOKEN_STAR       : op = MAKE_OP_FROM_TOKEN(token, OP_MUL   , 2, TYPE_UNKNOWN); break;
+            case TOKEN_LEFT_SQUARE: op = MAKE_OP_FROM_TOKEN(token, OP_INDEX , 2, TYPE_UNKNOWN); break;
+            case TOKEN_LEFT_PAREN : op = MAKE_OP_FROM_TOKEN(token, OP_CALL  , 1, TYPE_UNKNOWN); break;
             default:
                 should_break_loop = true;
         }
         if (should_break_loop) break;
 
         // Postfix
+        if (postfix_binding_power(op.op_type, &left_binding_power))
+        {
+            if (left_binding_power < min_binding_power)
+                break;
+            parser_next(parser); // We probably want to do this now.
+
+            if (op.op_type == OP_INDEX)
+            {
+                token = parser_peek(parser);
+                if (token.type == TOKEN_RIGHT_SQUARE)
+                {
+                    fprintf(stderr, "Parser line %d: Nothing found in square braces.\n", __LINE__);
+                    exit(1);
+                }
+                rhs = parser_parse_expr_inner(parser, 0);
+                parser_next(parser); // Skip second bracket
+
+                arrins(expr, 0, op);
+                rhs_len = arrlen(rhs);
+                for (size_t i = 0; i < rhs_len; ++i)
+                {
+                    arrput(expr, rhs[i]);
+                }
+                arrfree(rhs);
+            }
+            else if (op.op_type == OP_CALL)
+            {
+                token = parser_peek(parser);
+                if (token.type != TOKEN_RIGHT_PAREN)
+                {
+                    do
+                    {
+                        rhs = parser_parse_expr_inner(parser, 0);
+
+                        rhs_len = arrlen(rhs);
+                        for (size_t i = 0; i < rhs_len; ++i)
+                        {
+                            arrput(expr, rhs[i]);
+                        }
+                        arrfree(rhs);
+
+                        op.args++;
+
+                        token = parser_next(parser); // Skip second bracket
+
+                        if (token.type == TOKEN_RIGHT_PAREN)
+                            break;
+                        else if (token.type == TOKEN_COMMA)
+                            continue;
+                        else
+                        {
+                            fprintf(stderr, "Parser line %d: Function arguments have to be seperated by commas.\n", __LINE__);
+                            exit(1);
+                        }
+                    }
+                    while(true);
+                }
+                arrins(expr, 0, op);
+            }
+            else
+            {
+                arrins(expr, 0, op);
+                //fprintf(stderr, "Parser line %d: Postfix parsing not implemented.\n", __LINE__);
+                //exit(1);
+            }
+
+            continue;
+        }
 
         // Infix
         if (infix_binding_power(op.op_type, &left_binding_power, &right_binding_power))
@@ -139,7 +216,7 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
                 break;
 
             parser_next(parser);
-            rhs = parser_parse_expr(parser, right_binding_power);
+            rhs = parser_parse_expr_inner(parser, right_binding_power);
             
             arrins(expr, 0, op);
             rhs_len = arrlen(rhs);
@@ -168,6 +245,18 @@ void prefix_binding_power(ExprOpType op_type, int8_t* right)
     }
 }
 
+bool postfix_binding_power(ExprOpType op_type, int8_t* left)
+{
+    switch (op_type)
+    {
+        case OP_INDEX : *left = 7; break;
+        case OP_CALL  : *left = 7; break;
+        default:
+            return false;
+    }
+    return true;
+}
+
 bool infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right)
 {
     switch (op_type)
@@ -182,8 +271,8 @@ bool infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right)
     return true;
 }
 
-//    return parser_parse_expr_inner(parser);
-//ExprOp* parser_parse_expr_inner(parser)
+//    return parser_parse_expr_inner_inner(parser);
+//ExprOp* parser_parse_expr_inner_inner(parser)
 //{
 //}
 

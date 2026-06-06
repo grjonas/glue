@@ -93,6 +93,7 @@ typedef struct
 {
     ExprOpType  op_type ;
     ExprType    type    ;
+    int32_t     args    ;
 
     const char* literal ;
     int32_t line;
@@ -126,9 +127,11 @@ typedef enum
 }
 LhsOpType;
 
-ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power);
+ExprOp* parser_parse_expr(Parser* parser);
+ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power);
 
-void   prefix_binding_power(ExprOpType op_type, int8_t* right);
+void prefix_binding_power(ExprOpType op_type, int8_t* right);
+bool postfix_binding_power(ExprOpType op_type, int8_t* left);
 bool infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right);
 //ExprOp* parser_parse_expr_inner(Parser parser, int8_t minimum_binding_power);
 

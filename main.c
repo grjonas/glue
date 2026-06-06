@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     }
 
     Parser parser = init_parser(scanner);
-    ExprOp* eo = parser_parse_expr(&parser, 0);
+    ExprOp* eo = parser_parse_expr(&parser);
     int32_t eolen = arrlen(eo);
 
     for (int32_t i = 0; i < eolen; ++i)
