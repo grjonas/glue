@@ -91,7 +91,6 @@ ExprOpType;
 typedef struct
 {
     ExprOpType  op_type ;
-    int32_t     args    ;
     ExprType    type    ;
 
     const char* literal ;
@@ -118,7 +117,8 @@ Parser free_parser(Scanner scanner);
 Token parser_peek(Parser* parser);
 Token parser_next(Parser* parser);
 
-ExprOp* parser_parse_expr(Parser* parser);
+ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power);
+void infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right);
 //ExprOp* parser_parse_expr_inner(Parser parser, int8_t minimum_binding_power);
 
 //void infix_binding_power(ExprOpType op, int8_t* left, int8_t* right);
