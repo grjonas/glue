@@ -63,11 +63,12 @@ typedef enum
     OP_TRUE,
     OP_FALSE,
     OP_NIL,
-    // Unary
+    // Prefix
     OP_NEG, // unary '-'
     OP_NOT,
+    // Postfix
     OP_INDEX,
-    // Binary
+    // Infix
     OP_ADD,
     OP_SUB,
     OP_MUL,
@@ -117,8 +118,18 @@ Parser free_parser(Scanner scanner);
 Token parser_peek(Parser* parser);
 Token parser_next(Parser* parser);
 
+typedef enum
+{
+    LHS_OP_TYPE_ATOM  ,
+    LHS_OP_TYPE_PREFIX,
+    LHS_OP_TYPE_PARENS,
+}
+LhsOpType;
+
 ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power);
-void infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right);
+
+void   prefix_binding_power(ExprOpType op_type, int8_t* right);
+bool infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right);
 //ExprOp* parser_parse_expr_inner(Parser parser, int8_t minimum_binding_power);
 
 //void infix_binding_power(ExprOpType op, int8_t* left, int8_t* right);

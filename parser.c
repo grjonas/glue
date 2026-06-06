@@ -39,6 +39,9 @@ Token parser_next(Parser* parser)
     return token;
 }
 
+// LHS_OP_TYPE_ATOM,
+// LHS_OP_TYPE_PREFIX,
+// LHS_OP_TYPE_PARENS
 #define MAKE_OP_FROM_TOKEN(token, oper_type, expr_type) (ExprOp){\
         .op_type = (oper_type),\
         .type = (expr_type),\
@@ -47,6 +50,7 @@ Token parser_next(Parser* parser)
         .column = (token).column,\
         .length = (token).length\
     } 
+// https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
 ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
 {
     ExprOp* expr = NULL;
@@ -54,21 +58,63 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
 
     ExprOp  lhs;
     ExprOp  op ;
-    ExprOp* rhs;
+    ExprOp* rhs; size_t rhs_len;
     int8_t left_binding_power, right_binding_power;
 
     // Parse first literal
     token = parser_next(parser);
+    LhsOpType lot;
     switch (token.type)
     {
-        case TOKEN_NUMBER : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER , TYPE_UNKNOWN); break;
-        case TOKEN_INTEGER: lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER, TYPE_UNKNOWN); break;
+        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER , TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        case TOKEN_MINUS     : op  = MAKE_OP_FROM_TOKEN(token, OP_NEG    , TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
+        case TOKEN_LEFT_PAREN: lot = LHS_OP_TYPE_PARENS; break;
         //case TOKEN_IDENTIFIER: expr = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); break;
         default:
             fprintf(stderr, "Parser line %d: Could not find atomic expression.\n", __LINE__);
             exit(1);
     }
-    arrput(expr, lhs);
+    switch (lot)
+    {
+        case LHS_OP_TYPE_ATOM:
+            arrput(expr, lhs);
+            break;
+
+        case LHS_OP_TYPE_PREFIX:
+            prefix_binding_power(op.op_type, &right_binding_power);
+            rhs = parser_parse_expr(parser, right_binding_power);
+
+            arrput(expr, op);
+            rhs_len = arrlen(rhs);
+            for (size_t i = 0; i < rhs_len; ++i)
+            {
+                arrput(expr, rhs[i]);
+            }
+            arrfree(rhs);
+            break;
+
+        case LHS_OP_TYPE_PARENS:
+            token = parser_peek(parser);
+            if (token.type == TOKEN_RIGHT_PAREN)
+            {
+                fprintf(stderr, "Parser line %d: Nothing found in parentheses.\n", __LINE__);
+                exit(1);
+            }
+            rhs = parser_parse_expr(parser, 0);
+
+            rhs_len = arrlen(rhs);
+            for (size_t i = 0; i < rhs_len; ++i)
+            {
+                arrput(expr, rhs[i]);
+            }
+            arrfree(rhs);
+            parser_next(parser);
+            break;
+        default:
+            fprintf(stderr, "Parser line %d: Unknown LhsOpType value.\n", __LINE__);
+            exit(1);
+    }
     
     while (true)
     {
@@ -84,35 +130,56 @@ ExprOp* parser_parse_expr(Parser* parser, int8_t min_binding_power)
         }
         if (should_break_loop) break;
 
-        infix_binding_power(op.op_type, &left_binding_power, &right_binding_power);
-        if (left_binding_power < min_binding_power)
-            break;
+        // Postfix
 
-        parser_next(parser);
-        rhs = parser_parse_expr(parser, right_binding_power);
-        
-        arrins(expr, 0, op);
-        size_t rhs_len = arrlen(rhs);
-        for (size_t i = 0; i < rhs_len; ++i)
+        // Infix
+        if (infix_binding_power(op.op_type, &left_binding_power, &right_binding_power))
         {
-            arrput(expr, rhs[i]);
+            if (left_binding_power < min_binding_power)
+                break;
+
+            parser_next(parser);
+            rhs = parser_parse_expr(parser, right_binding_power);
+            
+            arrins(expr, 0, op);
+            rhs_len = arrlen(rhs);
+            for (size_t i = 0; i < rhs_len; ++i)
+            {
+                arrput(expr, rhs[i]);
+            }
+            arrfree(rhs);
+            continue;
         }
-        arrfree(rhs);
+
+        break;
     }
 
     return expr;
 }
 
-void infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right)
+void prefix_binding_power(ExprOpType op_type, int8_t* right)
+{
+    switch (op_type)
+    {
+        case OP_NEG : *right = 5; break;
+        default:
+            fprintf(stderr, "Parser line %d: Operator is not prefix.\n", __LINE__);
+            exit(1);
+    }
+}
+
+bool infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right)
 {
     switch (op_type)
     {
         case OP_ADD : *left = 1; *right = 2; break;
         case OP_MUL : *left = 3; *right = 4; break;
         default:
-            fprintf(stderr, "Parser line %d: Operator is not infix.\n", __LINE__);
-            exit(1);
+            return false;
+            //fprintf(stderr, "Parser line %d: Operator is not infix.\n", __LINE__);
+            //exit(1);
     }
+    return true;
 }
 
 //    return parser_parse_expr_inner(parser);
