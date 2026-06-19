@@ -76,7 +76,7 @@ void arena_alloc_and_set_size(Arena* arena, size_t new_size)
 }
 
 // returns new offset
-size_t push_arena(Arena* arena, size_t obj_size, void* obj)
+size_t push_arena(Arena* arena, size_t obj_size, const void* obj)
 {
     size_t new_size   = arena->size + obj_size;
     size_t old_offset = arena->size;

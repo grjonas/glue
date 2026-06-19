@@ -9,6 +9,8 @@ PTR_TO_STR
 TYPE
 PTR_TO_EXPR
 */
+#define ARENA_NULL 0
+#define arrfree_and_set_null(op) do { arrfree(op); op = NULL; } while(0)
 
 typedef enum
 {
@@ -149,6 +151,15 @@ typedef enum
 }
 LhsOpType;
 
+void stmt_append_header(Stmt* stmt, StmtType type, int32_t depth, int32_t line, int32_t column, int32_t length);
+Stmt* parser_parse_stmts(Parser* parser, int32_t depth);
+Stmt* parser_parse_stmt(Parser* parser, int32_t depth);
+bool parser_skip(Parser* parser, bool (*predicate)(TokenType));
+bool is_newline(TokenType type);
+size_t parser_parse_identifier(Parser* parser);
+size_t parser_parse_type(Parser* parser);
+Stmt* parser_parse_block(Parser* parser, int32_t depth);
+
 size_t parser_parse_expr(Parser* parser);
 ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power);
 
@@ -156,11 +167,12 @@ void prefix_binding_power(ExprOpType op_type, int8_t* right);
 bool postfix_binding_power(ExprOpType op_type, int8_t* left);
 bool infix_binding_power(ExprOpType op_type, int8_t* left, int8_t* right);
 
-void append_rhs_to_expr(ExprOp* expr, ExprOp* rhs);
+void append_rhs_to_expr(ExprOp** expr, ExprOp** rhs);
 
 //ExprOp* parser_parse_expr_inner(Parser parser, int8_t minimum_binding_power);
 
 //void infix_binding_power(ExprOpType op, int8_t* left, int8_t* right);
 //void prefix_binding_power(ExprOp op, int8_t* right);
+void print_expr_op(ExprOp* op);
 
 #endif

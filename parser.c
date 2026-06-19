@@ -73,27 +73,26 @@ void stmt_append_header(Stmt* stmt, StmtType type, int32_t depth, int32_t line, 
 {
     Stmt node;
     node = (Stmt){ .header = { .type = type, .depth = depth }};
-    arrput(curr_stmt, node);
+    arrput(stmt, node);
     node = (Stmt){ .position = { .line = line, .column = column }};
-    arrput(curr_stmt, node);
+    arrput(stmt, node);
     node = (Stmt){ .length = length };
-    arrput(curr_stmt, node);
+    arrput(stmt, node);
 }
 
 Stmt* parser_parse_stmts(Parser* parser, int32_t depth)
 {
     Stmt* curr_stmt = NULL;
     Stmt* recv_stmt = NULL;
-    parser_parse_stmt(parser, depth);
 
     while (true)
     {
-        recv_stmt = parser_parse_block(parser, depth + 1);
+        recv_stmt = parser_parse_stmt(parser, depth + 1);
         if (recv_stmt == NULL)
             break;
 
         append_list_to_list(curr_stmt, recv_stmt);
-        free(recv_stmt);
+        arrfree_and_set_null(recv_stmt);
     }
 
     return curr_stmt;
@@ -104,7 +103,15 @@ Stmt* parser_parse_stmt(Parser* parser, int32_t depth)
     Token tok;
     Stmt* curr_stmt = NULL;
     Stmt* recv_stmt = NULL;
-    Stmt  node;
+
+    Stmt  str_node;
+    Stmt type_node;
+    Stmt expr_node;
+    Stmt  err_node;
+
+    size_t type_ptr;
+    size_t expr_ptr;
+    size_t  str_ptr;
 
     parser_skip(parser, is_newline);
 
@@ -112,25 +119,62 @@ Stmt* parser_parse_stmt(Parser* parser, int32_t depth)
     switch (tok.type)
     {
         case TOKEN_LET:
-            parser_next(parser);
-            size_t str_ptr  = parser_parse_identifier(parser);
 
-            if (parser_peek(parser).type == TOKEN_EQUAL)
+            parser_next(parser);
+            str_ptr = parser_parse_identifier(parser);
+
+            if (parser_peek(parser).type == TOKEN_COLON)
             {
                 parser_next(parser);
-                size_t expr_ptr = parser_parse_expr(parser);
+                type_ptr = parser_parse_type(parser);
 
-                stmt_append_header(curr_stmt, STMT_LET_EXPR, depth, tok.line, tok.column, 0);
+                if (parser_peek(parser).type == TOKEN_EQUAL)
+                {
+                    parser_next(parser);
+                    expr_ptr = parser_parse_expr(parser);
+
+                    stmt_append_header(curr_stmt, STMT_LET_TYPE_AND_EXPR, depth, tok.line, tok.column, 0);
+                     str_node = (Stmt){ .arena_ptr =  str_ptr };
+                    type_node = (Stmt){ .arena_ptr = type_ptr };
+                    expr_node = (Stmt){ .arena_ptr = expr_ptr };
+                    arrput(curr_stmt,  str_node);
+                    arrput(curr_stmt, type_node);
+                    arrput(curr_stmt, expr_node);
+                }
+                else
+                {
+                    stmt_append_header(curr_stmt, STMT_LET_TYPE, depth, tok.line, tok.column, 0);
+                     str_node = (Stmt){ .arena_ptr =  str_ptr };
+                    type_node = (Stmt){ .arena_ptr = type_ptr };
+                    arrput(curr_stmt,  str_node);
+                    arrput(curr_stmt, type_node);
+                }
             }
             else
             {
-                stmt_append_header(curr_stmt, STMT_LET_BARE, depth, tok.line, tok.column, 0);
-            }
+                if (parser_peek(parser).type == TOKEN_EQUAL)
+                {
+                    parser_next(parser);
+                    expr_ptr = parser_parse_expr(parser);
 
-            break;
+                    stmt_append_header(curr_stmt, STMT_LET_EXPR, depth, tok.line, tok.column, 0);
+                     str_node = (Stmt){ .arena_ptr =  str_ptr };
+                    expr_node = (Stmt){ .arena_ptr = expr_ptr };
+                    arrput(curr_stmt,  str_node);
+                    arrput(curr_stmt, expr_node);
+                }
+                else
+                {
+                    stmt_append_header(curr_stmt, STMT_LET_BARE, depth, tok.line, tok.column, 0);
+                     str_node = (Stmt){ .arena_ptr =  str_ptr };
+                    arrput(curr_stmt,  str_node);
+                }
+            }
+            return curr_stmt;
+
         case TOKEN_IF:
             parser_next(parser);
-            size_t expr_ptr = parser_parse_expr(parser);
+            expr_ptr = parser_parse_expr(parser);
             
             stmt_append_header(curr_stmt, STMT_IF, depth, tok.line, tok.column, 0);
 
@@ -140,23 +184,31 @@ Stmt* parser_parse_stmt(Parser* parser, int32_t depth)
                 parser_skip(parser, is_newline);
                 recv_stmt = parser_parse_stmt(parser, depth + 1);
                 append_list_to_list(curr_stmt, recv_stmt);
-                free(recv_stmt);
+                arrfree(recv_stmt);
             }
             else if (tok.type == TOKEN_DO)
             {
                 recv_stmt = parser_parse_block(parser, depth + 1);
-                append_list_to_list(curr_stmt, recv_stmt);
-                free(recv_stmt);
+                if (recv_stmt == NULL)
+                {
+                    err_node = (Stmt){ .header = { .type = STMT_EMPTY, .depth = depth + 1}};
+                    arrput(curr_stmt, err_node);
+                }
+                else
+                {
+                    append_list_to_list(curr_stmt, recv_stmt);
+                    arrfree(recv_stmt);
+                }
             }
             else
             {
                 stmt_append_header(curr_stmt, STMT_ERR, depth, tok.line, tok.column, 0);
             }
 
-            break;
+            return curr_stmt;
         case TOKEN_WHILE:
             parser_next(parser);
-            size_t expr_ptr = parser_parse_expr(parser);
+            expr_ptr = parser_parse_expr(parser);
             
             stmt_append_header(curr_stmt, STMT_WHILE, depth, tok.line, tok.column, 0);
 
@@ -166,22 +218,35 @@ Stmt* parser_parse_stmt(Parser* parser, int32_t depth)
                 parser_skip(parser, is_newline);
                 recv_stmt = parser_parse_stmt(parser, depth + 1);
                 append_list_to_list(curr_stmt, recv_stmt);
-                free(recv_stmt);
+                arrfree(recv_stmt);
             }
             else if (tok.type == TOKEN_DO)
             {
                 recv_stmt = parser_parse_block(parser, depth + 1);
-                append_list_to_list(curr_stmt, recv_stmt);
-                free(recv_stmt);
+                if (recv_stmt == NULL)
+                {
+                    err_node = (Stmt){ .header = { .type = STMT_EMPTY, .depth = depth + 1}};
+                    arrput(curr_stmt, err_node);
+                }
+                else
+                {
+                    append_list_to_list(curr_stmt, recv_stmt);
+                    arrfree(recv_stmt);
+                }
             }
             else
             {
                 stmt_append_header(curr_stmt, STMT_ERR, depth, tok.line, tok.column, 0);
             }
 
-            break;
+            return curr_stmt;
+
         case TOKEN_DO:
-            parser_parse_block(parser, depth + 1);
+            //perror("Parser line %d: Not implemented yet.\n");
+            //exit(1);
+            recv_stmt = parser_parse_block(parser, depth + 1);
+            return recv_stmt;
+
         case TOKEN_ERROR:
             return NULL;
         default:
@@ -190,12 +255,12 @@ Stmt* parser_parse_stmt(Parser* parser, int32_t depth)
     }
 }
 
-size_t parser_add_string(Parser* parser)
+size_t parser_parse_identifier(Parser* parser)
 {
-    Token tok = parse_next(parser);
-    if (tok.type != TOKEN_IDENTIFIER)
+    Token token = parser_next(parser);
+    if (token.type != TOKEN_IDENTIFIER)
     {
-        perror("Parser line %d: The next token is not an identifier.\n")
+        perror("Parser line %d: The next token is not an identifier.\n");
         exit(1);
     }
     char zero = '\0';
@@ -204,16 +269,18 @@ size_t parser_add_string(Parser* parser)
     return ptr;
 }
 
-//void parser_parse_block(Parser* parser, int32_t depth)
-//{
-//}
+Stmt* parser_parse_block(Parser* parser, int32_t depth)
+{
+    perror("Parser line %d: Not implemented yet.\n");
+    exit(1);
+}
 
 size_t parser_parse_expr(Parser* parser)
 {
     ExprOp* expr  = parser_parse_expr_inner(parser, 0);
     size_t length = arrlen(expr) * sizeof(ExprOp);
     size_t ptr    = push_arena(&(parser->arena), length, expr);
-    arrfree(expr);
+    arrfree_and_set_null(expr);
     return ptr;
 }
 
@@ -234,7 +301,7 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
 
     ExprOp  lhs;
     ExprOp  op ;
-    ExprOp* rhs;
+    ExprOp* rhs = NULL;
     int8_t left_binding_power, right_binding_power;
 
     // Parse first literal
@@ -273,8 +340,8 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
             rhs = parser_parse_expr_inner(parser, right_binding_power);
 
             arrput(expr, op);
-            append_rhs_to_expr(expr, rhs);
-            arrfree(rhs);
+            append_rhs_to_expr(&expr, &rhs);
+            arrfree_and_set_null(rhs);
             break;
 
         case LHS_OP_TYPE_PARENS:
@@ -286,8 +353,8 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
             }
             rhs = parser_parse_expr_inner(parser, 0);
 
-            append_rhs_to_expr(expr, rhs);
-            arrfree(rhs);
+            append_rhs_to_expr(&expr, &rhs);
+            arrfree_and_set_null(rhs);
             parser_next(parser);
             break;
         default:
@@ -347,11 +414,16 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
                     exit(1);
                 }
                 rhs = parser_parse_expr_inner(parser, 0);
-                parser_next(parser); // Skip second bracket
+                token = parser_next(parser); // Skip second bracket
+                if (token.type == TOKEN_RIGHT_SQUARE)
+                {
+                    fprintf(stderr, "Parser line %d: Expected right square brace.\n", __LINE__);
+                    exit(1);
+                }
 
                 arrins(expr, 0, op);
-                append_rhs_to_expr(expr, rhs);
-                arrfree(rhs);
+                append_rhs_to_expr(&expr, &rhs);
+                arrfree_and_set_null(rhs);
             }
             else if (op.op_type == OP_CALL)
             {
@@ -362,8 +434,8 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
                     {
                         rhs = parser_parse_expr_inner(parser, 0);
 
-                        append_rhs_to_expr(expr, rhs);
-                        arrfree(rhs);
+                        append_rhs_to_expr(&expr, &rhs);
+                        arrfree_and_set_null(rhs);
 
                         op.args++;
 
@@ -403,16 +475,17 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int8_t min_binding_power)
             rhs = parser_parse_expr_inner(parser, right_binding_power);
             
             arrins(expr, 0, op);
-            append_rhs_to_expr(expr, rhs);
-             
-            arrfree(rhs);
+            append_rhs_to_expr(&expr, &rhs);
+            arrfree_and_set_null(rhs);
             continue;
         }
 
         break;
     }
 
+    // print_expr_op(expr);
     return expr;
+
 }
 #undef MAKE_OP_FROM_TOKEN
 
@@ -520,12 +593,82 @@ bool infix_binding_power(
     return true;
 }
 
-void append_rhs_to_expr(ExprOp* expr, ExprOp* rhs)
+void append_rhs_to_expr(ExprOp** expr, ExprOp** rhs)
 {
-    size_t rhs_len = arrlen(rhs);
-    for (size_t i = 0; i < rhs_len; ++i)
+    int rhs_len = arrlen(*rhs);
+    for (int i = 0; i < rhs_len; ++i)
     {
-        arrput(expr, rhs[i]);
+        ExprOp r = *rhs[i];
+        arrput(*expr, r);
     }
 }
 
+// TODO: Implement later
+size_t parser_parse_type(Parser* parser)
+{
+    return ARENA_NULL;
+}
+
+const char* show_op_type(ExprOpType op)
+{
+    switch (op)
+    {
+        case OP_STRING: return "OP_STRING";
+        case OP_IDENTIFIER: return "OP_IDENTIFIER";
+        case OP_INTEGER: return "OP_INTEGER";
+        case OP_NUMBER: return "OP_NUMBER";
+        case OP_TRUE: return "OP_TRUE";
+        case OP_FALSE: return "OP_FALSE";
+        case OP_NIL: return "OP_NIL";
+        case OP_PRINT: return "OP_PRINT";
+        case OP_NEG: return "OP_NEG";
+        case OP_NOT: return "OP_NOT";
+        case OP_PRE_INC: return "OP_PRE_INC";
+        case OP_PRE_DEC: return "OP_PRE_DEC";
+        case OP_INDEX: return "OP_INDEX";
+        case OP_POST_INC: return "OP_POST_INC";
+        case OP_POST_DEC: return "OP_POST_DEC";
+        case OP_ADD: return "OP_ADD";
+        case OP_SUB: return "OP_SUB";
+        case OP_MUL: return "OP_MUL";
+        case OP_DIV: return "OP_DIV";
+        case OP_MOD: return "OP_MOD";
+        case OP_AND: return "OP_AND";
+        case OP_OR: return "OP_OR"; 
+        case OP_GREATER: return "OP_GREATER";
+        case OP_LESS: return "OP_LESS";
+        case OP_GREATER_EQUAL: return "OP_GREATER_EQUAL";
+        case OP_LESS_EQUAL: return "OP_LESS_EQUAL";
+        case OP_EQUAL: return "OP_EQUAL";
+        case OP_NOT_EQUAL: return "OP_NOT_EQUAL";
+        case OP_ACCESS: return "OP_ACCESS";
+        case OP_CHAIN: return "OP_CHAIN";
+        case OP_ASSIGN: return "OP_ASSIGN";
+        case OP_ASSIGN_ADD: return "OP_ASSIGN_ADD";
+        case OP_ASSIGN_SUB: return "OP_ASSIGN_SUB";
+        case OP_ASSIGN_MUL: return "OP_ASSIGN_MUL";
+        case OP_ASSIGN_MOD: return "OP_ASSIGN_MOD";
+        case OP_CALL: return "OP_CALL";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+void print_expr_op(ExprOp* op)
+{
+    int len = arrlen(op);
+    printf("Expr (len = %d):\n", len);
+    for (int i = 0; i < len; ++i)
+    {
+        ExprOp e = op[i];
+        const char* type = show_op_type(e.op_type); 
+        printf(
+            "[%d:%d:%d]: '%.*s'\n",
+            e.line   ,
+            e.column ,
+            e.length ,
+            e.length ,
+            e.literal
+        );
+    }
+}

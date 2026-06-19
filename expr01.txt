@@ -1,1 +1,1 @@
-pritt(to_uppercase("Hello, World!") + newline)
+a = pritt(to_uppercase("Hello, World!") + new)
