@@ -94,15 +94,17 @@ bool is_newline(TokenType type)
 }
 
 // Stmt
+// TODO: Implement length calculations when parsing.
 Stmt* parser_parse_stmt(Parser* parser)
 {
     Token token     ;
     Stmt  outer_stmt;
 
-    Stmt     * stmt      ;
-    StmtLet  * stmt_let  ;
-    StmtIf   * stmt_if   ;
-    StmtWhile* stmt_while;
+    Stmt     * stmt       = NULL;
+    StmtLet  * stmt_let   = NULL;
+    StmtIf   * stmt_if    = NULL;
+    StmtWhile* stmt_while = NULL;
+    StmtBlock* stmt_block = NULL;
 
     parser_skip(parser, is_newline);
     token = parser_peek(parser);
@@ -183,11 +185,36 @@ Stmt* parser_parse_stmt(Parser* parser)
             }
             return stmt;
 
-        // case TOKEN_DO:
-            // parser_parse_block(parser);
+        case TOKEN_ERROR:
+            return NULL;
+
+        case TOKEN_DO:
+            outer_stmt  = (Stmt)
+            {
+                .kind   = STMT_BLOCK  ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = -1          ,
+            };
+
+            stmt_block = parser_parse_stmt_block(parser);
+            if (stmt_block == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse 'do' block.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            outer_stmt.stmt.block = stmt_block;
+
+            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
+            if (stmt == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            return stmt;
 
         default:
-            // Otherwise we are assuming the statement is an expression.
+            // TODO: Implement parsing expression statements.
             fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
             exit(1);
     }
@@ -195,7 +222,8 @@ Stmt* parser_parse_stmt(Parser* parser)
 
 StmtBlock* parser_parse_stmt_block(Parser* parser)
 {
-    StmtBlock* = NULL;
+    StmtBlock* stmt_block = NULL;
+    StmtBlock  block_mem;
     int start  = -1;
     int end    = -1;
 
@@ -207,10 +235,10 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
 
     while (depth > 0)
     {
-        Token token = parse_next(parser);
+        Token token = parser_next(parser);
         if (token.type == TOKEN_ERROR)
         {
-            fprintf(stderr, "[%s:%d] Statement parsing: could not find the end of 'do' block.\n", __FILE__, __LINE__);
+            fprintf(stderr, "[%s:%d] Statement parsing: Could not find the end of 'do' block.\n", __FILE__, __LINE__);
             exit(1);
         }
         else if (token.type == TOKEN_DO)
@@ -223,23 +251,54 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
         }
     }
 
+    block_mem = (StmtBlock)
+    {
+        .size = 0   ,
+        .body = NULL,
+    };
 
-    if (parser->current == start + 1)
+    if (parser->current > start + 1)
     {
-    }
-    else if (parser->current < start + 1)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Do block somehow ended before it started (Really weird error).\n", __FILE__, __LINE__);
-        exit(1);
-    }
-    else
-    {
+        Stmt** stmts = NULL;
+        Stmt*  stmt  = NULL;
+
+        int   size = 0;
+
+        while ((stmt = parser_parse_stmt(parser)) != NULL)
+        {
+            arrput(stmts, stmt);
+        }
+
+        // TODO: Check if stb_ds arrlen returns zero upon encountering a NULL ptr (I reckon yes).
+        if (stmts != NULL)
+        {
+            Stmt** tmp_ptr = NULL;
+            size = arrlen(stmts);
+
+            tmp_ptr = (Stmt**) arena_push(&parser->arena, stmts, size * sizeof(Stmt));
+            arrfree(stmts);
+            stmts = tmp_ptr;
+        }
+
+        block_mem = (StmtBlock)
+        {
+            .size = size ,
+            .body = stmts,
+        };
     }
 
     // After return
     parser->start   = start;
     parser->end     = end  ;
-    parser->current = end  ;
+    parser->current = start;
+
+    stmt_block = arena_push(&parser->arena, &block_mem, sizeof(StmtBlock));
+    if (stmt_block == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
     return stmt_block;
 }
 
@@ -1097,6 +1156,7 @@ static void print_stmt_inner(Stmt* stmt, int depth)
             break;
         }
 
+        /*
         case STMT_FN:
         {
             StmtFn* fn = stmt->stmt.fn;
@@ -1115,7 +1175,7 @@ static void print_stmt_inner(Stmt* stmt, int depth)
                 for (int i = 0; i < fn->body->size; ++i)
                 {
                     print_stmt_inner(
-                        &fn->body->stmts[i],
+                        &fn->body->body[i],
                         depth + 2
                     );
                 }
@@ -1123,6 +1183,7 @@ static void print_stmt_inner(Stmt* stmt, int depth)
 
             break;
         }
+        */
 
         case STMT_RETURN:
         {

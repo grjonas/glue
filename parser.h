@@ -60,6 +60,7 @@ struct Parser
 enum StmtKind
 {
     STMT_ERR              ,
+    STMT_BLOCK            ,
     STMT_LET              ,
     STMT_EXPR             ,
     STMT_IF               ,
@@ -95,8 +96,8 @@ struct Stmt
 
 struct StmtBlock
 {
-    int   size ; // Number of statements
-    Stmt* stmts;
+    int    size; // Number of statements
+    Stmt** body;
 };
 
 struct StmtLet
@@ -263,10 +264,11 @@ Token parser_jump(Parser* parser, int new_state);
 Token parser_restore(Parser* parser, int old_state);
 
 // Stmt
-Stmt     * parser_parse_stmt(Parser* parser);
+Stmt     * parser_parse_stmt      (Parser* parser);
 
-StmtLet  * parser_parse_stmt_let(Parser* parser);
-StmtIf   * parser_parse_stmt_if(Parser* parser);
+StmtBlock* parser_parse_stmt_block(Parser* parser);
+StmtLet  * parser_parse_stmt_let  (Parser* parser);
+StmtIf   * parser_parse_stmt_if   (Parser* parser);
 StmtWhile* parser_parse_stmt_while(Parser* parser);
 char     * parser_parse_identifier(Parser* parser);
 
