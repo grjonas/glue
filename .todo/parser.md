@@ -1,3 +1,4 @@
 # Parser
-- [ ]: Add type parsing - we can write a function similiar to the pratt parser we have,
-	and then reuse much of the code.
+- [ ]: Implement type parsing.
+- [ ]: Rewrite expression parsing to use new type structure.
+- [ ]: Implement statement parsing.
