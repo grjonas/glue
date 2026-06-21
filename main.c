@@ -6,7 +6,6 @@
 // Needs to be freed.
 int main(int argc, char** argv)
 {
-    assert(sizeof(Stmt) == 8);
     if (argc < 2)
     {
         fprintf(stderr, "Not enough arguments\n");
@@ -41,7 +40,6 @@ int main(int argc, char** argv)
     // print_expr_op(expr);
 
     Stmt* stmt = parser_parse_stmt(&parser, 0);
-    print_stmt(stmt);
 
     return 0;
 }

@@ -1,5 +1,7 @@
 #include "parser.h"
 
+#define arrfree_and_set_null(op) do { arrfree(op); op = NULL; } while(0)
+
 Parser init_parser(Scanner scanner)
 {
     Parser parser =
@@ -10,11 +12,6 @@ Parser init_parser(Scanner scanner)
         .start        = 0                         ,
         .end          = arrlen(scanner.token_list),
         .current      = 0                         ,
-        .exprs        = NULL                      ,
-        .identifiers  = NULL                      ,
-        .str_literals = NULL                      ,
-        .int_literals = NULL                      ,
-        .num_literals = NULL                      ,
         .log          = NULL                      ,
     };
 
@@ -74,218 +71,92 @@ bool is_newline(TokenType type)
     }
 }
 
-void stmt_append_header(Stmt** stmt, StmtType type, int depth, int line, int column, int length)
+// Stmt
+Stmt* parser_parse_stmt(Parser* parser)
 {
-    Stmt node;
-    node = (Stmt){ .header = { .type = type, .depth = depth }};
-    arrput(*stmt, node);
-    node = (Stmt){ .position = { .line = line, .column = column }};
-    arrput(*stmt, node);
-    node = (Stmt){ .length = length };
-    arrput(*stmt, node);
-}
+    Token token;
 
-Stmt* parser_parse_stmts(Parser* parser, int depth)
-{
-    Stmt* curr_stmt = NULL;
-    Stmt* recv_stmt = NULL;
+    Stmt    stmt      ;
+    StmtLet stmt_let  ;
 
-    while (true)
-    {
-        recv_stmt = parser_parse_stmt(parser, depth + 1);
-        if (recv_stmt == NULL)
-            break;
-
-        append_list_to_list(curr_stmt, recv_stmt);
-        arrfree_and_set_null(recv_stmt);
-    }
-
-    return curr_stmt;
-}
-
-Stmt* parser_parse_stmt(Parser* parser, int depth)
-{
-    Token tok;
-    Stmt* curr_stmt = NULL;
-    Stmt* recv_stmt = NULL;
-
-    Stmt identifier_node;
-    Stmt type_node;
-    Stmt expr_node;
-    Stmt err_node;
-
-    ExprOp* type_ptr = NULL;
-    ExprOp* expr_ptr = NULL;
-    char*   identifier_ptr = NULL;
+    char  * identifier;
+    Type  * type      ;
+    ExprOp* expr      ;
 
     parser_skip(parser, is_newline);
-
-    tok = parser_peek(parser);
-    switch (tok.type)
+    token = parser_peek(parser);
+    switch (token.type)
     {
         case TOKEN_LET:
-
             parser_next(parser);
-            identifier_ptr = parser_parse_identifier(parser);
+            stmt_let = (StmtLet)
+            {
+                .identifier = NULL,
+                .type       = NULL,
+                .expr       = NULL,
+            };
 
-            if (parser_peek(parser).type == TOKEN_COLON)
+            identifier = parser_parse_identifier(parser);
+            if (identifier == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Could not find identifier.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            stmt_let.identifier = identifier;
+
+            token = parser_peek(parser);
+            if (token.type == TOKEN_COLON)
             {
                 parser_next(parser);
-                type_ptr = parser_parse_type(parser);
 
-                if (parser_peek(parser).type == TOKEN_EQUAL)
+                type = parser_parse_type(parser);
+                if (type == NULL)
                 {
-                    parser_next(parser);
-                    expr_ptr = parser_parse_expr(parser);
-
-                    stmt_append_header(&curr_stmt, STMT_LET_TYPE_AND_EXPR, depth, tok.line, tok.column, 0);
-                    identifier_node = (Stmt){ .literal = identifier_ptr };
-                    type_node       = (Stmt){ .expr   = type_ptr };
-                    expr_node       = (Stmt){ .expr   = expr_ptr };
-                    arrput(curr_stmt,  identifier_node);
-                    arrput(curr_stmt, type_node);
-                    arrput(curr_stmt, expr_node);
+                    fprintf(stderr, "[%s:%d] Statement parsing: Could not find type.\n", __FILE__, __LINE__);
+                    exit(1);
                 }
-                else
-                {
-                    stmt_append_header(&curr_stmt, STMT_LET_TYPE, depth, tok.line, tok.column, 0);
-                    identifier_node = (Stmt){ .literal = identifier_ptr };
-                    type_node       = (Stmt){ .expr = type_ptr };
-                    arrput(curr_stmt,  identifier_node);
-                    arrput(curr_stmt, type_node);
-                }
+                stmt_let.type = type;
             }
-            else
+
+            // TODO: Fix this later, not a high priority, but this is kind of bothering me.
+            token = parser_peek(parser);
+            if (token.type == TOKEN_EQUAL)
             {
-                if (parser_peek(parser).type == TOKEN_EQUAL)
+                parser_next(parser);
+
+                expr = parser_parse_expr(parser);
+                if (expr == NULL)
                 {
-                    parser_next(parser);
-                    expr_ptr = parser_parse_expr(parser);
-
-                    stmt_append_header(&curr_stmt, STMT_LET_EXPR, depth, tok.line, tok.column, 0);
-                    identifier_node = (Stmt){ .literal = identifier_ptr };
-                    expr_node       = (Stmt){ .expr    = expr_ptr };
-                    arrput(curr_stmt,  identifier_node);
-                    arrput(curr_stmt, expr_node);
+                    fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
+                    exit(1);
                 }
-                else
-                {
-                    stmt_append_header(&curr_stmt, STMT_LET_BARE, depth, tok.line, tok.column, 0);
-                    identifier_node = (Stmt){ .literal  = identifier_ptr };
-                    arrput(curr_stmt,  identifier_node);
-                }
-            }
-            return curr_stmt;
-
-        case TOKEN_IF:
-            parser_next(parser);
-            expr_ptr = parser_parse_expr(parser);
-            
-            stmt_append_header(&curr_stmt, STMT_IF, depth, tok.line, tok.column, 0);
-            expr_node = (Stmt){ .expr = expr_ptr };
-            arrput(curr_stmt, expr_node);
-
-            tok = parser_peek(parser);
-            if (is_newline(tok.type))
-            {
-                parser_skip(parser, is_newline);
-                recv_stmt = parser_parse_stmt(parser, depth + 1);
-                append_list_to_list(curr_stmt, recv_stmt);
-                arrfree_and_set_null(recv_stmt);
-            }
-            else if (tok.type == TOKEN_DO)
-            {
-                recv_stmt = parser_parse_block(parser, depth + 1);
-                if (recv_stmt == NULL)
-                {
-                    err_node = (Stmt){ .header = { .type = STMT_EMPTY, .depth = depth + 1}};
-                    arrput(curr_stmt, err_node);
-                }
-                else
-                {
-                    append_list_to_list(curr_stmt, recv_stmt);
-                    arrfree_and_set_null(recv_stmt);
-                }
-            }
-            else
-            {
-                stmt_append_header(&curr_stmt, STMT_ERR, depth, tok.line, tok.column, 0);
+                stmt_let.expr = expr;
             }
 
-            return curr_stmt;
-        case TOKEN_WHILE:
-            parser_next(parser);
-            expr_ptr = parser_parse_expr(parser);
-            
-            stmt_append_header(&curr_stmt, STMT_WHILE, depth, tok.line, tok.column, 0);
-            expr_node = (Stmt){ .expr = expr_ptr };
-            arrput(curr_stmt, expr_node);
-
-            tok = parser_peek(parser);
-            if (is_newline(tok.type))
-            {
-                parser_skip(parser, is_newline);
-                recv_stmt = parser_parse_stmt(parser, depth + 1);
-                append_list_to_list(curr_stmt, recv_stmt);
-                arrfree_and_set_null(recv_stmt);
-            }
-            else if (tok.type == TOKEN_DO)
-            {
-                recv_stmt = parser_parse_block(parser, depth + 1);
-                if (recv_stmt == NULL)
-                {
-                    err_node = (Stmt){ .header = { .type = STMT_EMPTY, .depth = depth + 1}};
-                    arrput(curr_stmt, err_node);
-                }
-                else
-                {
-                    append_list_to_list(curr_stmt, recv_stmt);
-                    arrfree_and_set_null(recv_stmt);
-                }
-            }
-            else
-            {
-                stmt_append_header(&curr_stmt, STMT_ERR, depth, tok.line, tok.column, 0);
-            }
-
-            return curr_stmt;
-
-        case TOKEN_DO:
-            //perror("Parser line %d: Not implemented yet.\n");
-            //exit(1);
-            recv_stmt = parser_parse_block(parser, depth + 1);
-            return recv_stmt;
-
-        case TOKEN_ERROR:
-            return NULL;
+            fprintf(stderr, "[%s:%d] Statement parsing: Not implemented yet.\n", __FILE__, __LINE__);
+            exit(1);
         default:
-            perror("Parser line %d: Failed to parse statement\n");
+            fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
             exit(1);
     }
 }
 
+// Identifier
 char* parser_parse_identifier(Parser* parser)
 {
-    Token token = parser_next(parser);
-    if (token.type != TOKEN_IDENTIFIER)
-    {
-        fprintf(stderr, "Parser line %d: The next token is not an identifier.\n", __LINE__);
-        exit(1);
-    }
-
-    char* identifier = calloc((size_t)token.length + 1, sizeof(char)); // This sets everything to '\0'
-    if (identifier == NULL)
-    {
-        fprintf(stderr, "Failed to allocate memory in %s:%d.\n", __FILE__, __LINE__);
-        exit(1);
-    }
-    arrput(parser->identifiers, identifier);
-    return identifier;
+    fprintf(stderr, "[%s:%d] Identifier parsing is not implemented yet.\n", __FILE__, __LINE__);
+    exit(1);
 }
 
-Stmt* parser_parse_block(Parser* parser, int depth)
+// Type
+Type* parser_parse_type(Parser* parser)
 {
-    fprintf(stderr, "Parser line %d: Not implemented yet.\n", __LINE__);
+    return parser_parse_type_inner(parser);
+}
+
+Type* parser_parse_type_inner(Parser* parser)
+{
+    fprintf(stderr, "[%s:%d] Type parsing is not implemented yet.\n", __FILE__, __LINE__);
     exit(1);
 }
 
@@ -499,40 +370,9 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
     return expr;
 
 }
-
-ExprOp* parser_parse_type(Parser* parser)
-{
-    ExprOp* type = parser_parse_type_inner(parser, 0);
-    return type;
-}
-
-// TODO: Rework this to add literals to parser storage.
-ExprOp* parser_parse_type_inner(Parser* parser, int min_binding_power)
-{
-    ExprOp* expr = NULL;
-    Token token;
-
-    ExprOp  lhs;
-
-    // Parse first literal
-    token = parser_next(parser);
-    switch (token.type)
-    {
-        // Atoms
-        case TOKEN_IDENTIFIER: lhs = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); break;
-        default:
-            fprintf(stderr, "Parser line %d: Could not find atomic expression.\n", __LINE__);
-            exit(1);
-    }
-    arrput(expr, lhs);
-    
-    // print_expr_op(expr);
-    return expr;
-
-}
 #undef MAKE_OP_FROM_TOKEN
 
-void prefix_binding_power(ExprOpType op_type, int* right)
+void prefix_binding_power(ExprOpKind op_type, int* right)
 {
     switch (op_type)
     {
@@ -549,7 +389,7 @@ void prefix_binding_power(ExprOpType op_type, int* right)
     }
 }
 
-bool postfix_binding_power(ExprOpType op_type, int* left)
+bool postfix_binding_power(ExprOpKind op_type, int* left)
 {
     switch (op_type)
     {
@@ -571,7 +411,7 @@ bool postfix_binding_power(ExprOpType op_type, int* left)
 }
 
 bool infix_binding_power(
-    ExprOpType op_type,
+    ExprOpKind op_type,
     int* left,
     int* right)
 {
@@ -652,7 +492,7 @@ void append_rhs_to_expr(ExprOp** expr, ExprOp** rhs)
 //     return ARENA_NULL;
 // }
 
-const char* show_op_type(ExprOpType op)
+const char* show_op_type(ExprOpKind op)
 {
     switch (op)
     {
@@ -716,14 +556,14 @@ void print_expr_op(ExprOp* op)
     }
 }
 
-const char* stmt_type_name(StmtType type)
+const char* stmt_type_name(StmtKind kind)
 {
-    switch (type)
+    switch (kind)
     {
-        case STMT_ERR:       return "STMT_ERR";
-        case STMT_LET_BARE:  return "STMT_LET_BARE";
-        case STMT_LET_TYPE:  return "STMT_LET_TYPE";
-        case STMT_LET_EXPR:  return "STMT_LET_EXPR";
+        case STMT_ERR:               return "STMT_ERR";
+        case STMT_LET_BARE:          return "STMT_LET_BARE";
+        case STMT_LET_TYPE:          return "STMT_LET_TYPE";
+        case STMT_LET_EXPR:          return "STMT_LET_EXPR";
         case STMT_LET_TYPE_AND_EXPR: return "STMT_LET_TYPE_AND_EXPR";
         case STMT_EXPR:              return "STMT_EXPR";
         case STMT_IF:                return "STMT_IF";
@@ -736,99 +576,5 @@ const char* stmt_type_name(StmtType type)
         case STMT_RETURN:            return "STMT_RETURN";
         case STMT_EMPTY:             return "STMT_EMPTY";
         default:                     return "UNKNOWN";
-    }
-}
-
-void print_stmt(Stmt* stmt)
-{
-    if (stmt == NULL)
-    {
-        printf("<null stmt>\n");
-        return;
-    }
-
-    StmtType type = stmt[0].header.type;
-    int depth     = stmt[0].header.depth;
-
-    int line      = stmt[1].position.line;
-    int column    = stmt[1].position.column;
-
-    printf("%s (depth=%d, line=%d, column=%d)\n",
-           stmt_type_name(type),
-           depth,
-           line,
-           column);
-
-    switch (type)
-    {
-        case STMT_LET_BARE:
-        {
-            printf("  identifier = %s\n",
-                   stmt[3].literal);
-            break;
-        }
-
-        case STMT_LET_TYPE:
-        {
-            printf("  identifier = %s\n",
-                   stmt[3].literal);
-
-            printf("  type expr:\n");
-            print_expr_op(stmt[4].expr);
-            break;
-        }
-
-        case STMT_LET_EXPR:
-        {
-            printf("  identifier = %s\n",
-                   stmt[3].literal);
-
-            printf("  value expr:\n");
-            print_expr_op(stmt[4].expr);
-            break;
-        }
-
-        case STMT_LET_TYPE_AND_EXPR:
-        {
-            printf("  identifier = %s\n",
-                   stmt[3].literal);
-
-            printf("  type expr:\n");
-            print_expr_op(stmt[4].expr);
-
-            printf("  value expr:\n");
-            print_expr_op(stmt[5].expr);
-            break;
-        }
-
-        case STMT_IF:
-        {
-            printf("  if statement\n");
-            break;
-        }
-
-        case STMT_WHILE:
-        {
-            printf("  while statement\n");
-            break;
-        }
-
-        case STMT_EMPTY:
-        {
-            printf("  empty\n");
-            break;
-        }
-
-        case STMT_ERR:
-        {
-            printf("  error node\n");
-            break;
-        }
-
-        default:
-        {
-            printf("  printer not implemented for this stmt type\n");
-            break;
-        }
     }
 }
