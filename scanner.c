@@ -62,10 +62,14 @@ const char* token_type_name(TokenType type)
         case TOKEN_COMMENT:         return "TOKEN_COMMENT";
 
         // Keywords.
+        case TOKEN_NIL_T:           return "TOKEN_NIL_T";
+        case TOKEN_BOOL:            return "TOKEN_BOOL";
+        case TOKEN_INT:             return "TOKEN_INT";
+        case TOKEN_REAL:            return "TOKEN_REAL";
         case TOKEN_LET:             return "TOKEN_LET";
         case TOKEN_TYPE:            return "TOKEN_TYPE";
         case TOKEN_EFFECT:          return "TOKEN_EFFECT";
-        case TOKEN_NIL:             return "TOKEN_NIL";
+        case TOKEN_NIL_V:           return "TOKEN_NIL_V";
         case TOKEN_TRUE:            return "TOKEN_TRUE";
         case TOKEN_FALSE:           return "TOKEN_FALSE";
         case TOKEN_NOT:             return "TOKEN_NOT";
@@ -314,6 +318,34 @@ Token scanner_scan_token(Scanner* scanner)
             {
                 switch (c)
                 {
+                    case 'N': // Nil
+                        if (scanner_match_string(scanner, "il", 1))
+                            rt = scanner_make_token(scanner, TOKEN_NIL_T, 0, 2);
+                        else
+                            rt = scanner_scan_identifier(scanner);
+                        break;
+
+                    case 'B': // Bool
+                        if (scanner_match_string(scanner, "ool", 1))
+                            rt = scanner_make_token(scanner, TOKEN_BOOL, 0, 3);
+                        else
+                            rt = scanner_scan_identifier(scanner);
+                        break;
+
+                    case 'I': // Int
+                        if (scanner_match_string(scanner, "nt", 1))
+                            rt = scanner_make_token(scanner, TOKEN_INT, 0, 2);
+                        else
+                            rt = scanner_scan_identifier(scanner);
+                        break;
+
+                    case 'R': // Real
+                        if (scanner_match_string(scanner, "eal", 1))
+                            rt = scanner_make_token(scanner, TOKEN_REAL, 0, 3);
+                        else
+                            rt = scanner_scan_identifier(scanner);
+                        break;
+
                     case 'l': // let, loop
                         if (scanner_match_string(scanner, "et", 1))
                             rt = scanner_make_token(scanner, TOKEN_LET, 0, 2);
@@ -347,7 +379,7 @@ Token scanner_scan_token(Scanner* scanner)
 
                     case 'n': // nil
                         if (scanner_match_string(scanner, "il", 1))
-                            rt = scanner_make_token(scanner, TOKEN_NIL, 0, 2);
+                            rt = scanner_make_token(scanner, TOKEN_NIL_V, 0, 2);
                         else if (scanner_match_string(scanner, "ot", 1))
                             rt = scanner_make_token(scanner, TOKEN_NOT, 0, 2);
                         else

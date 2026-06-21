@@ -74,78 +74,290 @@ bool is_newline(TokenType type)
 // Stmt
 Stmt* parser_parse_stmt(Parser* parser)
 {
-    Token token;
+    Token token     ;
+    Stmt  outer_stmt;
 
-    Stmt    stmt      ;
-    StmtLet stmt_let  ;
-
-    char  * identifier;
-    Type  * type      ;
-    ExprOp* expr      ;
+    Stmt     * stmt      ;
+    StmtLet  * stmt_let  ;
+    StmtIf   * stmt_if   ;
+    StmtWhile* stmt_while;
 
     parser_skip(parser, is_newline);
     token = parser_peek(parser);
     switch (token.type)
     {
         case TOKEN_LET:
-            parser_next(parser);
-            stmt_let = (StmtLet)
+            outer_stmt  = (Stmt)
             {
-                .identifier = NULL,
-                .type       = NULL,
-                .expr       = NULL,
+                .kind   = STMT_LET    ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = -1          ,
             };
 
-            identifier = parser_parse_identifier(parser);
-            if (identifier == NULL)
+            stmt_let = parser_parse_stmt_let(parser);
+            if (stmt_let == NULL)
             {
-                fprintf(stderr, "[%s:%d] Statement parsing: Could not find identifier.\n", __FILE__, __LINE__);
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse let statement.\n", __FILE__, __LINE__);
                 exit(1);
             }
-            stmt_let.identifier = identifier;
+            outer_stmt.stmt.let = stmt_let;
 
-            token = parser_peek(parser);
-            if (token.type == TOKEN_COLON)
+            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
+            if (stmt == NULL)
             {
-                parser_next(parser);
-
-                type = parser_parse_type(parser);
-                if (type == NULL)
-                {
-                    fprintf(stderr, "[%s:%d] Statement parsing: Could not find type.\n", __FILE__, __LINE__);
-                    exit(1);
-                }
-                stmt_let.type = type;
+                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+                exit(1);
             }
+            return stmt;
 
-            // TODO: Fix this later, not a high priority, but this is kind of bothering me.
-            token = parser_peek(parser);
-            if (token.type == TOKEN_EQUAL)
+        case TOKEN_IF:
+            outer_stmt  = (Stmt)
             {
-                parser_next(parser);
+                .kind   = STMT_IF     ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = -1          ,
+            };
 
-                expr = parser_parse_expr(parser);
-                if (expr == NULL)
-                {
-                    fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
-                    exit(1);
-                }
-                stmt_let.expr = expr;
+            stmt_if = parser_parse_stmt_if(parser);
+            if (stmt_if == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse if statement.\n", __FILE__, __LINE__);
+                exit(1);
             }
+            outer_stmt.stmt.if_stmt = stmt_if;
 
-            fprintf(stderr, "[%s:%d] Statement parsing: Not implemented yet.\n", __FILE__, __LINE__);
-            exit(1);
+            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
+            if (stmt == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            return stmt;
+
+        case TOKEN_WHILE:
+            outer_stmt  = (Stmt)
+            {
+                .kind   = STMT_WHILE  ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = -1          ,
+            };
+
+            stmt_while = parser_parse_stmt_while(parser);
+            if (stmt_while == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse while statement.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            outer_stmt.stmt.while_stmt = stmt_while;
+
+            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
+            if (stmt == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            return stmt;
+
+        // case TOKEN_DO:
+            // parser_parse_block(parser);
+
         default:
             fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
             exit(1);
     }
 }
 
+StmtLet* parser_parse_stmt_let(Parser* parser)
+{
+    StmtLet  stmt_let          ;
+    StmtLet* return_stmt = NULL;
+
+    Token    token             ;
+    char  *  identifier  = NULL;
+    Type  *  type        = NULL;
+    ExprOp*  expr        = NULL;
+
+    stmt_let = (StmtLet)
+    {
+        .identifier = NULL,
+        .type       = NULL,
+        .expr       = NULL,
+    };
+
+    parser_next(parser);
+
+    identifier = parser_parse_identifier(parser);
+    if (identifier == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Could not find identifier.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt_let.identifier = identifier;
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_COLON)
+    {
+        parser_next(parser);
+
+        type = parser_parse_type(parser);
+        if (type == NULL)
+        {
+            fprintf(stderr, "[%s:%d] Statement parsing: Could not find type.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+        stmt_let.type = type;
+    }
+
+    // TODO: Fix this later, not a high priority, but this is kind of bothering me.
+    token = parser_peek(parser);
+    if (token.type == TOKEN_EQUAL)
+    {
+        parser_next(parser);
+
+        expr = parser_parse_expr(parser);
+        if (expr == NULL)
+        {
+            fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+        stmt_let.expr = expr;
+    }
+
+    return_stmt = (StmtLet*) arena_push(&parser->arena, &stmt_let, sizeof(StmtLet));
+    if (return_stmt == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return return_stmt;
+}
+
+StmtIf* parser_parse_stmt_if(Parser* parser)
+{
+    StmtIf  stmt_if;
+    StmtIf* return_stmt = NULL;
+
+    ExprOp* condition   = NULL;
+    Stmt  * body        = NULL;
+
+    stmt_if = (StmtIf)
+    {
+        .condition = NULL,
+        .body      = NULL,
+        .stmt_else = NULL,
+    };
+
+    parser_next(parser);
+
+    condition = parser_parse_expr(parser);
+    if (condition == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt_if.condition = condition;
+
+    body = parser_parse_stmt(parser);
+    if (body == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse inner statement.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt_if.body = body;
+
+    // TODO: Implement else branch parsing
+    return_stmt = (StmtIf*) arena_push(&parser->arena, &stmt_if, sizeof(StmtIf));
+    if (return_stmt == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return return_stmt;
+}
+
+StmtWhile* parser_parse_stmt_while(Parser* parser)
+{
+    StmtWhile  stmt_while        ;
+    StmtWhile* return_stmt = NULL;
+
+    ExprOp   * condition   = NULL;
+    Stmt     * body        = NULL;
+
+    stmt_while = (StmtWhile)
+    {
+        .condition = NULL,
+        .body      = NULL,
+    };
+
+    parser_next(parser);
+
+    condition = parser_parse_expr(parser);
+    if (condition == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt_while.condition = condition;
+
+    body = parser_parse_stmt(parser);
+    if (body == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse inner statement.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt_while.body = body;
+
+    return_stmt = (StmtWhile*) arena_push(&parser->arena, &stmt_while, sizeof(StmtWhile));
+    if (return_stmt == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return return_stmt;
+}
+
 // Identifier
 char* parser_parse_identifier(Parser* parser)
 {
-    fprintf(stderr, "[%s:%d] Identifier parsing is not implemented yet.\n", __FILE__, __LINE__);
-    exit(1);
+    char* identifier = NULL;
+    Token token;
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_IDENTIFIER)
+    {
+        int   length;
+        char* tmp_ptr;
+
+        parser_next(parser);
+
+        length = token.length + 1;
+        identifier = calloc(length, sizeof(char));
+        if (identifier == NULL)
+        {
+            fprintf(stderr, "[%s:%d] Failed to allocate memory.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+
+        // TODO: Check if casting to size_t does what I think it does (it might not because this is C).
+        memcpy(identifier, token.start, (size_t) length * sizeof(char));
+
+        tmp_ptr = identifier;
+        identifier = arena_push(&parser->arena, identifier, (size_t) length * sizeof(char));
+        free(tmp_ptr);
+        if (identifier == NULL)
+        {
+            fprintf(stderr, "[%s:%d] Failed to push identifier to arena.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+    }
+
+    return identifier;
 }
 
 // Type
@@ -154,10 +366,92 @@ Type* parser_parse_type(Parser* parser)
     return parser_parse_type_inner(parser);
 }
 
+// For now can parse only primitive types.
 Type* parser_parse_type_inner(Parser* parser)
 {
-    fprintf(stderr, "[%s:%d] Type parsing is not implemented yet.\n", __FILE__, __LINE__);
-    exit(1);
+    Type  outer_type ;
+    Type* type = NULL;
+
+    Token token;
+
+    outer_type = (Type)
+    {
+        .kind           = TYPE_UNKNOWN,
+        .body.primitive = NULL        , // Assumes primitive, though this should set all pointers to NULL.
+    };
+
+    token = parser_next(parser);
+    switch(token.type)
+    {
+        case TOKEN_NIL_T:
+            outer_type.kind = TYPE_NIL ;
+            break;
+        case TOKEN_BOOL :
+            outer_type.kind = TYPE_BOOL;
+            break;
+        case TOKEN_INT  :
+            outer_type.kind = TYPE_INT;
+            break;
+        case TOKEN_REAL :
+            outer_type.kind = TYPE_REAL;
+            break;
+        default:
+            fprintf(stderr, "[%s:%d] Type parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+
+    type = arena_push(&parser->arena, &outer_type, sizeof(Type));
+    if (type == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return type;
+}
+
+Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_type)
+{
+    Type        * type          = NULL;
+    TypeFunction* type_function = NULL;
+    Type        * type_args     = NULL;
+
+    Type         type_mem;
+    TypeFunction func_mem;  
+
+    type_args = (Type*) arena_push(arena, argv, (size_t) argc * sizeof(Type));
+    if (type_args == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    func_mem = (TypeFunction)
+    {
+        .argc        = argc       ,
+        .argv        = type_args  ,
+        .return_type = return_type,
+    };
+    type_function = (TypeFunction*) arena_push(arena, &func_mem, sizeof(TypeFunction));
+    if (type_function == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    type_mem = (Type)
+    {
+        .kind          = TYPE_FUNCTION,
+        .body.function = type_function,
+    };
+    type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
+    if (type == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return type;
 }
 
 ExprOp* parser_parse_expr(Parser* parser)
@@ -193,14 +487,14 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
     switch (token.type)
     {
         // Atoms
-        case TOKEN_NIL       : lhs = MAKE_OP_FROM_TOKEN(token, OP_NIL       , 0, TYPE_NIL    ); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_NIL_V     : lhs = MAKE_OP_FROM_TOKEN(token, OP_NIL       , 0, TYPE_NIL    ); lot = LHS_OP_TYPE_ATOM; break;
         case TOKEN_TRUE      : lhs = MAKE_OP_FROM_TOKEN(token, OP_TRUE      , 0, TYPE_BOOL   ); lot = LHS_OP_TYPE_ATOM; break;
         case TOKEN_FALSE     : lhs = MAKE_OP_FROM_TOKEN(token, OP_FALSE     , 0, TYPE_BOOL   ); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER    , 0, TYPE_FLOAT  ); lot = LHS_OP_TYPE_ATOM  ; break;
-        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER   , 0, TYPE_INT    ); lot = LHS_OP_TYPE_ATOM  ; break;
-        case TOKEN_STRING    : lhs = MAKE_OP_FROM_TOKEN(token, OP_STRING    , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
-        case TOKEN_IDENTIFIER: lhs = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
-        case TOKEN_PRINT     : lhs = MAKE_OP_FROM_TOKEN(token, OP_PRINT     , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM  ; break;
+        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER    , 0, TYPE_REAL   ); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER   , 0, TYPE_INT    ); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_STRING    : lhs = MAKE_OP_FROM_TOKEN(token, OP_STRING    , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_IDENTIFIER: lhs = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_PRINT     : lhs = MAKE_OP_FROM_TOKEN(token, OP_PRINT     , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
         // Ops
         case TOKEN_MINUS       : op = MAKE_OP_FROM_TOKEN(token, OP_NEG    , 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
         case TOKEN_BANG        : op = MAKE_OP_FROM_TOKEN(token, OP_NOT    , 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
@@ -561,14 +855,11 @@ const char* stmt_type_name(StmtKind kind)
     switch (kind)
     {
         case STMT_ERR:               return "STMT_ERR";
-        case STMT_LET_BARE:          return "STMT_LET_BARE";
-        case STMT_LET_TYPE:          return "STMT_LET_TYPE";
-        case STMT_LET_EXPR:          return "STMT_LET_EXPR";
-        case STMT_LET_TYPE_AND_EXPR: return "STMT_LET_TYPE_AND_EXPR";
+        case STMT_LET:               return "STMT_LET";
         case STMT_EXPR:              return "STMT_EXPR";
         case STMT_IF:                return "STMT_IF";
         case STMT_ELIF:              return "STMT_ELIF";
-        case STMT_ELSE:              return "STMT_ELSE";
+        // case STMT_ELSE:              return "STMT_ELSE";
         case STMT_WHILE:             return "STMT_WHILE";
         case STMT_BREAK:             return "STMT_BREAK";
         case STMT_CONTINUE:          return "STMT_CONTINUE";

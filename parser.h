@@ -60,14 +60,11 @@ struct Parser
 enum StmtKind
 {
     STMT_ERR              ,
-    STMT_LET_BARE         ,
-    STMT_LET_TYPE         ,
-    STMT_LET_EXPR         ,
-    STMT_LET_TYPE_AND_EXPR,
+    STMT_LET              ,
     STMT_EXPR             ,
     STMT_IF               ,
     STMT_ELIF             ,
-    STMT_ELSE             ,
+    // STMT_ELSE             ,
     STMT_WHILE            ,
     STMT_BREAK            ,
     STMT_CONTINUE         ,
@@ -79,7 +76,7 @@ enum StmtKind
 // Tagged Union
 struct Stmt
 {
-    StmtKind type;
+    StmtKind kind;
     int line     ;
     int column   ;
     int length   ;
@@ -88,6 +85,7 @@ struct Stmt
     {
         StmtBlock* block     ;
         StmtLet  * let       ;
+        ExprOp   * expr      ;
         StmtIf   * if_stmt   ;
         StmtWhile* while_stmt;
         StmtFn   * fn        ;
@@ -111,7 +109,7 @@ struct StmtLet
 struct StmtIf
 {
     ExprOp  * condition;
-    Stmt    * stmt     ;
+    Stmt    * body     ;
     StmtElif* stmt_else; // else or elif
 };
 
@@ -121,14 +119,14 @@ struct StmtIf
 struct StmtElif
 {
     ExprOp  * condition;
-    Stmt    * stmt     ;
+    Stmt    * body     ;
     StmtElif* stmt_else; // else or elif
 };
 
 struct StmtWhile
 {
     ExprOp* condition;
-    Stmt  * stmt     ;
+    Stmt  * body     ;
 };
 
 struct StmtFn
@@ -157,7 +155,7 @@ enum TypeKind
     TYPE_NIL      ,
     TYPE_BOOL     ,
     TYPE_INT      , // i64 - for now at least
-    TYPE_FLOAT    , // f64 - for now at least
+    TYPE_REAL     , // f64 - for now at least
 
     // Derivative
     TYPE_LIST     ,
@@ -174,8 +172,8 @@ struct Type
 
     union
     {
-        // Primitives don't have any elements.
-        Type        * list       ;
+        void        * primitive  ; // Primitives don't have any elements, so this would be NULL.
+        TypeKind      list       ;
         TypeFunction* function   ;
         TypeStruct  * struct_type;
     }
@@ -255,8 +253,13 @@ Parser free_parser(Scanner scanner);
 Token parser_peek(Parser* parser);
 Token parser_next(Parser* parser);
 
-// Identifier parsing
-char* parser_parse_identifier(Parser* parser);
+// Stmt
+Stmt     * parser_parse_stmt(Parser* parser);
+
+StmtLet  * parser_parse_stmt_let(Parser* parser);
+StmtIf   * parser_parse_stmt_if(Parser* parser);
+StmtWhile* parser_parse_stmt_while(Parser* parser);
+char     * parser_parse_identifier(Parser* parser);
 
 // Type parsing
 Type* parser_parse_type(Parser* parser);
