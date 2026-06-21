@@ -150,17 +150,23 @@ enum TypeKind
     // Special
     TYPE_UNKNOWN  ,
 
-    // Primitives
-    TYPE_TYPE     ,
+    TYPE_PRIMITIVE_SEPERATOR,
+
+    // Built-in primitives
+    // TYPE_TYPE     ,
     TYPE_NIL      ,
     TYPE_BOOL     ,
     TYPE_INT      , // i64 - for now at least
     TYPE_REAL     , // f64 - for now at least
 
-    // Derivative
+    TYPE_DERIVATIVE_SEPERATOR,
+
+    // Built-in derivative
     TYPE_LIST     ,
     TYPE_STRUCT   ,
     TYPE_FUNCTION ,
+
+    TYPE_MISC_SEPERATOR,
 
     // TYPE_SEPERATOR, // Used to seperate the built-in types, from newly created ones
 };

@@ -410,6 +410,53 @@ Type* parser_parse_type_inner(Parser* parser)
     return type;
 }
 
+Type* construct_type_unknown(Arena* arena)
+{
+    Type* type = NULL;
+    Type  type_mem   ;
+
+    type_mem = (Type)
+    {
+        .kind           = TYPE_UNKNOWN,
+        .body.primitive = NULL        ,
+    };
+    type = arena_push(arena, &type_mem, sizeof(Type));
+    if (type == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return type;
+}
+
+Type* construct_type_primitive(Arena* arena, TypeKind kind)
+{
+    Type* type = NULL;
+    Type  type_mem   ;
+
+    if (kind <= TYPE_PRIMITIVE_SEPERATOR || TYPE_DERIVATIVE_SEPERATOR <= kind)
+    {
+        fprintf(stderr, "[%s:%d] Type construction: Cannot construct primitive type by passing a non-primitive TypeKind.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    type_mem = (Type)
+    {
+        .kind           = kind,
+        .body.primitive = NULL,
+    };
+    type = arena_push(arena, &type_mem, sizeof(Type));
+    if (type == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    return type;
+}
+
+
 Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_type)
 {
     Type        * type          = NULL;
@@ -422,7 +469,7 @@ Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_t
     type_args = (Type*) arena_push(arena, argv, (size_t) argc * sizeof(Type));
     if (type_args == NULL)
     {
-        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
         exit(1);
     }
 
@@ -435,7 +482,7 @@ Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_t
     type_function = (TypeFunction*) arena_push(arena, &func_mem, sizeof(TypeFunction));
     if (type_function == NULL)
     {
-        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
         exit(1);
     }
 
@@ -447,7 +494,7 @@ Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_t
     type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
     if (type == NULL)
     {
-        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
+        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
         exit(1);
     }
 
@@ -471,6 +518,8 @@ ExprOp* parser_parse_expr(Parser* parser)
         .column = (token).column,\
         .length = (token).length\
     } 
+#define CONSTRUCT_PRIMITIVE(tp) construct_type_primitive(&parser->arena, (tp))
+#define CONSTRUCT_UNKNOWN       construct_type_unknown(&parser->arena)
 ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
 {
     ExprOp* expr = NULL;
@@ -487,19 +536,19 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
     switch (token.type)
     {
         // Atoms
-        case TOKEN_NIL_V     : lhs = MAKE_OP_FROM_TOKEN(token, OP_NIL       , 0, TYPE_NIL    ); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_TRUE      : lhs = MAKE_OP_FROM_TOKEN(token, OP_TRUE      , 0, TYPE_BOOL   ); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_FALSE     : lhs = MAKE_OP_FROM_TOKEN(token, OP_FALSE     , 0, TYPE_BOOL   ); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER    , 0, TYPE_REAL   ); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER   , 0, TYPE_INT    ); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_STRING    : lhs = MAKE_OP_FROM_TOKEN(token, OP_STRING    , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_IDENTIFIER: lhs = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
-        case TOKEN_PRINT     : lhs = MAKE_OP_FROM_TOKEN(token, OP_PRINT     , 0, TYPE_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_NIL_V     : lhs = MAKE_OP_FROM_TOKEN(token, OP_NIL       , 0, CONSTRUCT_PRIMITIVE(TYPE_NIL )); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_TRUE      : lhs = MAKE_OP_FROM_TOKEN(token, OP_TRUE      , 0, CONSTRUCT_PRIMITIVE(TYPE_BOOL)); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_FALSE     : lhs = MAKE_OP_FROM_TOKEN(token, OP_FALSE     , 0, CONSTRUCT_PRIMITIVE(TYPE_BOOL)); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_NUMBER    : lhs = MAKE_OP_FROM_TOKEN(token, OP_NUMBER    , 0, CONSTRUCT_PRIMITIVE(TYPE_REAL)); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_INTEGER   : lhs = MAKE_OP_FROM_TOKEN(token, OP_INTEGER   , 0, CONSTRUCT_PRIMITIVE(TYPE_INT )); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_STRING    : lhs = MAKE_OP_FROM_TOKEN(token, OP_STRING    , 0, CONSTRUCT_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_IDENTIFIER: lhs = MAKE_OP_FROM_TOKEN(token, OP_IDENTIFIER, 0, CONSTRUCT_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
+        case TOKEN_PRINT     : lhs = MAKE_OP_FROM_TOKEN(token, OP_PRINT     , 0, CONSTRUCT_UNKNOWN); lot = LHS_OP_TYPE_ATOM; break;
         // Ops
-        case TOKEN_MINUS       : op = MAKE_OP_FROM_TOKEN(token, OP_NEG    , 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
-        case TOKEN_BANG        : op = MAKE_OP_FROM_TOKEN(token, OP_NOT    , 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
-        case TOKEN_PLUS_PLUS   : op = MAKE_OP_FROM_TOKEN(token, OP_PRE_INC, 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
-        case TOKEN_MINUS_MINUS : op = MAKE_OP_FROM_TOKEN(token, OP_PRE_DEC, 1, TYPE_UNKNOWN); lot = LHS_OP_TYPE_PREFIX; break;
+        case TOKEN_MINUS       : op = MAKE_OP_FROM_TOKEN(token, OP_NEG    , 1, construct_type_unknown(&parser->arena)); lot = LHS_OP_TYPE_PREFIX; break;
+        case TOKEN_BANG        : op = MAKE_OP_FROM_TOKEN(token, OP_NOT    , 1, construct_type_unknown(&parser->arena)); lot = LHS_OP_TYPE_PREFIX; break;
+        case TOKEN_PLUS_PLUS   : op = MAKE_OP_FROM_TOKEN(token, OP_PRE_INC, 1, construct_type_unknown(&parser->arena)); lot = LHS_OP_TYPE_PREFIX; break;
+        case TOKEN_MINUS_MINUS : op = MAKE_OP_FROM_TOKEN(token, OP_PRE_DEC, 1, construct_type_unknown(&parser->arena)); lot = LHS_OP_TYPE_PREFIX; break;
         // Special
         case TOKEN_LEFT_PAREN: lot = LHS_OP_TYPE_PARENS; break;
         default:
@@ -546,30 +595,30 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
         token = parser_peek(parser);
         switch (token.type)
         {
-            case TOKEN_PLUS         : op = MAKE_OP_FROM_TOKEN(token, OP_ADD          , 2, TYPE_UNKNOWN); break;
-            case TOKEN_MINUS        : op = MAKE_OP_FROM_TOKEN(token, OP_SUB          , 2, TYPE_UNKNOWN); break;
-            case TOKEN_STAR         : op = MAKE_OP_FROM_TOKEN(token, OP_MUL          , 2, TYPE_UNKNOWN); break;
-            case TOKEN_SLASH        : op = MAKE_OP_FROM_TOKEN(token, OP_DIV          , 2, TYPE_UNKNOWN); break;
-            case TOKEN_PERCENT      : op = MAKE_OP_FROM_TOKEN(token, OP_MOD          , 2, TYPE_UNKNOWN); break;
-            case TOKEN_AND          : op = MAKE_OP_FROM_TOKEN(token, OP_AND          , 2, TYPE_UNKNOWN); break;
-            case TOKEN_OR           : op = MAKE_OP_FROM_TOKEN(token, OP_OR           , 2, TYPE_UNKNOWN); break;
-            case TOKEN_EQUAL_EQUAL  : op = MAKE_OP_FROM_TOKEN(token, OP_EQUAL        , 2, TYPE_UNKNOWN); break;
-            case TOKEN_BANG_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_NOT_EQUAL    , 2, TYPE_UNKNOWN); break;
-            case TOKEN_GREATER      : op = MAKE_OP_FROM_TOKEN(token, OP_GREATER      , 2, TYPE_UNKNOWN); break;
-            case TOKEN_LESS         : op = MAKE_OP_FROM_TOKEN(token, OP_LESS         , 2, TYPE_UNKNOWN); break;
-            case TOKEN_GREATER_EQUAL: op = MAKE_OP_FROM_TOKEN(token, OP_GREATER_EQUAL, 2, TYPE_UNKNOWN); break;
-            case TOKEN_LESS_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_LESS_EQUAL   , 2, TYPE_UNKNOWN); break;
-            case TOKEN_DOT          : op = MAKE_OP_FROM_TOKEN(token, OP_ACCESS       , 2, TYPE_UNKNOWN); break;
-            case TOKEN_COLON        : op = MAKE_OP_FROM_TOKEN(token, OP_CHAIN        , 2, TYPE_UNKNOWN); break;
-            case TOKEN_EQUAL        : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN       , 2, TYPE_UNKNOWN); break;
-            case TOKEN_PLUS_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_ADD   , 2, TYPE_UNKNOWN); break;
-            case TOKEN_MINUS_EQUAL  : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_SUB   , 2, TYPE_UNKNOWN); break;
-            case TOKEN_STAR_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_MUL   , 2, TYPE_UNKNOWN); break;
-            case TOKEN_PERCENT_EQUAL: op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_MOD   , 2, TYPE_UNKNOWN); break;
-            case TOKEN_PLUS_PLUS    : op = MAKE_OP_FROM_TOKEN(token, OP_POST_INC     , 1, TYPE_UNKNOWN); break;
-            case TOKEN_MINUS_MINUS  : op = MAKE_OP_FROM_TOKEN(token, OP_POST_DEC     , 1, TYPE_UNKNOWN); break;
-            case TOKEN_LEFT_SQUARE  : op = MAKE_OP_FROM_TOKEN(token, OP_INDEX        , 2, TYPE_UNKNOWN); break;
-            case TOKEN_LEFT_PAREN   : op = MAKE_OP_FROM_TOKEN(token, OP_CALL         , 1, TYPE_UNKNOWN); break;
+            case TOKEN_PLUS         : op = MAKE_OP_FROM_TOKEN(token, OP_ADD          , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_MINUS        : op = MAKE_OP_FROM_TOKEN(token, OP_SUB          , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_STAR         : op = MAKE_OP_FROM_TOKEN(token, OP_MUL          , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_SLASH        : op = MAKE_OP_FROM_TOKEN(token, OP_DIV          , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_PERCENT      : op = MAKE_OP_FROM_TOKEN(token, OP_MOD          , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_AND          : op = MAKE_OP_FROM_TOKEN(token, OP_AND          , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_OR           : op = MAKE_OP_FROM_TOKEN(token, OP_OR           , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_EQUAL_EQUAL  : op = MAKE_OP_FROM_TOKEN(token, OP_EQUAL        , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_BANG_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_NOT_EQUAL    , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_GREATER      : op = MAKE_OP_FROM_TOKEN(token, OP_GREATER      , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_LESS         : op = MAKE_OP_FROM_TOKEN(token, OP_LESS         , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_GREATER_EQUAL: op = MAKE_OP_FROM_TOKEN(token, OP_GREATER_EQUAL, 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_LESS_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_LESS_EQUAL   , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_DOT          : op = MAKE_OP_FROM_TOKEN(token, OP_ACCESS       , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_COLON        : op = MAKE_OP_FROM_TOKEN(token, OP_CHAIN        , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_EQUAL        : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN       , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_PLUS_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_ADD   , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_MINUS_EQUAL  : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_SUB   , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_STAR_EQUAL   : op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_MUL   , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_PERCENT_EQUAL: op = MAKE_OP_FROM_TOKEN(token, OP_ASSIGN_MOD   , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_PLUS_PLUS    : op = MAKE_OP_FROM_TOKEN(token, OP_POST_INC     , 1, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_MINUS_MINUS  : op = MAKE_OP_FROM_TOKEN(token, OP_POST_DEC     , 1, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_LEFT_SQUARE  : op = MAKE_OP_FROM_TOKEN(token, OP_INDEX        , 2, CONSTRUCT_UNKNOWN); break;
+            case TOKEN_LEFT_PAREN   : op = MAKE_OP_FROM_TOKEN(token, OP_CALL         , 1, CONSTRUCT_UNKNOWN); break;
             default:
                 should_break_loop = true;
         }
@@ -634,9 +683,10 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
             }
             else
             {
-                arrins(expr, 0, op);
-                //fprintf(stderr, "Parser line %d: Postfix parsing not implemented.\n", __LINE__);
-                //exit(1);
+                // TODO: Properly implement postfix parsing.
+                // arrins(expr, 0, op);
+                fprintf(stderr, "Parser line %d: Postfix parsing not implemented.\n", __LINE__);
+                exit(1);
             }
 
             continue;
@@ -665,6 +715,8 @@ ExprOp* parser_parse_expr_inner(Parser* parser, int min_binding_power)
 
 }
 #undef MAKE_OP_FROM_TOKEN
+#undef CONSTRUCT_PRIMITIVE
+#undef CONSTRUCT_UNKNOWN
 
 void prefix_binding_power(ExprOpKind op_type, int* right)
 {
@@ -838,7 +890,7 @@ void print_expr_op(ExprOp* op)
     for (int i = 0; i < len; ++i)
     {
         ExprOp e = op[i];
-        const char* type = show_op_type(e.op_type); 
+        // const char* type = show_op_type(e.op_type); 
         printf(
             "[%d:%d:%d]: '%.*s'\n",
             e.line   ,
