@@ -4,17 +4,88 @@
 // Pratt parser
 Expr* parser_parse_expr(Parser* parser)
 {
-//    Token token;
-//
-//    // First, we parse the primary expressions.
-//    token = parser_peek(parser);
-//    switch (token)
-//    {
-//        case TOKEN_IDENTIFIER
-//    }
+    Expr* expr = NULL;
+    Token token;
+
+    expr = parser_parse_expr_primary(parser);
 
     fprintf(stderr, "[%s:%d] Expression parsing: Not implemented yet.\n", __FILE__, __LINE__);
     exit(1);
+}
+
+// Returns NULL on failure
+Expr* parser_parse_expr_primary(Parser* parser)
+{
+    Expr  outer_expr ;
+    Expr* expr = NULL;
+
+    ExprPrimary* expr_primary = NULL;
+    Type* type = NULL;
+
+    token = parser_peek(parser);
+    switch (token.type)
+    {
+        case TOKEN_IDENTIFIER:
+        case TOKEN_NIL_V     :
+            expr_primary = construct_expr_primary(EXPR_PRIMARY_NIL    , &type, (char*) token.start, token.length);
+        case TOKEN_FALSE     :
+        case TOKEN_TRUE      :
+            expr_primary = construct_expr_primary(EXPR_PRIMARY_BOOLEAN, &type, (char*) token.start, token.length);
+        case TOKEN_INTEGER   :
+            expr_primary = construct_expr_primary(EXPR_PRIMARY_INTEGER, &type, (char*) token.start, token.length);
+        case TOKEN_NUMBER    :
+            expr_primary = construct_expr_primary(EXPR_PRIMARY_REAL   , &type, (char*) token.start, token.length);
+        case TOKEN_STRING    :
+            expr_primary = construct_expr_primary(EXPR_PRIMARY_STRING , &type, (char*) token.start, token.length);
+        default:
+    }
+
+    outer_expr = (Expr)
+    {
+        .kind         = EXPR_PRIMARY,
+        .type         = type        ,
+        .line         = token.line  ,
+        .column       = token.column,
+        .length       = token.length,
+        .expr.primary = expr_primary,
+    };
+
+    expr = arena_push(&parser->arena, &outer_expr, sizeof(Expr));
+    return expr;
+}
+
+// 'type' is type to construct
+ExprPrimary* construct_expr_primary(ExprPrimaryKind kind, Type** type, char* string, int length)
+{
+    ExprPrimary* expr_primary     = NULL;
+    ExprPrimary  expr_primary_mem       ;
+
+    Type* type = NULL;
+    Type  type_mem   ;
+
+    expr_primary.kind = kind;
+
+    type = (Type)
+    {
+        .kind         = TYPE_NIL,
+        .type.primary = NULL    ,
+    };
+
+    switch (kind)
+    {
+        case EXPR_PRIMARY_NIL     :
+            expr_primary.primary.nil = NULL;
+            break;
+        case EXPR_PRIMARY_BOOLEAN:
+            // This is a little fragile
+            break;
+    }
+
+    expr_primary = arena_push(&parser->arena, &expr_primary_mem, sizeof(ExprPrimary));
+    type         = arena_push(&parser->arena, &type_mem        , sizeof(Type)       );
+
+    *type = type;
+    return expr_primary;
 }
 
 void prefix_binding_power(ExprKind op_kind, int* right)

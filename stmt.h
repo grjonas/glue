@@ -1,6 +1,7 @@
 #ifndef STMT_H
 #define STMT_H
 
+#include "scanner.h"
 #include "parser.h"
 #include "expr.h"
 

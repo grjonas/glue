@@ -48,7 +48,7 @@ struct Type
         TypeFunction* function   ;
         TypeStruct  * struct_type;
     }
-    body;
+    type;
 };
 
 struct TypeFunction

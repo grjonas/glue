@@ -5,77 +5,86 @@
 #include "type.h"
 
 typedef struct Expr            Expr           ;
-typedef struct ExprOperand     ExprOperand    ;
+typedef struct ExprPrimary     ExprPrimary    ;
 typedef struct ExprUnary       ExprUnary      ;
 typedef struct ExprBinary      ExprBinary     ;
 typedef struct ExprFn          ExprFn         ;
 
 typedef enum   ExprKind        ExprKind       ;
-typedef enum   ExprOperandKind ExprOperandKind;
+typedef enum   ExprPrimaryKind ExprPrimaryKind;
 typedef enum   ExprUnaryKind   ExprUnaryKind  ;
 typedef enum   ExprBinaryKind  ExprBinaryKind ;
 // typedef enum   ExprFnKind      ExprFnKind     ;
 
 // Expr
+// enum ExprKind
+// {
+//     // Atom
+//     OP_STRING,
+//     OP_IDENTIFIER,
+//     OP_INTEGER,
+//     OP_NUMBER,
+//     OP_TRUE,
+//     OP_FALSE,
+//     OP_NIL,
+//     OP_PRINT,
+//     // Prefix
+//     OP_NEG, // unary '-'
+//     OP_NOT,
+//     OP_PRE_INC,
+//     OP_PRE_DEC,
+//     // Postfix
+//     OP_INDEX,
+//     OP_POST_INC,
+//     OP_POST_DEC,
+//     // Infix
+//     OP_ADD,
+//     OP_SUB,
+//     OP_MUL,
+//     OP_DIV,
+//     OP_MOD,
+//     OP_AND,
+//     OP_OR ,
+//     OP_GREATER,
+//     OP_LESS,
+//     OP_GREATER_EQUAL,
+//     OP_LESS_EQUAL,
+//     OP_EQUAL,
+//     OP_NOT_EQUAL,
+//     OP_ACCESS,
+//     OP_CHAIN,
+//     // Assign (right associative)
+//     OP_ASSIGN,
+//     OP_ASSIGN_ADD,
+//     OP_ASSIGN_SUB,
+//     OP_ASSIGN_MUL,
+//     OP_ASSIGN_MOD,
+//     // Unique
+//     OP_CALL,
+//     //OP_COLON, // technically binary, but it has different behaviour
+// };
+
 enum ExprKind
 {
-    // Atom
-    OP_STRING,
-    OP_IDENTIFIER,
-    OP_INTEGER,
-    OP_NUMBER,
-    OP_TRUE,
-    OP_FALSE,
-    OP_NIL,
-    OP_PRINT,
-    // Prefix
-    OP_NEG, // unary '-'
-    OP_NOT,
-    OP_PRE_INC,
-    OP_PRE_DEC,
-    // Postfix
-    OP_INDEX,
-    OP_POST_INC,
-    OP_POST_DEC,
-    // Infix
-    OP_ADD,
-    OP_SUB,
-    OP_MUL,
-    OP_DIV,
-    OP_MOD,
-    OP_AND,
-    OP_OR ,
-    OP_GREATER,
-    OP_LESS,
-    OP_GREATER_EQUAL,
-    OP_LESS_EQUAL,
-    OP_EQUAL,
-    OP_NOT_EQUAL,
-    OP_ACCESS,
-    OP_CHAIN,
-    // Assign (right associative)
-    OP_ASSIGN,
-    OP_ASSIGN_ADD,
-    OP_ASSIGN_SUB,
-    OP_ASSIGN_MUL,
-    OP_ASSIGN_MOD,
-    // Unique
-    OP_CALL,
-    //OP_COLON, // technically binary, but it has different behaviour
+    EXPR_PRIMARY.
+    EXPR_UNARY  ,
+    EXPR_BINARY ,
+    EXPR_FN     ,
 };
 
-// TODO: Redo ExprOperandKind later.
-enum ExprOperandKind
+// TODO: Redo ExprPrimaryKind later.
+enum ExprPrimaryKind
 {
-    EXPR_OPERAND_BOOLEAN   ,
-    EXPR_OPERAND_STRING    ,
-    EXPR_OPERAND_NATURAL   ,
-    EXPR_OPERAND_INTEGER   ,
-    EXPR_OPERAND_REAL      ,
-    EXPR_OPERAND_STRUCT    ,
-    EXPR_OPERAND_FN        ,
-    EXPR_OPERAND_IDENTIFIER,
-    EXPR_OPERAND_PRINT     ,
+    EXPR_PRIMARY_NIL       ,
+    EXPR_PRIMARY_BOOLEAN   ,
+    EXPR_PRIMARY_STRING    ,
+    EXPR_PRIMARY_NATURAL   ,
+    EXPR_PRIMARY_INTEGER   ,
+    EXPR_PRIMARY_REAL      ,
+    EXPR_PRIMARY_STRUCT    ,
+    EXPR_PRIMARY_FN        ,
+    EXPR_PRIMARY_IDENTIFIER,
+    EXPR_PRIMARY_PRINT     ,
 };
 
 enum ExprUnaryKind
@@ -119,20 +128,21 @@ struct Expr
 
     union
     {
-        ExprOperand* operand;
+        ExprPrimary* operand;
         ExprUnary  * unary  ;
         ExprBinary * binary ;
         ExprFn     * fn     ;
     }
-    stmt;
+    expr;
 };
 
-struct ExprOperand
+struct ExprPrimary
 {
-    ExprOperandKind kind;
+    ExprPrimaryKind kind;
     union
     {
         // Nil is not included here
+        char* nil       ; // Always NULL here.
         char* identifier;
         bool  boolean   ;
         char* string    ;
@@ -142,13 +152,13 @@ struct ExprOperand
         char* obj       ; // Some kind of other object.
         // struct
     }
-    operand;
+    primary;
 };
 
 struct ExprUnary
 {
     ExprUnaryKind kind;
-    Expr* expr;
+    Expr* unary;
 };
 
 struct ExprBinary
