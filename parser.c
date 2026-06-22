@@ -18,6 +18,26 @@ Parser init_parser(Scanner scanner)
     return parser;
 }
 
+void parser_free(Parser* parser)
+{
+    free((char*) parser->txt);
+    arrfree(parser->tokens);
+    arena_free(&parser->arena);
+    assert(parser->log == NULL); // Idk, placed it here just in case.
+    // arrfree(log);
+
+    *parser = (Parser)
+    {
+        .state   = PARSER_STATE_UNPARSED,
+        .txt     = NULL                 ,
+        .tokens  = NULL                 ,
+        .start   = -1                   ,
+        .end     = -1                   ,
+        .current = -1                   ,
+        .log     = NULL                 ,
+    };
+}
+
 Token parser_peek(Parser* parser)
 {
     const char* err = "No more tokens left.";
@@ -106,6 +126,7 @@ Stmt* parser_parse_stmt(Parser* parser)
     StmtWhile* stmt_while = NULL;
     StmtBlock* stmt_block = NULL;
     StmtFn   * stmt_fn    = NULL;
+    ExprOp   * expr       = NULL;
 
     parser_skip(parser, is_newline);
     token = parser_peek(parser);
@@ -213,11 +234,28 @@ Stmt* parser_parse_stmt(Parser* parser)
 
             stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
             return stmt;
-
         default:
             // TODO: Implement parsing expression statements.
-            fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
-            exit(1);
+            outer_stmt  = (Stmt)
+            {
+                .kind   = STMT_EXPR   ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = -1          ,
+            };
+
+            expr = parser_parse_expr(parser);
+            if (expr == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse expression.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            outer_stmt.stmt.expr = expr;
+
+            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
+            return stmt;
+            // fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
+            // exit(1);
     }
 }
 
@@ -458,7 +496,7 @@ StmtFn* parser_parse_stmt_fn(Parser* parser)
         exit(1);
     }
 
-    token = parser_peek(parser);
+    token = parser_next(parser);
     if (token.type != TOKEN_LEFT_PAREN)
     {
         fprintf(stderr, "[%s:%d] Statement parsing: Expected '(' after function name.\n", __FILE__, __LINE__);

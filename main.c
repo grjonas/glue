@@ -44,9 +44,8 @@ int main(int argc, char** argv)
 
     print_stmt(stmt);
 
-    // char* ls = NULL;
-    // assert(arrlen(ls) == 0);
-    // arrput(ls, 'k');
+    parser_free(&parser);
+
     // assert(arrlen(ls) == 1);
     // arrfree(ls);
     // assert(arrlen(ls) == 0);

@@ -30,6 +30,7 @@ enum ParserState
 {
     PARSER_STATE_UNPARSED,
     PARSER_STATE_PARSED  ,
+    PARSER_STATE_FREED   ,
 };
 
 struct Parser
@@ -256,7 +257,7 @@ struct ExprOp
 };
 
 Parser init_parser(Scanner scanner);
-Parser free_parser(Scanner scanner);
+void parser_free(Parser* parser);
 
 Token parser_peek(Parser* parser);
 Token parser_next(Parser* parser);
