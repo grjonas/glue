@@ -105,6 +105,7 @@ Stmt* parser_parse_stmt(Parser* parser)
     StmtIf   * stmt_if    = NULL;
     StmtWhile* stmt_while = NULL;
     StmtBlock* stmt_block = NULL;
+    StmtFn   * stmt_fn    = NULL;
 
     parser_skip(parser, is_newline);
     token = parser_peek(parser);
@@ -128,11 +129,6 @@ Stmt* parser_parse_stmt(Parser* parser)
             outer_stmt.stmt.let = stmt_let;
 
             stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            if (stmt == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
-                exit(1);
-            }
             return stmt;
 
         case TOKEN_IF:
@@ -153,11 +149,6 @@ Stmt* parser_parse_stmt(Parser* parser)
             outer_stmt.stmt.if_stmt = stmt_if;
 
             stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            if (stmt == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
-                exit(1);
-            }
             return stmt;
 
         case TOKEN_WHILE:
@@ -178,11 +169,6 @@ Stmt* parser_parse_stmt(Parser* parser)
             outer_stmt.stmt.while_stmt = stmt_while;
 
             stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            if (stmt == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
-                exit(1);
-            }
             return stmt;
 
         case TOKEN_ERROR:
@@ -206,11 +192,26 @@ Stmt* parser_parse_stmt(Parser* parser)
             outer_stmt.stmt.block = stmt_block;
 
             stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            if (stmt == NULL)
+            return stmt;
+
+        case TOKEN_FN:
+            outer_stmt  = (Stmt)
             {
-                fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+                .kind   = STMT_FN     ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = -1          ,
+            };
+
+            stmt_fn = parser_parse_stmt_fn(parser);
+            if (stmt_fn == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse function.\n", __FILE__, __LINE__);
                 exit(1);
             }
+            outer_stmt.stmt.fn = stmt_fn;
+
+            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
             return stmt;
 
         default:
@@ -269,7 +270,6 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
             arrput(stmts, stmt);
         }
 
-        // TODO: Check if stb_ds arrlen returns zero upon encountering a NULL ptr (I reckon yes).
         if (stmts != NULL)
         {
             Stmt** tmp_ptr = NULL;
@@ -292,12 +292,7 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
     parser->end     = end  ;
     parser->current = start;
 
-    stmt_block = arena_push(&parser->arena, &block_mem, sizeof(StmtBlock));
-    if (stmt_block == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to push to arena.\n", __FILE__, __LINE__);
-        exit(1);
-    }
+    stmt_block = (StmtBlock*) arena_push(&parser->arena, &block_mem, sizeof(StmtBlock));
 
     return stmt_block;
 }
@@ -359,11 +354,6 @@ StmtLet* parser_parse_stmt_let(Parser* parser)
     }
 
     return_stmt = (StmtLet*) arena_push(&parser->arena, &stmt_let, sizeof(StmtLet));
-    if (return_stmt == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
-        exit(1);
-    }
 
     return return_stmt;
 }
@@ -403,11 +393,6 @@ StmtIf* parser_parse_stmt_if(Parser* parser)
 
     // TODO: Implement else branch parsing
     return_stmt = (StmtIf*) arena_push(&parser->arena, &stmt_if, sizeof(StmtIf));
-    if (return_stmt == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
-        exit(1);
-    }
 
     return return_stmt;
 }
@@ -445,11 +430,160 @@ StmtWhile* parser_parse_stmt_while(Parser* parser)
     stmt_while.body = body;
 
     return_stmt = (StmtWhile*) arena_push(&parser->arena, &stmt_while, sizeof(StmtWhile));
-    if (return_stmt == NULL)
+
+    return return_stmt;
+}
+
+StmtFn* parser_parse_stmt_fn(Parser* parser)
+{
+    StmtFn  stmt_fn           ;
+    StmtFn* return_stmt = NULL;
+
+    char*       identifier  = NULL;
+    int         argc        = 0   ;
+    StmtFnArg** argv        = NULL;
+    Type*       return_type = NULL;
+    Stmt     *  body        = NULL;
+
+    Token token;
+    StmtFnArg*  curr_arg = NULL;
+    StmtFnArg** tmp_ptr;
+
+    parser_next(parser);
+
+    identifier = parser_parse_identifier(parser);
+    if (identifier == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Arena push failed.\n", __FILE__, __LINE__);
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse identifier.\n", __FILE__, __LINE__);
         exit(1);
     }
+
+    token = parser_peek(parser);
+    if (token.type != TOKEN_LEFT_PAREN)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Expected '(' after function name.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    token = parser_peek(parser);
+    // We check to see if the function is a prcedure or not.
+    if (token.type != TOKEN_RIGHT_PAREN)
+    {
+        // If it's not, then we parse an argument.
+        // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
+        // On TOKEN_COMMA, we continue the loop.
+        // On TOKEN_LEFT_PAREN, we exit the loop.
+        while (true)
+        {
+            curr_arg = parser_parse_stmt_fn_arg(parser);
+            if (curr_arg == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse function argument.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+
+            arrput(argv, curr_arg);
+            token = parser_peek(parser);
+            if (token.type == TOKEN_COMMA)
+            {
+                parser_next(parser);
+                continue;
+            }
+            else if (token.type == TOKEN_RIGHT_PAREN)
+            {
+                parser_next(parser);
+                break;
+            }
+            else
+            {
+                fprintf(stderr, "[%s:%d] Statement parsing: Expected ',' or ')' after function argument.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+        }
+
+        tmp_ptr = argv;
+        argc = arrlen(tmp_ptr);
+        argv = (StmtFnArg**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(StmtFnArg));
+        arrfree(tmp_ptr);
+    }
+    else
+    {
+        parser_next(parser);
+    }
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_COLON)
+    {
+        parser_next(parser);
+        return_type = parser_parse_type(parser);
+        if (return_type == NULL)
+        {
+            fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse return type.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+    }
+
+    body = parser_parse_stmt(parser);
+    if (body == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse function body.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    stmt_fn = (StmtFn)
+    {
+        .identifier  = identifier ,
+        .argc        = argc       ,
+        .argv        = argv       ,
+        .return_type = return_type,
+        .body        = body       ,
+    };
+
+    return_type = arena_push(&parser->arena, &stmt_fn, sizeof(StmtFn));
+    return return_stmt;
+
+    // fprintf(stderr, "[%s:%d] Statement parsing: Function parsing not implemented yet.\n", __FILE__, __LINE__);
+    // exit(1);
+}
+
+StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
+{
+    StmtFnArg  stmt_fn_arg       ;
+    StmtFnArg* return_stmt = NULL;
+
+    Token token;
+    char* identifier       = NULL;
+    Type* type             = NULL;
+
+    stmt_fn_arg = (StmtFnArg)
+    {
+        .identifier = NULL,
+        .type       = NULL,
+    };
+
+    identifier = parser_parse_identifier(parser);
+    if (identifier == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse identifier.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt_fn_arg.identifier = identifier;
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_COLON)
+    {
+        parser_next(parser);
+
+        type = parser_parse_type(parser);
+        if (type == NULL)
+        {
+            fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse type.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+        stmt_fn_arg.type = type;
+    }
+
+    return_stmt = (StmtFnArg*) arena_push(&parser->arena, &stmt_fn_arg, sizeof(StmtFnArg));
 
     return return_stmt;
 }
@@ -480,13 +614,8 @@ char* parser_parse_identifier(Parser* parser)
         memcpy(identifier, token.start, (size_t) length * sizeof(char));
 
         tmp_ptr = identifier;
-        identifier = arena_push(&parser->arena, identifier, (size_t) length * sizeof(char));
+        identifier = (char*) arena_push(&parser->arena, identifier, (size_t) length * sizeof(char));
         free(tmp_ptr);
-        if (identifier == NULL)
-        {
-            fprintf(stderr, "[%s:%d] Failed to push identifier to arena.\n", __FILE__, __LINE__);
-            exit(1);
-        }
     }
 
     return identifier;
@@ -532,12 +661,7 @@ Type* parser_parse_type_inner(Parser* parser)
             exit(1);
     }
 
-    type = arena_push(&parser->arena, &outer_type, sizeof(Type));
-    if (type == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Type parsing: Failed to push to arena.\n", __FILE__, __LINE__);
-        exit(1);
-    }
+    type = (Type*) arena_push(&parser->arena, &outer_type, sizeof(Type));
 
     return type;
 }
@@ -552,12 +676,7 @@ Type* construct_type_unknown(Arena* arena)
         .kind           = TYPE_UNKNOWN,
         .body.primitive = NULL        ,
     };
-    type = arena_push(arena, &type_mem, sizeof(Type));
-    if (type == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
-        exit(1);
-    }
+    type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
 
     return type;
 }
@@ -578,12 +697,7 @@ Type* construct_type_primitive(Arena* arena, TypeKind kind)
         .kind           = kind,
         .body.primitive = NULL,
     };
-    type = arena_push(arena, &type_mem, sizeof(Type));
-    if (type == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
-        exit(1);
-    }
+    type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
 
     return type;
 }
@@ -599,11 +713,6 @@ Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_t
     TypeFunction func_mem;  
 
     type_args = (Type*) arena_push(arena, argv, (size_t) argc * sizeof(Type));
-    if (type_args == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Type construction: Failed to push to arena.\n", __FILE__, __LINE__);
-        exit(1);
-    }
 
     func_mem = (TypeFunction)
     {

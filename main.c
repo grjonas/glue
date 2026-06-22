@@ -44,5 +44,13 @@ int main(int argc, char** argv)
 
     print_stmt(stmt);
 
+    // char* ls = NULL;
+    // assert(arrlen(ls) == 0);
+    // arrput(ls, 'k');
+    // assert(arrlen(ls) == 1);
+    // arrfree(ls);
+    // assert(arrlen(ls) == 0);
+    // printf("All tests passed!\n");
+
     return 0;
 }

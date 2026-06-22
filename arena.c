@@ -186,8 +186,21 @@ void* arena_push(Arena* arena, void* obj, size_t size)
 {
     void* memory = NULL;
 
-    if (arena == NULL || obj == NULL || size == 0)
-        return NULL;
+    if (arena == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Cannot allocate memory to a NULL arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    if (obj == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Cannot push empty object to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    if (size == 0)
+    {
+        fprintf(stderr, "[%s:%d] Cannot push objects of size 0 to arena.\n", __FILE__, __LINE__);
+        exit(1);
+    }
 
     arena_make_sure_block_list_is_initialized(arena);
     ArenaBlock* block = arena_get_block_with_enough_memory(arena, size);

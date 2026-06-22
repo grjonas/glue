@@ -19,7 +19,7 @@ typedef struct StmtLet      StmtLet     ;
 typedef struct StmtIf       StmtIf      ;
 typedef struct StmtElif     StmtElif    ;
 typedef struct StmtWhile    StmtWhile   ;
-typedef struct StmtFnArgs   StmtFnArgs  ;
+typedef struct StmtFnArg    StmtFnArg   ;
 typedef struct StmtFn       StmtFn      ;
 
 typedef struct TypeFunction TypeFunction;
@@ -130,16 +130,17 @@ struct StmtWhile
     Stmt  * body     ;
 };
 
+// TODO: Refactor this slightly such that we have a function Type field.
 struct StmtFn
 {
     char*       identifier ;
     int         argc       ;
-    StmtFnArgs* argv       ;
+    StmtFnArg** argv       ;
     Type*       return_type;
-    StmtBlock*  body       ;
+    Stmt     *  body       ;
 };
 
-struct StmtFnArgs
+struct StmtFnArg
 {
     char*   identifier;
     Type*   type      ;
@@ -264,13 +265,15 @@ Token parser_jump(Parser* parser, int new_state);
 Token parser_restore(Parser* parser, int old_state);
 
 // Stmt
-Stmt     * parser_parse_stmt      (Parser* parser);
+Stmt     * parser_parse_stmt       (Parser* parser);
 
-StmtBlock* parser_parse_stmt_block(Parser* parser);
-StmtLet  * parser_parse_stmt_let  (Parser* parser);
-StmtIf   * parser_parse_stmt_if   (Parser* parser);
-StmtWhile* parser_parse_stmt_while(Parser* parser);
-char     * parser_parse_identifier(Parser* parser);
+StmtBlock* parser_parse_stmt_block (Parser* parser);
+StmtLet  * parser_parse_stmt_let   (Parser* parser);
+StmtIf   * parser_parse_stmt_if    (Parser* parser);
+StmtWhile* parser_parse_stmt_while (Parser* parser);
+StmtFn   * parser_parse_stmt_fn    (Parser* parser);
+StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser);
+char     * parser_parse_identifier (Parser* parser);
 
 // Type parsing
 Type* parser_parse_type(Parser* parser);
