@@ -823,3 +823,14 @@ Token scanner_scan_identifier(Scanner* scanner)
 //        .length = 0
 //    };
 //}
+
+bool is_newline(TokenType type)
+{
+    switch (type)
+    {
+        case TOKEN_SEMICOLON: return true;
+        case TOKEN_NEWLINE  : return true;
+        default: return false;
+    }
+}
+

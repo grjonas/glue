@@ -1,0 +1,14 @@
+fn add(a: Int, b : Int) : Int
+do
+	return a + b
+end
+
+let a = 0
+let b = 1
+let c = 1
+while a < 100
+do
+	c = add(a, b)
+	a = b
+ 	b = c	
+end

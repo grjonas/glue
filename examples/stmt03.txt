@@ -1,0 +1,8 @@
+do
+	let a : Int = 5
+	while true do
+		let b = 4
+		do
+		end
+	end
+end

@@ -1,6 +1,9 @@
 #include "dependencies.h"
 #include "scanner.h"
 #include "parser.h"
+#include "stmt.h"
+#include "type.h"
+#include "expr.h"
 
 // Returns a null-terminated string that has the file's contents.
 // Needs to be freed.
@@ -39,10 +42,10 @@ int main(int argc, char** argv)
     // ExprOp* expr = parser_parse_expr(&parser);
     // print_expr_op(expr);
 
-    Stmt* stmt = parser_parse_stmt(&parser);
-    // parser_parse_stmt(&parser);
+    // Stmt* stmt = parser_parse_stmt(&parser);
+    parser_parse_stmt(&parser);
 
-    print_stmt(stmt);
+    // print_stmt(stmt);
 
     parser_free(&parser);
 
