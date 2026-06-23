@@ -236,6 +236,15 @@ Expr* parser_parse_expr_primary(Parser* parser)
             type         = arena_push(&parser->arena, &type_mem        , sizeof(Type)       );
             break;
 
+        case TOKEN_LEFT_PAREN:
+            expr = parser_parse_expr_parens(parser);
+            if (expr == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Expression parsing: Could not parse expression inside parentheses.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            return expr;
+
         default:
             fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
             exit(1);
@@ -252,6 +261,49 @@ Expr* parser_parse_expr_primary(Parser* parser)
     };
 
     expr = arena_push(&parser->arena, &outer_expr, sizeof(Expr));
+    return expr;
+}
+
+// Maybe this is a bit overengineered,
+// but in the event I refactor the parser and forget to change this,
+// This should come in handy.
+Expr* parser_parse_expr_parens(Parser* parser)
+{
+    Expr* expr = NULL;
+    int start  = -1;
+    int end    = -1;
+
+    unsigned int depth = 1;
+
+    parser_next(parser);
+    start = parser->current;
+    end   = parser->end    ;
+
+    while (depth > 0)
+    {
+        Token token = parser_next(parser);
+        if (token.type == TOKEN_ERROR)
+        {
+            fprintf(stderr, "[%s:%d] Expression parsing: Could not find matching parenthese.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+        else if (token.type == TOKEN_LEFT_PAREN)
+        {
+            ++depth;
+        }
+        else if (token.type == TOKEN_RIGHT_PAREN)
+        {
+            --depth;
+        }
+    }
+
+    expr = parser_parse_expr(parser);
+
+    // After return
+    parser->start   = start;
+    parser->end     = end  ;
+    parser->current = start;
+
     return expr;
 }
 
