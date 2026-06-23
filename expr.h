@@ -66,7 +66,7 @@ typedef enum   ExprBinaryKind  ExprBinaryKind ;
 
 enum ExprKind
 {
-    EXPR_PRIMARY.
+    EXPR_PRIMARY,
     EXPR_UNARY  ,
     EXPR_BINARY ,
     EXPR_FN     ,
@@ -75,6 +75,7 @@ enum ExprKind
 // TODO: Redo ExprPrimaryKind later.
 enum ExprPrimaryKind
 {
+    EXPR_PRIMARY_UNKNOWN   ,
     EXPR_PRIMARY_NIL       ,
     EXPR_PRIMARY_BOOLEAN   ,
     EXPR_PRIMARY_STRING    ,
@@ -89,6 +90,7 @@ enum ExprPrimaryKind
 
 enum ExprUnaryKind
 {
+    EXPR_UNARY_UNKNOWN       ,
     EXPR_UNARY_PRE_INCREMENT ,
     EXPR_UNARY_PRE_DECREMENT ,
     EXPR_UNARY_POST_INCREMENT,
@@ -99,6 +101,7 @@ enum ExprUnaryKind
 
 enum ExprBinaryKind
 {
+    EXPR_BINARY_UNKNOWN      ,
     EXPR_BINARY_ADD          ,
     EXPR_BINARY_SUBTRACT     ,
     EXPR_BINARY_MULTIPLY     ,
@@ -128,7 +131,7 @@ struct Expr
 
     union
     {
-        ExprPrimary* operand;
+        ExprPrimary* primary;
         ExprUnary  * unary  ;
         ExprBinary * binary ;
         ExprFn     * fn     ;
@@ -147,7 +150,7 @@ struct ExprPrimary
         bool  boolean   ;
         char* string    ;
         char* natural   ; // These will have to be changed later i think.
-        char  integer   ; // These will have to be changed later i think.
+        char* integer   ; // These will have to be changed later i think.
         char* real      ; // These will have to be changed later i think.
         char* obj       ; // Some kind of other object.
         // struct
@@ -182,6 +185,9 @@ struct ExprFn
 // }
 // LhsOpType;
 Expr* parser_parse_expr(Parser* parser);
+Expr* parser_parse_expr_primary(Parser* parser);
+
+ExprBinary get_infix_operator(Token token, int* left_bp, int* right_bp);
 
 void prefix_binding_power(ExprKind op_type, int* right);
 bool postfix_binding_power(ExprKind op_type, int* left);

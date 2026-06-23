@@ -1,6 +1,7 @@
 # Parser
-- [ ]: Implement type parsing.
+- [X]: Implement type parsing. (basic)
 - [ ]: Rewrite expression parsing to use new type structure.
-- [ ]: Implement statement parsing.
+- [X]: Implement statement parsing.
 - [ ]: Implement proper error handling parser.
-- [ ]: Split statment parsing function into multiple functions.
+- [X]: Split statment parsing function into multiple functions.
+- [ ]: Rethink TOKEN_EOF, TOKEN_ERROR, and other such stuff.

@@ -17,7 +17,7 @@ Type* parser_parse_type_inner(Parser* parser)
     outer_type = (Type)
     {
         .kind           = TYPE_UNKNOWN,
-        .body.primitive = NULL        , // Assumes primitive, though this should set all pointers to NULL.
+        .type.primitive = NULL        , // Assumes primitive, though this should set all pointers to NULL.
     };
 
     token = parser_next(parser);
@@ -53,7 +53,7 @@ Type* construct_type_unknown(Arena* arena)
     type_mem = (Type)
     {
         .kind           = TYPE_UNKNOWN,
-        .body.primitive = NULL        ,
+        .type.primitive = NULL        ,
     };
     type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
 
@@ -74,7 +74,7 @@ Type* construct_type_primitive(Arena* arena, TypeKind kind)
     type_mem = (Type)
     {
         .kind           = kind,
-        .body.primitive = NULL,
+        .type.primitive = NULL,
     };
     type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
 
@@ -109,7 +109,7 @@ Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_t
     type_mem = (Type)
     {
         .kind          = TYPE_FUNCTION,
-        .body.function = type_function,
+        .type.function = type_function,
     };
     type = (Type*) arena_push(arena, &type_mem, sizeof(Type));
     if (type == NULL)

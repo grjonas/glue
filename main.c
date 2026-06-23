@@ -45,6 +45,8 @@ int main(int argc, char** argv)
     // Stmt* stmt = parser_parse_stmt(&parser);
     parser_parse_stmt(&parser);
 
+    Expr* expr = NULL;
+    expr = parser_parse_expr(&parser);
     // print_stmt(stmt);
 
     parser_free(&parser);

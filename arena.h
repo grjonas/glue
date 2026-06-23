@@ -36,5 +36,6 @@ void arena_init(Arena* arena);
 void arena_free(Arena* arena);
 
 void* arena_push(Arena* arena, void* obj, size_t size);
+void* arena_push_empty(Arena* arena, size_t size);
 
 #endif

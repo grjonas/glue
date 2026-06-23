@@ -214,3 +214,21 @@ void* arena_push(Arena* arena, void* obj, size_t size)
 
     return memory;
 }
+
+// Ehh, implementation could be more efficient, but it is what it is.
+void* arena_push_empty(Arena* arena, size_t size)
+{
+    char* mem = NULL;
+    void* ret = NULL;
+
+    mem = calloc(size, sizeof(char));
+    if (mem == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Unable to allocate memory.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    ret = arena_push(arena, mem, size);
+    free(mem);
+    return ret;
+}
