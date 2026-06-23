@@ -9,15 +9,46 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
     Expr* rhs = NULL;
 
     Expr        expr_mem       ;
+    ExprUnary   expr_unary_mem ;
     ExprBinary  expr_binary_mem;
-    // Expr      * expr            = NULL;
-    ExprBinary* expr_binary     = NULL;
 
-    int left_bp, right_bp; // 'bp' stands for 'binding power'
+    // Expr      * expr     = NULL;
+    ExprUnary * expr_unary  = NULL;
+    ExprBinary* expr_binary = NULL;
+
+    int left_bp = -1, right_bp = -1; // 'bp' stands for 'binding power'
 
     Token token;
 
     lhs = parser_parse_expr_primary(parser);
+    if (lhs == NULL)
+    {
+        token = parser_peek(parser);
+        expr_unary_mem = get_prefix_operator(token, &right_bp);
+        if (expr_unary_mem.kind == EXPR_UNARY_UNKNOWN)
+        {
+            fprintf(stderr, "[%s:%d] Expression parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
+            exit(1);
+        }
+        parser_next(parser);
+
+        rhs = parser_parse_expr_inner(parser, right_bp);
+
+        expr_unary_mem.unary = rhs;
+        expr_unary = (ExprUnary*) arena_push(&parser->arena, &expr_unary_mem, sizeof(ExprUnary));
+
+        expr_mem = (Expr)
+        {
+            // TODO: Fix txt position information.
+            .kind        = EXPR_UNARY  ,
+            .line        = token.line  ,
+            .column      = token.column,
+            .length      = token.length,
+            .expr.unary  = expr_unary  ,
+        };
+
+        lhs = arena_push(&parser->arena, &expr_mem, sizeof(Expr));
+    }
 
     while (true)
     {
@@ -64,6 +95,26 @@ Expr* parser_parse_expr(Parser* parser)
     return parser_parse_expr_inner(parser, 0);
 }
 
+ExprUnary  get_prefix_operator(Token token, int* right_bp)
+{
+    ExprUnary expr_unary_mem = (ExprUnary)
+    {
+        .kind  = EXPR_UNARY_UNKNOWN,
+        .unary = NULL              ,
+    };
+
+    switch (token.type)
+    {
+        case TOKEN_NOT : expr_unary_mem.kind = EXPR_UNARY_NOT   ; *right_bp = 11; break;
+        case TOKEN_BANG: expr_unary_mem.kind = EXPR_UNARY_NEGATE; *right_bp = 11; break;
+        default:
+            expr_unary_mem.kind = EXPR_UNARY_UNKNOWN;
+            *right_bp = -1;
+    }
+
+    return expr_unary_mem;
+}
+
 ExprBinary get_infix_operator(Token token, int* left_bp, int* right_bp)
 {
     ExprBinary expr_binary_mem = (ExprBinary)
@@ -101,7 +152,9 @@ ExprBinary get_infix_operator(Token token, int* left_bp, int* right_bp)
     return expr_binary_mem;
 }
 
-// Returns NULL on failure
+// On failure, returns NULL, doesn't change parser state.
+// Possible to make the code smaller, but I'm going to refactor this later,
+// so I don't want any difficult to anticipate behaviour.
 Expr* parser_parse_expr_primary(Parser* parser)
 {
     Expr  outer_expr ;
@@ -120,6 +173,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
     switch (token.type)
     {
         case TOKEN_IDENTIFIER:
+            parser_next(parser);
+
             buffer = (char*) arena_push_empty(&parser->arena, (token.length + 1) * sizeof(char));
             memcpy(buffer, token.start, token.length * sizeof(char));
 
@@ -139,6 +194,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
             type         = arena_push(&parser->arena, &type_mem        , sizeof(Type)       );
             break;
         case TOKEN_NIL_V     :
+            parser_next(parser);
+
             expr_primary_mem = (ExprPrimary)
             {
                 .kind        = EXPR_PRIMARY_NIL,
@@ -159,6 +216,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
         case TOKEN_FALSE     :
             boolean_value = false;
         case TOKEN_TRUE      :
+            parser_next(parser);
+
             // 'boolean_value = true;' by default
             expr_primary_mem = (ExprPrimary)
             {
@@ -177,6 +236,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
             break;
 
         case TOKEN_INTEGER   :
+            parser_next(parser);
+
             buffer = (char*) arena_push_empty(&parser->arena, (token.length + 1) * sizeof(char));
             memcpy(buffer, token.start, token.length * sizeof(char));
 
@@ -197,6 +258,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
             break;
 
         case TOKEN_NUMBER    :
+            parser_next(parser);
+
             buffer = (char*) arena_push_empty(&parser->arena, (token.length + 1) * sizeof(char));
             memcpy(buffer, token.start, token.length * sizeof(char));
 
@@ -217,6 +280,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
             break;
 
         case TOKEN_STRING    :
+            parser_next(parser);
+
             buffer = (char*) arena_push_empty(&parser->arena, (token.length + 1) * sizeof(char));
             memcpy(buffer, token.start, token.length * sizeof(char));
 
@@ -246,8 +311,9 @@ Expr* parser_parse_expr_primary(Parser* parser)
             return expr;
 
         default:
-            fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
-            exit(1);
+            // fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
+            // exit(1);
+            return NULL;
     }
 
     outer_expr = (Expr)

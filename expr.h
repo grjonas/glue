@@ -91,10 +91,10 @@ enum ExprPrimaryKind
 enum ExprUnaryKind
 {
     EXPR_UNARY_UNKNOWN       ,
-    EXPR_UNARY_PRE_INCREMENT ,
-    EXPR_UNARY_PRE_DECREMENT ,
-    EXPR_UNARY_POST_INCREMENT,
-    EXPR_UNARY_POST_DECREMENT,
+    // EXPR_UNARY_PRE_INCREMENT ,
+    // EXPR_UNARY_PRE_DECREMENT ,
+    // EXPR_UNARY_POST_INCREMENT,
+    // EXPR_UNARY_POST_DECREMENT,
     EXPR_UNARY_NOT           ,
     EXPR_UNARY_NEGATE        ,
 };
@@ -188,6 +188,7 @@ Expr* parser_parse_expr(Parser* parser);
 Expr* parser_parse_expr_primary(Parser* parser);
 
 Expr* parser_parse_expr_parens(Parser* parser);
+ExprUnary  get_prefix_operator(Token token, int* right_bp);
 ExprBinary get_infix_operator(Token token, int* left_bp, int* right_bp);
 
 void prefix_binding_power(ExprKind op_type, int* right);
