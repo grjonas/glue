@@ -3,6 +3,7 @@
 
 #include "dependencies.h"
 #include "scanner.h"
+#include "compile_error.h"
 
 typedef struct Parser       Parser      ;
 typedef enum   ParserState  ParserState ;
@@ -36,7 +37,7 @@ struct Parser
     // char**  num_literals; // Not used right now
 
     // If we fail to parse something for whatever reason, we append an error message here.
-    char** log;
+    CompileError** errs;
 };
 
 Parser init_parser(Scanner scanner);
@@ -48,5 +49,7 @@ Token parser_next(Parser* parser);
 Token parser_jump(Parser* parser, int new_state);
 Token parser_restore(Parser* parser, int old_state);
 bool parser_skip(Parser* parser, bool (*predicate)(TokenType));
+
+void parser_throw_compiler_error(Parser* parser, CompileError err);
 
 #endif

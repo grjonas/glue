@@ -4,158 +4,65 @@
 // TODO: Implement length calculations when parsing.
 Stmt* parser_parse_stmt(Parser* parser)
 {
-    Token token     ;
-    Stmt  outer_stmt;
+    // Stmt     * stmt       = NULL;
+    // Expr     * expr       = NULL;
 
-    Stmt     * stmt       = NULL;
-    StmtLet  * stmt_let   = NULL;
-    StmtIf   * stmt_if    = NULL;
-    StmtWhile* stmt_while = NULL;
-    StmtBlock* stmt_block = NULL;
-    StmtFn   * stmt_fn    = NULL;
-    Expr   * expr       = NULL;
+    Token token;
 
     parser_skip(parser, is_newline);
     token = parser_peek(parser);
     switch (token.type)
     {
         case TOKEN_LET:
-            outer_stmt  = (Stmt)
-            {
-                .kind   = STMT_LET    ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = -1          ,
-            };
-
-            stmt_let = parser_parse_stmt_let(parser);
-            if (stmt_let == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse let statement.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            outer_stmt.stmt.let = stmt_let;
-
-            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            return stmt;
+            return parser_parse_stmt_let(parser);
 
         case TOKEN_IF:
-            outer_stmt  = (Stmt)
-            {
-                .kind   = STMT_IF     ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = -1          ,
-            };
-
-            stmt_if = parser_parse_stmt_if(parser);
-            if (stmt_if == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse if statement.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            outer_stmt.stmt.if_stmt = stmt_if;
-
-            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            return stmt;
+            return parser_parse_stmt_if(parser);
 
         case TOKEN_WHILE:
-            outer_stmt  = (Stmt)
-            {
-                .kind   = STMT_WHILE  ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = -1          ,
-            };
-
-            stmt_while = parser_parse_stmt_while(parser);
-            if (stmt_while == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse while statement.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            outer_stmt.stmt.while_stmt = stmt_while;
-
-            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            return stmt;
+            return parser_parse_stmt_while(parser);
 
         case TOKEN_ERROR:
             return NULL;
 
         case TOKEN_DO:
-            outer_stmt  = (Stmt)
-            {
-                .kind   = STMT_BLOCK  ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = -1          ,
-            };
-
-            stmt_block = parser_parse_stmt_block(parser);
-            if (stmt_block == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse 'do' block.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            outer_stmt.stmt.block = stmt_block;
-
-            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            return stmt;
+            return  parser_parse_stmt_block(parser);
 
         case TOKEN_FN:
-            outer_stmt  = (Stmt)
-            {
-                .kind   = STMT_FN     ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = -1          ,
-            };
+            return parser_parse_stmt_fn(parser);
 
-            stmt_fn = parser_parse_stmt_fn(parser);
-            if (stmt_fn == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse function.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            outer_stmt.stmt.fn = stmt_fn;
-
-            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            return stmt;
         default:
-            // TODO: Implement parsing expression statements.
-            outer_stmt  = (Stmt)
-            {
-                .kind   = STMT_EXPR   ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = -1          ,
-            };
-
-            expr = parser_parse_expr(parser);
-            if (expr == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse expression.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            outer_stmt.stmt.expr = expr;
-
-            stmt = (Stmt*) arena_push(&parser->arena, &outer_stmt, sizeof(Stmt));
-            return stmt;
+            return parser_parse_stmt_expr(parser);
             // fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
             // exit(1);
     }
 }
 
-StmtBlock* parser_parse_stmt_block(Parser* parser)
+Stmt* parser_parse_stmt_block(Parser* parser)
 {
-    StmtBlock* stmt_block = NULL;
-    StmtBlock  block_mem;
+    Stmt* stmt_ptr = NULL;
+    Stmt  stmt;
     int start  = -1;
     int end    = -1;
-
     unsigned int depth = 1;
 
-    parser_next(parser);
+    Token token;
+
+    token = parser_next(parser);
+    if (token.type != TOKEN_DO)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_BLOCK  ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+    };
+
     start = parser->current;
     end   = parser->end    ;
 
@@ -177,7 +84,7 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
         }
     }
 
-    block_mem = (StmtBlock)
+    stmt.stmt.block = (StmtBlock)
     {
         .size = 0   ,
         .body = NULL,
@@ -186,13 +93,11 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
     if (parser->current > start + 1)
     {
         Stmt** stmts = NULL;
-        Stmt*  stmt  = NULL;
-
         int   size = 0;
 
-        while ((stmt = parser_parse_stmt(parser)) != NULL)
+        while ((stmt_ptr = parser_parse_stmt(parser)) != NULL)
         {
-            arrput(stmts, stmt);
+            arrput(stmts, stmt_ptr);
         }
 
         if (stmts != NULL)
@@ -205,7 +110,7 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
             stmts = tmp_ptr;
         }
 
-        block_mem = (StmtBlock)
+        stmt.stmt.block = (StmtBlock)
         {
             .size = size ,
             .body = stmts,
@@ -217,37 +122,57 @@ StmtBlock* parser_parse_stmt_block(Parser* parser)
     parser->end     = end  ;
     parser->current = start;
 
-    stmt_block = (StmtBlock*) arena_push(&parser->arena, &block_mem, sizeof(StmtBlock));
-
-    return stmt_block;
+    stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
 }
 
-StmtLet* parser_parse_stmt_let(Parser* parser)
+Stmt* parser_parse_stmt_let(Parser* parser)
 {
-    StmtLet  stmt_let          ;
-    StmtLet* return_stmt = NULL;
+    Stmt* stmt_ptr = NULL;
+    Stmt  stmt;
 
-    Token    token             ;
-    char  *  identifier  = NULL;
-    Type  *  type        = NULL;
-    Expr*  expr        = NULL;
+    char* identifier = NULL;
+    Type* type       = NULL;
+    Expr* expr       = NULL;
 
-    stmt_let = (StmtLet)
+    Token token;
+
+    token = parser_next(parser);
+    if (token.type != TOKEN_LET)
     {
-        .identifier = NULL,
-        .type       = NULL,
-        .expr       = NULL,
-    };
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
 
-    parser_next(parser);
+    stmt = (Stmt)
+    {
+        .kind   = STMT_LET    ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+
+        .stmt.let = (StmtLet)
+        {
+            .identifier = NULL,
+            .type       = NULL,
+            .expr       = NULL,
+        },
+    };
 
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Could not find identifier.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Could not find identifier.",
+        });
+        return NULL;
     }
-    stmt_let.identifier = identifier;
+    stmt.stmt.let.identifier = identifier;
 
     token = parser_peek(parser);
     if (token.type == TOKEN_COLON)
@@ -257,10 +182,17 @@ StmtLet* parser_parse_stmt_let(Parser* parser)
         type = parser_parse_type(parser);
         if (type == NULL)
         {
-            fprintf(stderr, "[%s:%d] Statement parsing: Could not find type.\n", __FILE__, __LINE__);
-            exit(1);
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Could not find type while parsing the type of let statement.",
+            });
+            return NULL;
         }
-        stmt_let.type = type;
+        stmt.stmt.let.type = type;
     }
 
     // TODO: Fix this later, not a high priority, but this is kind of bothering me.
@@ -272,97 +204,159 @@ StmtLet* parser_parse_stmt_let(Parser* parser)
         expr = parser_parse_expr(parser);
         if (expr == NULL)
         {
-            fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
-            exit(1);
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Could not find expression on rhs of let statement.",
+            });
+            return NULL;
         }
-        stmt_let.expr = expr;
+        stmt.stmt.let.expr = expr;
     }
 
-    return_stmt = (StmtLet*) arena_push(&parser->arena, &stmt_let, sizeof(StmtLet));
-
-    return return_stmt;
+    stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
 }
 
-StmtIf* parser_parse_stmt_if(Parser* parser)
+Stmt* parser_parse_stmt_if(Parser* parser)
 {
-    StmtIf  stmt_if;
-    StmtIf* return_stmt = NULL;
+    Stmt* stmt_ptr = NULL;
+    Stmt  stmt;
 
-    Expr* condition   = NULL;
-    Stmt  * body        = NULL;
+    Expr* condition = NULL;
+    Stmt* body      = NULL;
 
-    stmt_if = (StmtIf)
+    Token token;
+
+    token = parser_next(parser);
+    if (token.type != TOKEN_IF)
     {
-        .condition = NULL,
-        .body      = NULL,
-        .stmt_else = NULL,
-    };
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
 
-    parser_next(parser);
+    stmt = (Stmt)
+    {
+        .kind   = STMT_IF     ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+
+        .stmt.iff = (StmtIf)
+        {
+            .condition = NULL,
+            .body      = NULL,
+            .next      = NULL,
+        }
+    };
 
     condition = parser_parse_expr(parser);
     if (condition == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Could not find expression while parsing if statement condition.",
+        });
+        return NULL;
     }
-    stmt_if.condition = condition;
+    stmt.stmt.iff.condition = condition;
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse inner statement.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Could not find inner statement in if statement.",
+        });
+        return NULL;
     }
-    stmt_if.body = body;
+    stmt.stmt.iff.body = body;
 
     // TODO: Implement else branch parsing
-    return_stmt = (StmtIf*) arena_push(&parser->arena, &stmt_if, sizeof(StmtIf));
-
-    return return_stmt;
+    stmt_ptr  = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
 }
 
-StmtWhile* parser_parse_stmt_while(Parser* parser)
+Stmt* parser_parse_stmt_while(Parser* parser)
 {
-    StmtWhile  stmt_while        ;
-    StmtWhile* return_stmt = NULL;
+    Stmt* stmt_ptr = NULL;
+    Stmt  stmt;
 
     Expr   * condition   = NULL;
     Stmt     * body        = NULL;
 
-    stmt_while = (StmtWhile)
-    {
-        .condition = NULL,
-        .body      = NULL,
-    };
+    Token token;
 
-    parser_next(parser);
+    token = parser_next(parser);
+    if (token.type != TOKEN_WHILE)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_WHILE  ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+
+        .stmt.whilee = (StmtWhile)
+        {
+            .condition = NULL,
+            .body      = NULL,
+        }
+    };
 
     condition = parser_parse_expr(parser);
     if (condition == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Could not find expression.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Could not find expression while parsing while statement condition.",
+        });
+        return NULL;
     }
-    stmt_while.condition = condition;
+    stmt.stmt.whilee.condition = condition;
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse inner statement.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Could not find inner statement in while statement.",
+        });
+        return NULL;
     }
-    stmt_while.body = body;
+    stmt.stmt.whilee.body = body;
 
-    return_stmt = (StmtWhile*) arena_push(&parser->arena, &stmt_while, sizeof(StmtWhile));
-
-    return return_stmt;
+    stmt_ptr  = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
 }
 
-StmtFn* parser_parse_stmt_fn(Parser* parser)
+Stmt* parser_parse_stmt_fn(Parser* parser)
 {
-    StmtFn  stmt_fn           ;
-    StmtFn* return_stmt = NULL;
+    Stmt* stmt_ptr = NULL;
+    Stmt  stmt;
 
     char*       identifier  = NULL;
     int         argc        = 0   ;
@@ -371,29 +365,66 @@ StmtFn* parser_parse_stmt_fn(Parser* parser)
     Stmt     *  body        = NULL;
 
     Token token;
-    StmtFnArg*  curr_arg = NULL;
-    StmtFnArg** tmp_ptr;
 
-    parser_next(parser);
+    token = parser_next(parser);
+    if (token.type != TOKEN_WHILE)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_FN     ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+
+        .stmt.fn = (StmtFn)
+        {
+            .identifier  = NULL,
+            .argc        = 0   ,
+            .argv        = NULL,
+            .return_type = NULL,
+            .body        = NULL,
+        }
+    };
 
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse identifier.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Could not parse function name.",
+        });
+        return NULL;
     }
 
     token = parser_next(parser);
     if (token.type != TOKEN_LEFT_PAREN)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Expected '(' after function name.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Expected '(' after function name.",
+        });
+        return NULL;
     }
 
     token = parser_peek(parser);
     // We check to see if the function is a prcedure or not.
     if (token.type != TOKEN_RIGHT_PAREN)
     {
+        StmtFnArg*  curr_arg = NULL;
+        StmtFnArg** tmp_ptr;
+
         // If it's not, then we parse an argument.
         // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
         // On TOKEN_COMMA, we continue the loop.
@@ -403,8 +434,15 @@ StmtFn* parser_parse_stmt_fn(Parser* parser)
             curr_arg = parser_parse_stmt_fn_arg(parser);
             if (curr_arg == NULL)
             {
-                fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse function argument.\n", __FILE__, __LINE__);
-                exit(1);
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Statement parsing: Failed to parse function argument.",
+                });
+                return NULL;
             }
 
             arrput(argv, curr_arg);
@@ -421,8 +459,15 @@ StmtFn* parser_parse_stmt_fn(Parser* parser)
             }
             else
             {
-                fprintf(stderr, "[%s:%d] Statement parsing: Expected ',' or ')' after function argument.\n", __FILE__, __LINE__);
-                exit(1);
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Statement parsing: Expected ',' or ')' after function argument.",
+                });
+                return NULL;
             }
         }
 
@@ -443,19 +488,33 @@ StmtFn* parser_parse_stmt_fn(Parser* parser)
         return_type = parser_parse_type(parser);
         if (return_type == NULL)
         {
-            fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse return type.\n", __FILE__, __LINE__);
-            exit(1);
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Failed to parse function return type.",
+            });
+            return NULL;
         }
     }
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse function body.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Failed to parse function body.",
+        });
+        return NULL;
     }
 
-    stmt_fn = (StmtFn)
+    stmt.stmt.fn = (StmtFn)
     {
         .identifier  = identifier ,
         .argc        = argc       ,
@@ -464,11 +523,8 @@ StmtFn* parser_parse_stmt_fn(Parser* parser)
         .body        = body       ,
     };
 
-    return_type = arena_push(&parser->arena, &stmt_fn, sizeof(StmtFn));
-    return return_stmt;
-
-    // fprintf(stderr, "[%s:%d] Statement parsing: Function parsing not implemented yet.\n", __FILE__, __LINE__);
-    // exit(1);
+    stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
 }
 
 StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
@@ -489,8 +545,15 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse identifier.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Failed to parse function argument name.",
+        });
+        return NULL;
     }
     stmt_fn_arg.identifier = identifier;
 
@@ -502,15 +565,45 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
         type = parser_parse_type(parser);
         if (type == NULL)
         {
-            fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse type.\n", __FILE__, __LINE__);
-            exit(1);
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Failed to parse function argument type declaration.",
+            });
+            return NULL;
         }
         stmt_fn_arg.type = type;
     }
 
     return_stmt = (StmtFnArg*) arena_push(&parser->arena, &stmt_fn_arg, sizeof(StmtFnArg));
-
     return return_stmt;
+}
+
+Stmt* parser_parse_stmt_expr(Parser* parser)
+{
+    Stmt* stmt_ptr = NULL;
+    Stmt stmt;
+    Expr* expr = NULL;
+
+    stmt.kind = STMT_EXPR;
+    stmt.stmt.expr = NULL     ;
+
+    expr = parser_parse_expr(parser);
+    if (expr == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse expression.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+    stmt.line   = expr->line  ;
+    stmt.column = expr->column;
+    stmt.length = expr->length;
+    stmt.stmt.expr = expr;
+
+    stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
 }
 
 // Identifier
@@ -553,7 +646,7 @@ const char* stmt_type_name(StmtKind kind)
         case STMT_LET:               return "STMT_LET";
         case STMT_EXPR:              return "STMT_EXPR";
         case STMT_IF:                return "STMT_IF";
-        case STMT_ELIF:              return "STMT_ELIF";
+        // case STMT_ELIF:              return "STMT_ELIF";
         // case STMT_ELSE:              return "STMT_ELSE";
         case STMT_WHILE:             return "STMT_WHILE";
         case STMT_BREAK:             return "STMT_BREAK";

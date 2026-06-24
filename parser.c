@@ -12,7 +12,7 @@ Parser init_parser(Scanner scanner)
         .start        = 0                         ,
         .end          = arrlen(scanner.token_list),
         .current      = 0                         ,
-        .log          = NULL                      ,
+        .errs         = NULL                      ,
     };
 
     return parser;
@@ -23,18 +23,18 @@ void parser_free(Parser* parser)
     free((char*) parser->txt);
     arrfree(parser->tokens);
     arena_free(&parser->arena);
-    assert(parser->log == NULL); // Idk, placed it here just in case.
-    // arrfree(log);
+    // assert(parser->log == NULL); // Idk, placed it here just in case.
+    arrfree(parser->errs);
 
     *parser = (Parser)
     {
-        .state   = PARSER_STATE_UNPARSED,
+        .state   = PARSER_STATE_FREED   ,
         .txt     = NULL                 ,
         .tokens  = NULL                 ,
         .start   = -1                   ,
         .end     = -1                   ,
         .current = -1                   ,
-        .log     = NULL                 ,
+        .errs    = NULL                 ,
     };
 }
 
@@ -101,4 +101,11 @@ bool parser_skip(Parser* parser, bool (*predicate)(TokenType))
             break;
     }
     return ret;
+}
+
+void parser_throw_compiler_error(Parser* parser, CompileError err)
+{
+    CompileError* err_ptr = NULL;
+    err_ptr = (CompileError*) arena_push(&parser->arena, &err, sizeof(CompileError));
+    arrput(parser->errs, err_ptr);
 }
