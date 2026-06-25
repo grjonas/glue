@@ -121,24 +121,6 @@ enum ExprBinaryKind
     // TODO: Add more types of assignment
 };
 
-struct Expr
-{
-    ExprKind kind;
-    Type*    type;
-    int line  ;
-    int column;
-    int length;
-
-    union
-    {
-        ExprPrimary* primary;
-        ExprUnary  * unary  ;
-        ExprBinary * binary ;
-        ExprFn     * fn     ;
-    }
-    expr;
-};
-
 struct ExprPrimary
 {
     ExprPrimaryKind kind;
@@ -177,6 +159,25 @@ struct ExprFn
     Expr*  caller;
     Expr** argv  ;
 };
+
+struct Expr
+{
+    ExprKind kind;
+    Type*    type;
+    int line  ;
+    int column;
+    int length;
+
+    union
+    {
+        ExprPrimary primary;
+        ExprUnary   unary  ;
+        ExprBinary  binary ;
+        ExprFn      fn     ;
+    }
+    expr;
+};
+
 // typedef enum
 // {
 //     LHS_OP_TYPE_ATOM  ,
@@ -185,16 +186,13 @@ struct ExprFn
 // }
 // LhsOpType;
 Expr* parser_parse_expr(Parser* parser);
+
 Expr* parser_parse_expr_primary(Parser* parser);
-
 Expr* parser_parse_expr_parens(Parser* parser);
-ExprUnary  get_prefix_operator(Token token, int* right_bp);
-ExprBinary get_infix_operator(Token token, int* left_bp, int* right_bp);
+Expr* parser_parse_expr_prefix(Parser* parser);
 
-void prefix_binding_power(ExprKind op_type, int* right);
-bool postfix_binding_power(ExprKind op_type, int* left);
-bool infix_binding_power(ExprKind op_type, int* left, int* right);
-void append_rhs_to_expr(Expr** expr, Expr** rhs);
+ExprUnaryKind  get_prefix_operator(TokenType type, int* right_bp               );
+ExprBinaryKind get_infix_operator (TokenType type, int* left_bp , int* right_bp);
 
 void print_expr_op(Expr* op);
 
