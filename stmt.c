@@ -473,7 +473,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
 
         tmp_ptr = argv;
         argc = arrlen(tmp_ptr);
-        argv = (StmtFnArg**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(StmtFnArg));
+        argv = (StmtFnArg**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(StmtFnArg*));
         arrfree(tmp_ptr);
     }
     else

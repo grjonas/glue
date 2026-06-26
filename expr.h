@@ -118,6 +118,7 @@ enum ExprBinaryKind
     EXPR_BINARY_CHAIN        ,
     EXPR_BINARY_ACCESS       ,
     EXPR_BINARY_ASSIGN       ,
+    EXPR_BINARY_INDEX        ,
     // TODO: Add more types of assignment
 };
 
@@ -188,11 +189,17 @@ struct Expr
 Expr* parser_parse_expr(Parser* parser);
 
 Expr* parser_parse_expr_primary(Parser* parser);
-Expr* parser_parse_expr_parens(Parser* parser);
-Expr* parser_parse_expr_prefix(Parser* parser);
+Expr* parser_parse_expr_parens (Parser* parser);
+Expr* parser_parse_expr_prefix (Parser* parser);
+Expr* parser_parse_expr_index  (Parser* parser);
+Expr* parser_parse_expr_fn     (Parser* parser);
 
 ExprUnaryKind  get_prefix_operator(TokenType type, int* right_bp               );
 ExprBinaryKind get_infix_operator (TokenType type, int* left_bp , int* right_bp);
+ExprUnaryKind get_postfix_operator(TokenType type, int* right_bp               );
+
+bool is_infix(TokenType type);
+bool is_postfix(TokenType type, int* left_bp);
 
 void print_expr_op(Expr* op);
 
