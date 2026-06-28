@@ -39,13 +39,38 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
             }
             // parser_next(parser); /* We probably do not want to do this now */
 
+            // No postfix parsing aside from indexing and function calls
             Expr* outer_expr = NULL;
-            outer_expr = parser_parse_expr_index(parser);
-            if (outer_expr == NULL)
+            token = parser_peek(parser);
+            switch (token.type)
             {
-                outer_expr = parser_parse_expr_fn(parser);
-                if (outer_expr == NULL)
-                {
+                case TOKEN_LEFT_SQUARE:
+                    outer_expr = parser_parse_expr_index(parser);
+
+                    if (outer_expr->kind != EXPR_BINARY)
+                    {
+                        fprintf(stderr, "[%s:%d] Expression parsing: Logical error in pratt parser.\n", __FILE__, __LINE__);
+                        exit(1);
+                    }
+                    // The expression should be pushed already I think.
+                    outer_expr->expr.binary.left = lhs;
+                    lhs = outer_expr;
+                    break;
+
+                case TOKEN_LEFT_PAREN:
+                    outer_expr = parser_parse_expr_fn(parser);
+
+                    if (outer_expr->kind != EXPR_FN)
+                    {
+                        fprintf(stderr, "[%s:%d] Expression parsing: Logical error in pratt parser.\n", __FILE__, __LINE__);
+                        exit(1);
+                    }
+                    // The expression should be pushed already I think.
+                    outer_expr->expr.fn.caller = lhs;
+                    lhs = outer_expr;
+                    break;
+
+                default:
                     parser_throw_compiler_error(parser, (CompileError)
                     {
                         .kind   = ERROR_ERROR ,
@@ -55,47 +80,6 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
                         .msg    = "Expression parsing: Unexpected token encountered.",
                     });
                     return NULL;
-                    // Not implemented
-                    // outer_expr = parser_parse_expr_unary_postfix(parser);
-                    // if (outer_expr == NULL)
-                    // {
-                    //     fprintf(stderr, "[%s:%d] Expression parsing: Logical error in pratt parser.\n", __FILE__, __LINE__);
-                    //     exit(1);
-                    // }
-                    // else
-                    // {
-                    //     if (outer.expr.kind != EXPR_UNARY)
-                    //     {
-                    //         fprintf(stderr, "[%s:%d] Expression parsing: Logical error in pratt parser.\n", __FILE__, __LINE__);
-                    //         exit(1);
-                    //     }
-                    //     // The expression should be pushed already I think.
-                    //     outer_expr->expr.unary.unary = lhs;
-                    //     lhs = outer_expr;
-                    // }
-                }
-                else
-                {
-                    if (outer_expr->kind != EXPR_FN)
-                    {
-                        fprintf(stderr, "[%s:%d] Expression parsing: Logical error in pratt parser.\n", __FILE__, __LINE__);
-                        exit(1);
-                    }
-                    // The expression should be pushed already I think.
-                    outer_expr->expr.fn.caller = lhs;
-                    lhs = outer_expr;
-                }
-            }
-            else
-            {
-                if (outer_expr->kind != EXPR_BINARY)
-                {
-                    fprintf(stderr, "[%s:%d] Expression parsing: Logical error in pratt parser.\n", __FILE__, __LINE__);
-                    exit(1);
-                }
-                // The expression should be pushed already I think.
-                outer_expr->expr.binary.left = lhs;
-                lhs = outer_expr;
             }
 
             continue;
@@ -177,7 +161,7 @@ Expr* parser_parse_expr_prefix(Parser* parser)
             .line   = token.line  ,
             .column = token.column,
             .length = token.line  ,
-            .msg    = "Expression parsing: Unexpected token encountered.",
+            .msg    = "Expression parsing: Unexpected token encountered during prefix parsing.",
         });
         return NULL;
     }

@@ -91,6 +91,15 @@ Stmt* parser_parse_stmt(Parser* parser)
         case TOKEN_FN:
             return parser_parse_stmt_fn(parser);
 
+        case TOKEN_BREAK:
+            return parser_parse_stmt_break(parser);
+
+        case TOKEN_CONTINUE:
+            return parser_parse_stmt_continue(parser);
+
+        case TOKEN_RETURN:
+            return parser_parse_stmt_return(parser);
+
         default:
             return parser_parse_stmt_expr(parser);
             // fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
@@ -102,8 +111,9 @@ Stmt* parser_parse_stmt_block(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
-    int start  = -1;
-    int end    = -1;
+    int start   = -1;
+    int end     = -1;
+    int current = -1;
     unsigned int depth = 1;
 
     Token token;
@@ -123,8 +133,9 @@ Stmt* parser_parse_stmt_block(Parser* parser)
         .length = token.length,
     };
 
-    start = parser->current;
-    end   = parser->end    ;
+    start   = parser->start  ;
+    end     = parser->end    ;
+    current = parser->current;
 
     while (depth > 0)
     {
@@ -143,6 +154,9 @@ Stmt* parser_parse_stmt_block(Parser* parser)
             --depth;
         }
     }
+    parser->start   = current;
+    parser->end     = parser->current - 1;
+    parser->current = current;
 
     stmt.stmt.block = (StmtBlock)
     {
@@ -157,6 +171,7 @@ Stmt* parser_parse_stmt_block(Parser* parser)
 
         while ((stmt_ptr = parser_parse_stmt(parser)) != NULL)
         {
+            printf("yay\n");
             arrput(stmts, stmt_ptr);
         }
 
@@ -180,7 +195,8 @@ Stmt* parser_parse_stmt_block(Parser* parser)
     // After return
     parser->start   = start;
     parser->end     = end  ;
-    parser->current = start;
+    // We assume nothing is between current and 'end' token.
+    parser->current += 1;
 
     stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
     return stmt_ptr;
@@ -411,6 +427,92 @@ Stmt* parser_parse_stmt_while(Parser* parser)
 
     stmt_ptr  = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
     return stmt_ptr;
+}
+
+Stmt* parser_parse_stmt_break(Parser* parser)
+{
+    Stmt stmt;
+    Token token;
+
+    token = parser_next(parser);
+    if (token.type != TOKEN_BREAK)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_BREAK  ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+
+        .stmt.none = NULL     ,
+    };
+
+    return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+}
+
+
+Stmt* parser_parse_stmt_continue(Parser* parser)
+{
+    Stmt stmt;
+    Token token;
+
+    token = parser_next(parser);
+    if (token.type != TOKEN_CONTINUE)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_CONTINUE,
+        .line   = token.line   ,
+        .column = token.column ,
+        .length = token.length ,
+
+        .stmt.none = NULL      ,
+    };
+
+    return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+}
+
+Stmt* parser_parse_stmt_return(Parser* parser)
+{
+    Stmt stmt;
+    Expr* expr = NULL;
+    Token token;
+
+    token = parser_next(parser);
+    if (token.type != TOKEN_RETURN)
+    {
+        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    expr = parser_parse_expr(parser);
+    if (expr == NULL)
+    {
+        return NULL;
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_RETURN ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+
+        .stmt.returnn = (StmtReturn)
+        {
+            .expr = expr,
+        }
+    };
+
+    return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
 Stmt* parser_parse_stmt_fn(Parser* parser)

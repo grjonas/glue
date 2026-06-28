@@ -15,6 +15,7 @@ typedef struct StmtElif     StmtElif    ;
 typedef struct StmtWhile    StmtWhile   ;
 typedef struct StmtFnArg    StmtFnArg   ;
 typedef struct StmtFn       StmtFn      ;
+typedef struct StmtReturn   StmtReturn  ;
 
 // Stmt
 enum StmtKind
@@ -77,6 +78,11 @@ struct StmtFnArg
     Type*   type      ;
 };
 
+struct StmtReturn
+{
+    Expr* expr;
+};
+
 // Tagged Union
 struct Stmt
 {
@@ -88,28 +94,33 @@ struct Stmt
     // Can't have keywords as variables, so I just duplicate the last letter to get over that.
     union
     {
-        Expr*     expr  ;
-        StmtBlock block ;
-        StmtLet   let   ;
-        StmtIf    iff   ;
-        StmtWhile whilee;
-        StmtFn    fn    ;
+        Expr*      expr   ;
+        StmtBlock  block  ;
+        StmtLet    let    ;
+        StmtIf     iff    ;
+        StmtWhile  whilee ;
+        StmtFn     fn     ;
+        StmtReturn returnn;
+        void*      none   ; // For statements that are just singular tokens such as 'break' or 'continue'.
     }
     stmt;
 };
 
 // Stmt
-Stmt     * parser_parse_stmts      (Parser* parser);
+Stmt     * parser_parse_stmts        (Parser* parser);
 
-Stmt     * parser_parse_stmt       (Parser* parser);
+Stmt     * parser_parse_stmt         (Parser* parser);
 
-Stmt     * parser_parse_stmt_block (Parser* parser);
-Stmt     * parser_parse_stmt_let   (Parser* parser);
-Stmt     * parser_parse_stmt_if    (Parser* parser);
-Stmt     * parser_parse_stmt_while (Parser* parser);
-Stmt     * parser_parse_stmt_fn    (Parser* parser);
-StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser);
-Stmt     * parser_parse_stmt_expr  (Parser* parser);
+Stmt     * parser_parse_stmt_block   (Parser* parser);
+Stmt     * parser_parse_stmt_let     (Parser* parser);
+Stmt     * parser_parse_stmt_if      (Parser* parser);
+Stmt     * parser_parse_stmt_while   (Parser* parser);
+Stmt     * parser_parse_stmt_fn      (Parser* parser);
+StmtFnArg* parser_parse_stmt_fn_arg  (Parser* parser);
+Stmt     * parser_parse_stmt_expr    (Parser* parser);
+Stmt     * parser_parse_stmt_break   (Parser* parser);
+Stmt     * parser_parse_stmt_continue(Parser* parser);
+Stmt     * parser_parse_stmt_return  (Parser* parser);
 
 void print_stmt(Stmt* stmt);
 const char* stmt_type_name(StmtKind kind);
