@@ -104,7 +104,7 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
         if (is_infix(token.type))
         {
             binary_kind = get_infix_operator(token.type, &left_bp, &right_bp);
-            if (left_bp < right_bp)
+            if (left_bp < min_bp)
             {
                 break;
             }
@@ -113,6 +113,18 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
 
             // If managed to parse left hand side, and left_bp < min_bp, we try to parse the right hand side.
             rhs = parser_parse_expr_inner(parser, right_bp);
+            if (rhs == NULL)
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = -1          ,
+                    .column = -1          ,
+                    .length = -1          ,
+                    .msg    = "Expression parsing: Failed to parser right-hand side of expression.",
+                });
+                return NULL;
+            }
 
             expr = (Expr)
             {
@@ -321,40 +333,37 @@ Expr* parser_parse_expr_primary(Parser* parser)
 // This should come in handy.
 Expr* parser_parse_expr_parens(Parser* parser)
 {
-    Expr* expr = NULL;
-    int start  = -1;
-    int end    = -1;
+    Token token;
 
-    unsigned int depth = 1;
-
-    parser_next(parser);
-    start = parser->current;
-    end   = parser->end    ;
-
-    while (depth > 0)
+    token = parser_next(parser);
+    if (token.type != TOKEN_LEFT_PAREN)
     {
-        Token token = parser_next(parser);
-        if (token.type == TOKEN_ERROR)
+        parser_throw_compiler_error(parser, (CompileError)
         {
-            fprintf(stderr, "[%s:%d] Expression parsing: Could not find matching parenthese.\n", __FILE__, __LINE__);
-            exit(1);
-        }
-        else if (token.type == TOKEN_LEFT_PAREN)
-        {
-            ++depth;
-        }
-        else if (token.type == TOKEN_RIGHT_PAREN)
-        {
-            --depth;
-        }
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Expression parsing: Could not find start of parentheses..",
+        });
+        return NULL;
     }
 
-    expr = parser_parse_expr(parser);
+    Expr* expr = parser_parse_expr_inner(parser, 0);
 
-    // After return
-    parser->start   = start;
-    parser->end     = end  ;
-    parser->current = start;
+    token = parser_next(parser);
+    if (token.type != TOKEN_RIGHT_PAREN)
+    {
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Expression parsing: Could not find end of parentheses.",
+        });
+        return NULL;
+    }
 
     return expr;
 }
@@ -594,8 +603,8 @@ bool is_postfix(TokenType type, int* left_bp)
 {
     switch (type)
     {
-        case TOKEN_RIGHT_SQUARE: *left_bp = 15; return true;
-        case TOKEN_RIGHT_PAREN : *left_bp = 15; return true;
+        case TOKEN_LEFT_SQUARE: *left_bp = 15; return true;
+        case TOKEN_LEFT_PAREN : *left_bp = 15; return true;
         default:
             *left_bp = -1;
             return false;

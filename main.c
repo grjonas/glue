@@ -37,24 +37,34 @@ int main(int argc, char** argv)
         );
     }
 
-    Parser parser = init_parser(scanner);
+    Parser parser;
+
+    parser = init_parser(scanner);
 
     // ExprOp* expr = parser_parse_expr(&parser);
     // print_expr_op(expr);
 
     // Stmt* stmt = parser_parse_stmt(&parser);
-    parser_parse_stmt(&parser);
+    Stmt* stmt = parser_parse_stmts(&parser);
 
-    Expr* expr = NULL;
-    expr = parser_parse_expr(&parser);
-    // print_stmt(stmt);
+    int arr_len = arrlen(parser.errs);
+    for (int i = 0; i < arr_len; ++i)
+    {
+        CompileError t = *(parser.errs[i]);
+
+        fprintf(
+            stderr,
+            "[%d:%d:%d]: %s\n",
+            t.line  ,
+            t.column,
+            t.length,
+            t.msg   
+        );
+    }
+    if (arr_len > 0)
+        exit(1);
 
     parser_free(&parser);
-
-    // assert(arrlen(ls) == 1);
-    // arrfree(ls);
-    // assert(arrlen(ls) == 0);
-    // printf("All tests passed!\n");
 
     return 0;
 }

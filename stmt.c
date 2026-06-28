@@ -1,5 +1,65 @@
 #include "stmt.h"
 
+Stmt* parser_parse_stmts(Parser* parser)
+{
+    Stmt* stmt_ptr = NULL;
+    Stmt  stmt;
+    int start  = -1;
+    int end    = -1;
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_BLOCK  ,
+        .line   = 0  ,
+        .column = 0,
+        .length = strlen(parser->txt),
+    };
+
+    start = parser->current;
+    end   = parser->end    ;
+
+    stmt.stmt.block = (StmtBlock)
+    {
+        .size = 0   ,
+        .body = NULL,
+    };
+
+    if (parser->current >= start)
+    {
+        Stmt** stmts = NULL;
+        int   size = 0;
+
+        while ((stmt_ptr = parser_parse_stmt(parser)) != NULL)
+        {
+            arrput(stmts, stmt_ptr);
+        }
+
+        if (stmts != NULL)
+        {
+            Stmt** tmp_ptr = NULL;
+            size = arrlen(stmts);
+
+            tmp_ptr = (Stmt**) arena_push(&parser->arena, stmts, size * sizeof(Stmt));
+            arrfree(stmts);
+            stmts = tmp_ptr;
+        }
+
+        stmt.stmt.block = (StmtBlock)
+        {
+            .size = size ,
+            .body = stmts,
+        };
+    }
+
+    // After return
+    parser->start   = start;
+    parser->end     = end  ;
+    parser->current = start;
+
+    stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+    return stmt_ptr;
+}
+
 // Stmt
 // TODO: Implement length calculations when parsing.
 Stmt* parser_parse_stmt(Parser* parser)
@@ -90,7 +150,7 @@ Stmt* parser_parse_stmt_block(Parser* parser)
         .body = NULL,
     };
 
-    if (parser->current > start + 1)
+    if (parser->current >= start)
     {
         Stmt** stmts = NULL;
         int   size = 0;
@@ -367,7 +427,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     Token token;
 
     token = parser_next(parser);
-    if (token.type != TOKEN_WHILE)
+    if (token.type != TOKEN_FN)
     {
         fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
         exit(1);
@@ -591,11 +651,19 @@ Stmt* parser_parse_stmt_expr(Parser* parser)
     stmt.kind = STMT_EXPR;
     stmt.stmt.expr = NULL     ;
 
+    Token token = parser_peek(parser);
     expr = parser_parse_expr(parser);
     if (expr == NULL)
     {
-        fprintf(stderr, "[%s:%d] Statement parsing: Failed to parse expression.\n", __FILE__, __LINE__);
-        exit(1);
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Failed to parse expression.",
+        });
+        return NULL;
     }
     stmt.line   = expr->line  ;
     stmt.column = expr->column;

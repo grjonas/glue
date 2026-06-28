@@ -62,7 +62,6 @@ struct StmtWhile
     Stmt* body     ;
 };
 
-// TODO: Refactor this slightly such that we have a function Type field.
 struct StmtFn
 {
     char     *  identifier ;
@@ -99,9 +98,9 @@ struct Stmt
     stmt;
 };
 
-
-
 // Stmt
+Stmt     * parser_parse_stmts      (Parser* parser);
+
 Stmt     * parser_parse_stmt       (Parser* parser);
 
 Stmt     * parser_parse_stmt_block (Parser* parser);

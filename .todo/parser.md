@@ -5,4 +5,3 @@
 - [X]: Implement proper error handling parser.
 - [X]: Split statment parsing function into multiple functions.
 - [ ]: Rethink TOKEN_EOF, TOKEN_ERROR, and other such stuff.
-- [ ]: Modify second iteration of pratt parser to use types.

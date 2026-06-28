@@ -125,7 +125,6 @@ char* parser_parse_identifier(Parser* parser)
             exit(1);
         }
 
-        // TODO: Check if casting to size_t does what I think it does (it might not because this is C).
         memcpy(identifier, token.start, (size_t) length * sizeof(char));
 
         tmp_ptr = identifier;

@@ -29,7 +29,6 @@ struct Parser
     int current;
 
     // Output
-    // Stmt* stmt ;
     Arena arena;
     CompileError** errs;
 };

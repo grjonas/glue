@@ -24,7 +24,6 @@ enum ExprKind
     EXPR_FN     ,
 };
 
-// TODO: Redo ExprPrimaryKind later.
 enum ExprPrimaryKind
 {
     EXPR_PRIMARY_UNKNOWN   ,

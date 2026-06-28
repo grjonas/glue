@@ -287,7 +287,6 @@ Type* parser_parse_type_primitive(Parser* parser)
 
     type = (Type)
     {
-        .kind           = TYPE_UNKNOWN,
         .identifier     = token.start ,
         .line           = token.line  ,
         .column         = token.column,
