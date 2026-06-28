@@ -606,38 +606,6 @@ Stmt* parser_parse_stmt_expr(Parser* parser)
     return stmt_ptr;
 }
 
-// Identifier
-char* parser_parse_identifier(Parser* parser)
-{
-    char* identifier = NULL;
-    Token token;
-
-    token = parser_peek(parser);
-    if (token.type == TOKEN_IDENTIFIER)
-    {
-        int   length;
-        char* tmp_ptr;
-
-        parser_next(parser);
-
-        length = token.length + 1;
-        identifier = calloc(length, sizeof(char));
-        if (identifier == NULL)
-        {
-            fprintf(stderr, "[%s:%d] Failed to allocate memory.\n", __FILE__, __LINE__);
-            exit(1);
-        }
-
-        // TODO: Check if casting to size_t does what I think it does (it might not because this is C).
-        memcpy(identifier, token.start, (size_t) length * sizeof(char));
-
-        tmp_ptr = identifier;
-        identifier = (char*) arena_push(&parser->arena, identifier, (size_t) length * sizeof(char));
-        free(tmp_ptr);
-    }
-
-    return identifier;
-}
 const char* stmt_type_name(StmtKind kind)
 {
     switch (kind)

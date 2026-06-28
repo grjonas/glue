@@ -18,25 +18,19 @@ enum ParserState
 
 struct Parser
 {
-    ParserState state ;
+    // Input
     const char* txt   ;
-
     Token* tokens;
+
+    // State
+    ParserState state ;
     int start  ;
     int end    ;
     int current;
 
-    // Arena
+    // Output
+    // Stmt* stmt ;
     Arena arena;
-
-    // All of these have to be free at a later date.
-    // Expr* exprs; // Not used right now
-    // char**  identifiers ;
-    // char**  str_literals; // Not used right now
-    // char**  int_literals; // Not used right now
-    // char**  num_literals; // Not used right now
-
-    // If we fail to parse something for whatever reason, we append an error message here.
     CompileError** errs;
 };
 
@@ -49,6 +43,7 @@ Token parser_next(Parser* parser);
 Token parser_jump(Parser* parser, int new_state);
 Token parser_restore(Parser* parser, int old_state);
 bool parser_skip(Parser* parser, bool (*predicate)(TokenType));
+char     * parser_parse_identifier (Parser* parser);
 
 void parser_throw_compiler_error(Parser* parser, CompileError err);
 

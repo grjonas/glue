@@ -16,54 +16,6 @@ typedef enum   ExprUnaryKind   ExprUnaryKind  ;
 typedef enum   ExprBinaryKind  ExprBinaryKind ;
 // typedef enum   ExprFnKind      ExprFnKind     ;
 
-// Expr
-// enum ExprKind
-// {
-//     // Atom
-//     OP_STRING,
-//     OP_IDENTIFIER,
-//     OP_INTEGER,
-//     OP_NUMBER,
-//     OP_TRUE,
-//     OP_FALSE,
-//     OP_NIL,
-//     OP_PRINT,
-//     // Prefix
-//     OP_NEG, // unary '-'
-//     OP_NOT,
-//     OP_PRE_INC,
-//     OP_PRE_DEC,
-//     // Postfix
-//     OP_INDEX,
-//     OP_POST_INC,
-//     OP_POST_DEC,
-//     // Infix
-//     OP_ADD,
-//     OP_SUB,
-//     OP_MUL,
-//     OP_DIV,
-//     OP_MOD,
-//     OP_AND,
-//     OP_OR ,
-//     OP_GREATER,
-//     OP_LESS,
-//     OP_GREATER_EQUAL,
-//     OP_LESS_EQUAL,
-//     OP_EQUAL,
-//     OP_NOT_EQUAL,
-//     OP_ACCESS,
-//     OP_CHAIN,
-//     // Assign (right associative)
-//     OP_ASSIGN,
-//     OP_ASSIGN_ADD,
-//     OP_ASSIGN_SUB,
-//     OP_ASSIGN_MUL,
-//     OP_ASSIGN_MOD,
-//     // Unique
-//     OP_CALL,
-//     //OP_COLON, // technically binary, but it has different behaviour
-// };
-
 enum ExprKind
 {
     EXPR_PRIMARY,

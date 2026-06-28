@@ -118,6 +118,7 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
             {
                 // TODO: Fix txt position information.
                 .kind        = EXPR_BINARY ,
+                .type        = NULL        ,
                 .line        = token.line  ,
                 .column      = token.column,
                 .length      = token.length,
@@ -175,6 +176,7 @@ Expr* parser_parse_expr_prefix(Parser* parser)
     lhs = (Expr)
     {
         .kind   = EXPR_UNARY  ,
+        .type   = NULL        ,
         .line   = token.line  ,
         .column = token.column,
         .length = token.length,
@@ -198,9 +200,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
     Expr  expr;
     ExprPrimary expr_primary;
 
-    Type* type_ptr = NULL;
-    Type  type;
-
     bool  boolean_value = true;
     char* buffer = NULL;
 
@@ -219,14 +218,8 @@ Expr* parser_parse_expr_primary(Parser* parser)
                 .primary.identifier = buffer                 ,
             };
 
-            type = (Type)
-            {
-                .kind           = TYPE_NIL,
-                .type.primitive = NULL    ,
-            };
-
-            type_ptr = arena_push(&parser->arena, &type, sizeof(Type));
             break;
+
         case TOKEN_NIL_V     :
             parser_next(parser);
 
@@ -236,13 +229,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
                 .primary.nil = NULL            ,
             };
 
-            type  = (Type)
-            {
-                .kind           = TYPE_NIL,
-                .type.primitive = NULL    ,
-            };
-
-            type_ptr = arena_push(&parser->arena, &type, sizeof(Type));
             break;
 
         // TODO: Make the boolean value parsing a little less fragile.
@@ -258,13 +244,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
                 .primary.boolean = boolean_value       ,
             };
 
-            type  = (Type)
-            {
-                .kind           = TYPE_BOOL   ,
-                .type.primitive = NULL        ,
-            };
-
-            type_ptr= arena_push(&parser->arena, &type, sizeof(Type));
             break;
 
         case TOKEN_INTEGER   :
@@ -279,13 +258,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
                 .primary.integer = buffer              ,
             };
 
-            type  = (Type)
-            {
-                .kind           = TYPE_INT    ,
-                .type.primitive = NULL        ,
-            };
-
-            type_ptr = arena_push(&parser->arena, &type, sizeof(Type));
             break;
 
         case TOKEN_NUMBER    :
@@ -299,14 +271,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
                 .kind         = EXPR_PRIMARY_REAL   ,
                 .primary.real = buffer              ,
             };
-
-            type  = (Type)
-            {
-                .kind           = TYPE_INT    ,
-                .type.primitive = NULL        ,
-            };
-
-            type_ptr = arena_push(&parser->arena, &type, sizeof(Type));
             break;
 
         case TOKEN_STRING    :
@@ -321,13 +285,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
                 .primary.string = buffer              ,
             };
 
-            type  = (Type)
-            {
-                .kind           = TYPE_INT    ,
-                .type.primitive = NULL        ,
-            };
-
-            type_ptr = arena_push(&parser->arena, &type, sizeof(Type));
             break;
 
         case TOKEN_LEFT_PAREN:
@@ -348,7 +305,7 @@ Expr* parser_parse_expr_primary(Parser* parser)
     expr = (Expr)
     {
         .kind         = EXPR_PRIMARY,
-        .type         = type_ptr    ,
+        .type         = NULL        ,
         .line         = token.line  ,
         .column       = token.column,
         .length       = token.length,
@@ -449,6 +406,7 @@ Expr* parser_parse_expr_index(Parser* parser)
     {
         // TODO: Fix txt position information.
         .kind        = EXPR_BINARY ,
+        .type        = NULL        ,
         .line        = token.line  ,
         .column      = token.column,
         .length      = token.length,
@@ -547,6 +505,7 @@ Expr* parser_parse_expr_fn(Parser* parser)
     {
         // TODO: Fix txt position information.
         .kind        = EXPR_FN     ,
+        .type        = NULL        ,
         .line        = token.line  ,
         .column      = token.column,
         .length      = token.length,

@@ -111,7 +111,6 @@ Stmt     * parser_parse_stmt_while (Parser* parser);
 Stmt     * parser_parse_stmt_fn    (Parser* parser);
 StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser);
 Stmt     * parser_parse_stmt_expr  (Parser* parser);
-char     * parser_parse_identifier (Parser* parser);
 
 void print_stmt(Stmt* stmt);
 const char* stmt_type_name(StmtKind kind);
