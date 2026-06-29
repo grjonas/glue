@@ -1,4 +1,4 @@
-fn fib(n : Int)
+fn fib(n : Int) Int
 do
 	if n < 2; return n
 	

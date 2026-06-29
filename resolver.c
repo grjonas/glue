@@ -1,5 +1,56 @@
 #include "resolver.h"
 
+Resolver resolver_init(Parser parser, Stmt* stmts)
+{
+    return (Resolver)
+    {
+        .txt             = parser.txt   ,
+        .tokens          = parser.tokens,
+        .stmts           = stmts        ,
+        .arena           = parser.arena ,
+        .tmp_type_arena  = NULL         ,
+        .loop_depth      = 0            ,
+        .inside_function = false        ,
+        .fn_type         = NULL         ,
+        .declarations    = NULL,
+        .exprs           = NULL,
+        .types           = NULL,
+        .identifiers     = NULL,
+        .errs            = NULL,
+    };
+}
+
+void resolver_free(Resolver* resolver)
+{
+    free((char*)resolver->txt);
+    arrfree(resolver->tokens);
+    arena_free(&resolver->arena);
+    arena_free(&resolver->tmp_type_arena);
+
+    arrfree(resolver->declarations);
+    arrfree(resolver->exprs       );
+    arrfree(resolver->types       );
+    arrfree(resolver->identifiers );
+    arrfree(resolver->errs        );
+
+    *resolver = (Resolver)
+    {
+        .txt             = NULL                    ,
+        .tokens          = NULL                    ,
+        .stmts           = NULL                    ,
+        .arena           = resolver->arena         ,
+        .tmp_type_arena  = resolver->tmp_type_arena,
+        .loop_depth      = 0                       ,
+        .inside_function = false                   ,
+        .fn_type         = NULL                    ,
+        .declarations    = NULL                    ,
+        .exprs           = NULL                    ,
+        .types           = NULL                    ,
+        .identifiers     = NULL                    ,
+        .errs            = NULL                    ,
+    };
+}
+
 Stmt* resolver_resolve_stmt(Resolver* resolver)
 {
     Stmt* curr_stmt  = NULL;
@@ -151,6 +202,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             break;
 
         case STMT_RETURN  :
+            assert(curr_stmt->kind = STMT_RETURN);
+
             // TODO: Somehow bind this to it's respective function declaration.
             if (!resolver->inside_function)
             {
@@ -164,12 +217,16 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
                 });
                 return NULL;
             }
-            resolver_resolve_expr(resolver, expr, resolver->fn_type);
-            if (expr == NULL)
-            {
-                return NULL;
-            }
 
+            expr = curr_stmt->stmt.returnn.expr;
+            if (expr != NULL)
+            {
+                resolver_resolve_expr(resolver, expr, resolver->fn_type);
+                if (expr == NULL)
+                {
+                    return NULL;
+                }
+            }
             break;
 
         default:
@@ -371,7 +428,7 @@ Variable* resolver_get_nearest_variable(Resolver* resolver, char* identifier)
     // We iterate in reverse - this is because the later elements are newer than earlier ones.
     // Therefore, if there are multiple variables with the same identifier,
     // then the ones that are closer to the end of the list are going to be the closest in scope.
-    for (int i = decl_number; 0 < i; --i)
+    for (int i = decl_number - 1; 0 < i; --i)
     {
         Decl d = *(declarations[i]);
         switch (d.kind)

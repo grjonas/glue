@@ -4,6 +4,7 @@
 #include "stmt.h"
 #include "type.h"
 #include "expr.h"
+#include "resolver.h"
 
 // Returns a null-terminated string that has the file's contents.
 // Needs to be freed.
@@ -65,6 +66,12 @@ int main(int argc, char** argv)
         exit(1);
 
     parser_free(&parser);
+
+    Resolver resolver = resolver_init(parser, stmt);
+
+    resolver_resolve_stmt(&resolver);
+
+    resolver_free(&resolver);
 
     return 0;
 }
