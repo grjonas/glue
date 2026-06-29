@@ -45,9 +45,9 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             type       = curr_stmt->stmt.let.type      ;
             expr       = curr_stmt->stmt.let.expr      ;
 
-            resolver_declare_let(resolver, identifier, type, expr);
+            resolver_declare_let(resolver, identifier, type);
 
-            resolver_resolve_expr(resolver, expr);
+            resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
                 return NULL;
@@ -57,7 +57,7 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
         case STMT_EXPR    :
             expr = curr_stmt->stmt.expr;
 
-            resolver_resolve_expr(resolver, expr);
+            resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
                 return NULL;
@@ -68,14 +68,16 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             expr = curr_stmt->stmt.iff.condition;
             stmt = curr_stmt->stmt.iff.body     ;
 
-            resolver_resolve_expr(resolver, expr);
+            resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
                 return NULL;
             }
 
             resolver->stmts = stmt     ;
+
             resolver_resolve_stmt(resolver);
+
             resolver->stmts = curr_stmt;
             break;
 
@@ -83,7 +85,7 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             expr = curr_stmt->stmt.whilee.condition;
             stmt = curr_stmt->stmt.whilee.body     ;
 
-            resolver_resolve_expr(resolver, expr);
+            resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
                 return NULL;
@@ -91,9 +93,11 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
 
             resolver->stmts = stmt     ;
             resolver->loop_depth++;
+
             resolver_resolve_stmt(resolver);
-            resolver->loop_depth--;
+
             resolver->stmts = curr_stmt;
+            resolver->loop_depth--;
             break;
 
         case STMT_BREAK   :
@@ -130,11 +134,20 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             fn = curr_stmt->stmt.fn;
             stmt = fn.body;
 
-            resolver_declare_fn(resolver, fn);
+            Type* new_fn_type = resolver_declare_fn(resolver, fn)->decl.fn.variable->type; // What the hell is this?? xdddddd
 
-            resolver->stmts = stmt     ;
+            bool inside_function = resolver->inside_function;
+            Type* fn_type = resolver->fn_type;
+
+            resolver->stmts = stmt;
+            resolver->inside_function = true;
+            resolver->fn_type = new_fn_type;
+
             resolver_resolve_stmt(resolver);
+
             resolver->stmts = curr_stmt;
+            resolver->inside_function = inside_function;
+            resolver->fn_type = fn_type;
             break;
 
         case STMT_RETURN  :
@@ -151,7 +164,12 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
                 });
                 return NULL;
             }
-            assert(false);
+            resolver_resolve_expr(resolver, expr, resolver->fn_type);
+            if (expr == NULL)
+            {
+                return NULL;
+            }
+
             break;
 
         default:
@@ -163,13 +181,70 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
 }
 
 // Set variable to the biggest instance of identifier.
-void resolver_resolve_expr(Resolver* resolver, Expr* expr)
+// Also, if type isn't NULL, bind expr.type to type.
+// TODO: Refactor this rickety ass code.
+void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
 {
-    fprintf(stderr, "[%s:%d] Not implemented yet.\n", __FILE__, __LINE__);
-    exit(1);
+    switch (expr->kind)
+    {
+        case EXPR_PRIMARY:
+            // TODO: expand this later functions, once we implement them.
+            if (expr->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER)
+            {
+                char* identifier = expr->expr.primary.primary.identifier;
+                Variable* var = NULL;
+
+                var = resolver_get_nearest_variable(resolver, identifier);
+                if (var == NULL)
+                {
+                    expr = NULL;
+                    return;
+                }
+
+                expr->expr.primary.kind = EXPR_PRIMARY_VARIABLE;
+                expr->expr.primary.primary.variable = var;
+            }
+            else if (expr->expr.primary.kind == EXPR_PRIMARY_STRUCT)
+            {
+                ExprPrimaryStruct expr_struct = expr->expr.primary.primary.structt;
+                for (int i = 0; i < expr_struct.argc; ++i)
+                {
+                    ExprPrimaryStructField f = *(expr_struct.argv[i]);
+                    resolver_resolve_expr(resolver, f.value, f.type);
+                }
+            }
+            break;
+
+        case EXPR_UNARY:
+            resolver_resolve_expr(resolver, expr->expr.unary.unary, NULL);
+            break;
+
+        case EXPR_BINARY:
+            resolver_resolve_expr(resolver, expr->expr.binary.left , NULL);
+            resolver_resolve_expr(resolver, expr->expr.binary.right, NULL);
+            break;
+
+        case EXPR_FN:
+            resolver_resolve_expr(resolver, expr->expr.fn.caller, NULL);
+            for (int i = 0; i < expr->expr.fn.argc; ++i)
+            {
+                Expr* e = expr->expr.fn.argv[i];
+                resolver_resolve_expr(resolver, e, NULL);
+            }
+            break;
+
+        default:
+            fprintf(stderr, "[%s:%d] Variable resolution: Found expression of unknown kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+
+    if (type != NULL)
+    {
+        expr->type = type;
+    }
 }
 
-Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type, Expr* expr)
+Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type)
 {
     Decl  decl;
     Decl* decl_ptr = NULL;
@@ -202,8 +277,6 @@ Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type, Exp
     arrput(resolver->declarations, decl_ptr);
 
     return decl_ptr;
-    // fprintf(stderr, "[%s:%d] Not implemented yet.\n", __FILE__, __LINE__);
-    // exit(1);
 }
 
 // TODO: Make it so that we cannot have function arguments that have the same identifier as the function name.
@@ -224,8 +297,7 @@ Decl* resolver_declare_fn(Resolver* resolver, StmtFn fn)
 
     existing_identifier = resolver_get_identifier(resolver, fn.identifier);
 
-    Type tp = construct_fn_type(fn);
-    fn_type = (Type*) arena_push(&resolver->arena, &tp, sizeof(Type));
+    fn_type = construct_fn_type(&resolver->arena, fn);
     var = (Variable)
     {
         .identifier = existing_identifier,
@@ -236,9 +308,13 @@ Decl* resolver_declare_fn(Resolver* resolver, StmtFn fn)
 
     for (int i = 0; i < fn.argc; ++i)
     {
-        Decl* d = NULL;
-        StmtFnArg arg = *(fn.argv[i]);
-        d = resolver_declare_let(resolver, arg.identifier, arg.type, NULL);
+        Decl* d    = NULL;
+        char* arg  = NULL;
+        Type* type_arg  = NULL;
+
+        arg      = fn.argv[i]->identifier  ;
+        type_arg = fn_type->type.fn.argv[i];
+        d        = resolver_declare_let(resolver, arg, type_arg);
         assert(d->kind == DECL_LET);
         arrput(argv, d->decl.let.variable);
     }
@@ -259,27 +335,10 @@ Decl* resolver_declare_fn(Resolver* resolver, StmtFn fn)
         }
     };
 
-    // struct StmtFnArg
-    // {
-        // char*   identifier;
-        // Type*   type      ;
-    // };
-
-    // struct StmtFn
-    // {
-        // char     *  identifier ;
-        // int         argc       ;
-        // StmtFnArg** argv       ;
-        // Type     *  return_type;
-        // Stmt     *  body       ;
-    // };
-
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
     arrput(resolver->declarations, decl_ptr);
 
     return decl_ptr;
-    // fprintf(stderr, "[%s:%d] Not implemented yet.\n", __FILE__, __LINE__);
-    // exit(1);
 }
 
 char* resolver_get_identifier(Resolver* resolver, char* identifier)
@@ -303,6 +362,50 @@ char* resolver_get_identifier(Resolver* resolver, char* identifier)
     return new_id;
 }
 
+Variable* resolver_get_nearest_variable(Resolver* resolver, char* identifier)
+{
+    Decl** declarations = resolver->declarations;
+    int decl_number = arrlen(declarations);
+    Variable* var = NULL;
+
+    // We iterate in reverse - this is because the later elements are newer than earlier ones.
+    // Therefore, if there are multiple variables with the same identifier,
+    // then the ones that are closer to the end of the list are going to be the closest in scope.
+    for (int i = decl_number; 0 < i; --i)
+    {
+        Decl d = *(declarations[i]);
+        switch (d.kind)
+        {
+            case DECL_LET:
+                var = d.decl.let.variable;
+                break;
+
+            case DECL_FN:
+                var = d.decl.fn.variable;
+                break;
+
+            default:
+                fprintf(stderr, "[%s:%d] Variable resolution: Found declaration of unknown kind.\n", __FILE__, __LINE__);
+                exit(1);
+        }
+
+        if (memcmp(var->identifier, identifier, strlen(identifier)) == 0)
+        {
+            return var;
+        }
+    }
+
+    resolver_throw_compiler_error(resolver, (CompileError)
+    {
+        .kind   = ERROR_ERROR      ,
+        .line   = -1               ,
+        .column = -1               ,
+        .length = -1               ,
+        .msg    = "Variable resolution: Variable not declared.",
+    });
+    return NULL;
+}
+
 void resolver_throw_compiler_error(Resolver* resolver, CompileError err)
 {
     CompileError* err_ptr = NULL;
@@ -310,8 +413,48 @@ void resolver_throw_compiler_error(Resolver* resolver, CompileError err)
     arrput(resolver->errs, err_ptr);
 }
 
-Type construct_fn_type(StmtFn fn)
+Type* construct_fn_type(Arena* arena, StmtFn fn)
 {
-    fprintf(stderr, "[%s:%d] Not implemented yet.\n", __FILE__, __LINE__);
-    exit(1);
+    Type type;
+    Type** argv = NULL;
+
+    for (int i = 0; i < fn.argc; ++i)
+    {
+        Type* t = fn.argv[i]->type;
+        if (t == NULL)
+        {
+            Type new_type = (Type)
+            {
+                .kind   = TYPE_VARIABLE,
+                .line   = -1           ,
+                .column = -1           ,
+                .length = -1           ,
+                .type.none = NULL      ,
+            };
+
+            t = (Type*) arena_push(arena, &new_type, sizeof(Type));
+        }
+
+        arrput(argv, t);
+    }
+
+    Type** tmp_ptr = argv;
+    argv = (Type**) arena_push(arena, argv, fn.argc * sizeof(Type*));
+    arrfree(tmp_ptr);
+
+    type = (Type)
+    {
+        .kind   = TYPE_FN,
+        .line   = -1     ,
+        .column = -1     ,
+        .length = -1     ,
+
+        .type.fn = (TypeFunction)
+        {
+            .argc = fn.argc,
+            .argv = argv   , // Type**
+        }
+    };
+
+    return (Type*) arena_push(arena, &type, sizeof(Type));
 }

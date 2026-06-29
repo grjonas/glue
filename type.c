@@ -149,7 +149,7 @@ Type* parser_parse_type_struct(Parser* parser)
     return (Type*) arena_push(&parser->arena, &type, sizeof(Type));
 }
 
-Type* parser_parse_type_function(Parser* parser)
+Type* parser_parse_type_generic(Parser* parser)
  {
     Token token;
     int argc = 0;
@@ -231,11 +231,11 @@ Type* parser_parse_type_function(Parser* parser)
 
     type = (Type)
     {
-        .kind       = TYPE_FN     ,
+        .kind       = TYPE_GENERIC,
         .line       = token.line  ,
         .column     = token.column,
         .length     = token.line  ,
-        .type.fn = (TypeFunction)
+        .type.generic = (TypeGeneric)
         {
             .identifier = NULL,
             .argc = argc      ,
@@ -323,9 +323,9 @@ Type* parser_parse_type(Parser* parser)
             {
                 if (lhs->kind == TYPE_VARIABLE)
                 {
-                    rhs = parser_parse_type_function(parser);
+                    rhs = parser_parse_type_generic(parser);
                     // TODO: Set identifier later.
-                    rhs->type.fn.identifier = NULL;
+                    rhs->type.generic.identifier = NULL;
                     // rhs->type.fn.identifier = lhs->identifier;
                     rhs->line       = lhs->line      ;
                     rhs->column     = lhs->column    ;

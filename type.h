@@ -9,6 +9,7 @@ typedef enum   TypeKind         TypeKind      ;
 typedef struct TypeList        TypeList       ;
 typedef struct TypeStructField TypeStructField;
 typedef struct TypeStruct      TypeStruct     ;
+typedef struct TypeGeneric     TypeGeneric    ;
 typedef struct TypeFunction    TypeFunction   ;
 
 // Type
@@ -36,6 +37,8 @@ enum TypeKind
     TYPE_FN        ,
 
     TYPE_MISC_SEPERATOR,
+
+    TYPE_GENERIC   ,
 };
 
 struct TypeList
@@ -43,10 +46,16 @@ struct TypeList
     Type* type;
 };
 
-struct TypeFunction
+struct TypeGeneric
 {
     char* identifier;
     int   argc;
+    Type** argv;
+};
+
+struct TypeFunction
+{
+    int argc;
     Type** argv;
 };
 
@@ -76,6 +85,7 @@ struct Type
         void        * none     ; // Primitives and variables don't need any data, so they're just NULL void pointers;
         TypeList      list     ;
         TypeStruct    structt  ;
+        TypeGeneric   generic  ;
         TypeFunction  fn       ;
     }
     type;
