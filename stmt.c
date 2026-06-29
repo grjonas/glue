@@ -493,8 +493,10 @@ Stmt* parser_parse_stmt_return(Parser* parser)
         exit(1);
     }
 
+    // If it's NULL, then there are no expressions after return.
+    int old_errs = arrlen(parser->errs);
     expr = parser_parse_expr(parser);
-    if (expr == NULL)
+    if (arrlen(parser->errs) > old_errs)
     {
         return NULL;
     }
@@ -643,7 +645,21 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         parser_next(parser);
     }
 
-    token = parser_peek(parser);
+    int old_errs = arrlen(parser->errs);
+    return_type = parser_parse_type(parser);
+    if (arrlen(parser->errs) > old_errs)
+    {
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Failed to parse function return type.",
+        });
+        return NULL;
+    }
+
     if (token.type == TOKEN_COLON)
     {
         parser_next(parser);
