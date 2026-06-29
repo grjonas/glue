@@ -12,11 +12,11 @@ Resolver resolver_init(Parser parser, Stmt* stmts)
         .loop_depth      = 0            ,
         .inside_function = false        ,
         .fn_type         = NULL         ,
-        .declarations    = NULL,
-        .exprs           = NULL,
-        .types           = NULL,
-        .identifiers     = NULL,
-        .errs            = NULL,
+        .declarations    = NULL         ,
+        .exprs           = NULL         ,
+        .types           = NULL         ,
+        .identifiers     = NULL         ,
+        .errs            = NULL         ,
     };
 }
 
@@ -51,7 +51,7 @@ void resolver_free(Resolver* resolver)
     };
 }
 
-Stmt* resolver_resolve_stmt(Resolver* resolver)
+void resolver_resolve_stmt(Resolver* resolver)
 {
     Stmt* curr_stmt  = NULL;
 
@@ -101,7 +101,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
             break;
 
@@ -111,7 +112,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
             break;
 
@@ -122,7 +124,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
 
             resolver->stmts = stmt     ;
@@ -139,7 +142,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             resolver_resolve_expr(resolver, expr, NULL);
             if (expr == NULL)
             {
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
 
             resolver->stmts = stmt     ;
@@ -162,7 +166,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
                     .length = curr_stmt->line  ,
                     .msg    = "Statement resolution: Breaking while not in loop.",
                 });
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
             break;
 
@@ -177,7 +182,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
                     .length = curr_stmt->line  ,
                     .msg    = "Statement resolution: Continuing while not in loop.",
                 });
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
             break;
 
@@ -215,7 +221,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
                     .length = curr_stmt->line  ,
                     .msg    = "Statement resolution: Cannot return while not in function.",
                 });
-                return NULL;
+                resolver->stmts = NULL;
+                return;
             }
 
             expr = curr_stmt->stmt.returnn.expr;
@@ -224,7 +231,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
                 resolver_resolve_expr(resolver, expr, resolver->fn_type);
                 if (expr == NULL)
                 {
-                    return NULL;
+                    resolver->stmts = NULL;
+                    return;
                 }
             }
             break;
@@ -234,7 +242,8 @@ Stmt* resolver_resolve_stmt(Resolver* resolver)
             exit(1);
     }
 
-    return curr_stmt;
+    // return curr_stmt;
+    resolver->stmts = curr_stmt;
 }
 
 // Set variable to the biggest instance of identifier.

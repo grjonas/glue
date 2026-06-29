@@ -68,7 +68,7 @@ struct Resolver
 Resolver resolver_init(Parser parser, Stmt* stmt);
 void resolver_free(Resolver* resolver);
 
-Stmt* resolver_resolve_stmt(Resolver* resolver);
+void  resolver_resolve_stmt(Resolver* resolver);
 void  resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type);
 
 Decl*  resolver_declare_let  (Resolver* resolver, char* identifier, Type* type);
