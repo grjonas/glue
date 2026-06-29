@@ -14,6 +14,9 @@ typedef enum   ExprKind        ExprKind       ;
 typedef enum   ExprPrimaryKind ExprPrimaryKind;
 typedef enum   ExprUnaryKind   ExprUnaryKind  ;
 typedef enum   ExprBinaryKind  ExprBinaryKind ;
+
+typedef struct ExprPrimaryStructField ExprPrimaryStructField;
+typedef struct ExprPrimaryStruct      ExprPrimaryStruct;
 // typedef enum   ExprFnKind      ExprFnKind     ;
 
 enum ExprKind
@@ -73,21 +76,34 @@ enum ExprBinaryKind
     // TODO: Add more types of assignment
 };
 
+struct ExprPrimaryStructField
+{
+    char* key  ;
+    Type* type ;
+    Expr* value;
+};
+
+struct ExprPrimaryStruct
+{
+    int argc;
+    ExprPrimaryStructField** argv;
+};
+
 struct ExprPrimary
 {
     ExprPrimaryKind kind;
     union
     {
         // Nil is not included here
-        char* nil       ; // Always NULL here.
-        char* identifier;
-        bool  boolean   ;
-        char* string    ;
-        char* natural   ; // These will have to be changed later i think.
-        char* integer   ; // These will have to be changed later i think.
-        char* real      ; // These will have to be changed later i think.
-        char* obj       ; // Some kind of other object.
-        // struct
+        char* nil                ; // Always NULL here.
+        char* identifier         ;
+        bool  boolean            ;
+        char* string             ;
+        char* natural            ; // These will have to be changed later i think.
+        char* integer            ; // These will have to be changed later i think.
+        char* real               ; // These will have to be changed later i think.
+        ExprPrimaryStruct structt;
+        char* obj                ; // Some kind of other object.
     }
     primary;
 };
@@ -144,6 +160,7 @@ Expr* parser_parse_expr_parens (Parser* parser);
 Expr* parser_parse_expr_prefix (Parser* parser);
 Expr* parser_parse_expr_index  (Parser* parser);
 Expr* parser_parse_expr_fn     (Parser* parser);
+Expr* parser_parse_expr_struct (Parser* parser);
 
 ExprUnaryKind  get_prefix_operator(TokenType type, int* right_bp               );
 ExprBinaryKind get_infix_operator (TokenType type, int* left_bp , int* right_bp);

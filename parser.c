@@ -135,6 +135,26 @@ char* parser_parse_identifier(Parser* parser)
     return identifier;
 }
 
+bool parser_expect_token(Parser* parser, TokenType type)
+{
+    Token token = parser_peek(parser);
+    if (token.type != type)
+    {
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Unexpected token encountered",
+        });
+        return false;
+    }
+
+    parser_next(parser);
+    return true;
+}
+
 void parser_throw_compiler_error(Parser* parser, CompileError err)
 {
     CompileError* err_ptr = NULL;

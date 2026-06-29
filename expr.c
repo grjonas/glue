@@ -292,6 +292,15 @@ Expr* parser_parse_expr_primary(Parser* parser)
             }
             return expr_ptr;
 
+        case TOKEN_LEFT_BRACE:
+            expr_ptr = parser_parse_expr_struct(parser);
+            if (expr_ptr == NULL)
+            {
+                fprintf(stderr, "[%s:%d] Expression parsing: Could not parse struct.\n", __FILE__, __LINE__);
+                exit(1);
+            }
+            return expr_ptr;
+
         default:
             // fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
             // exit(1);
@@ -312,42 +321,157 @@ Expr* parser_parse_expr_primary(Parser* parser)
     return expr_ptr;
 }
 
-// Maybe this is a bit overengineered,
-// but in the event I refactor the parser and forget to change this,
-// This should come in handy.
-Expr* parser_parse_expr_parens(Parser* parser)
+Expr* parser_parse_expr_struct(Parser* parser)
 {
+    Expr expr;
+
+    int argc = 0;
+    ExprPrimaryStructField** argv = NULL;
+
     Token token;
 
-    token = parser_next(parser);
-    if (token.type != TOKEN_LEFT_PAREN)
-    {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Expression parsing: Could not find start of parentheses..",
-        });
+    if (!parser_expect_token(parser, TOKEN_LEFT_BRACE))
         return NULL;
+
+    while (true)
+    {
+        char* identifier = NULL;
+        Type* type       = NULL;
+        Expr* value      = NULL;
+
+        ExprPrimaryStructField  field     ;
+        ExprPrimaryStructField* arg = NULL;
+
+        token = parser_next(parser);
+        if (token.type != TOKEN_IDENTIFIER)
+        {
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Expression parsing: Failed to parse struct field name.",
+            });
+            return NULL;
+        }
+
+        token = parser_peek(parser);
+        if (token.type == TOKEN_COLON)
+        {
+            parser_next(parser);
+            type = parser_parse_type(parser);
+            if (type == NULL)
+            {
+                return NULL;
+            }
+        }
+
+        if (!parser_expect_token(parser, TOKEN_EQUAL))
+            return NULL;
+
+        int old_errs = arrlen(parser->errs);
+        value = parser_parse_expr_inner(parser, 0);
+        if (value == NULL)
+        {
+            if (arrlen(parser->errs) == old_errs)
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Expression parsing: Failed to parse expression inside of parentheses.",
+                });
+            }
+            return NULL;
+        }
+
+        field = (ExprPrimaryStructField)
+        {
+            .key   = identifier,
+            .type  = type      ,
+            .value = value     ,
+        };
+
+        arg = (ExprPrimaryStructField*) arena_push(&parser->arena, &field, sizeof(ExprPrimaryStructField));
+        arrput(argv, arg);
+
+        token = parser_next(parser);
+        if (token.type == TOKEN_COMMA)
+        {
+            continue;
+        }
+        else if (token.type == TOKEN_RIGHT_BRACE)
+        {
+            break;
+        }
+        else
+        {
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Expression parsing: Unexpected token encountered.",
+            });
+            return NULL;
+        }
     }
 
+    argc = arrlen(argv);
+    ExprPrimaryStructField** tmp_ptr = argv;
+    argv = (ExprPrimaryStructField**) arena_push(&parser->arena, argv, argc * sizeof(ExprPrimaryStructField*));
+    arrfree(tmp_ptr);
+
+    expr = (Expr)
+    {
+        .kind   = EXPR_PRIMARY,
+        .type   = NULL        ,
+        .line   = -1          ,
+        .column = -1          ,
+        .length = -1          ,
+        .expr.primary = (ExprPrimary)
+        {
+            .kind    = EXPR_PRIMARY_STRUCT,
+            .primary.structt = (ExprPrimaryStruct)
+            {
+                .argc = argc,
+                .argv = argv,
+            }
+        }
+    };
+
+    return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
+}
+
+Expr* parser_parse_expr_parens(Parser* parser)
+{
+    if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
+        return NULL;
+
+    int old_errs = arrlen(parser->errs);
     Expr* expr = parser_parse_expr_inner(parser, 0);
-
-    token = parser_next(parser);
-    if (token.type != TOKEN_RIGHT_PAREN)
+    if (expr == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
+        if (arrlen(parser->errs) == old_errs)
         {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Expression parsing: Could not find end of parentheses.",
-        });
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = -1          ,
+                .column = -1          ,
+                .length = -1          ,
+                .msg    = "Expression parsing: Failed to parse expression inside of parentheses.",
+            });
+        }
         return NULL;
     }
+
+    if (!parser_expect_token(parser, TOKEN_RIGHT_PAREN))
+        return NULL;
 
     return expr;
 }

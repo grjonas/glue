@@ -43,6 +43,7 @@ Token parser_jump(Parser* parser, int new_state);
 Token parser_restore(Parser* parser, int old_state);
 bool parser_skip(Parser* parser, bool (*predicate)(TokenType));
 char     * parser_parse_identifier (Parser* parser);
+bool parser_expect_token(Parser* parser, TokenType type);
 
 void parser_throw_compiler_error(Parser* parser, CompileError err);
 
