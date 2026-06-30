@@ -792,6 +792,24 @@ Stmt* parser_parse_stmt_expr(Parser* parser)
     return stmt_ptr;
 }
 
+Stmt* parser_parse_stmt_alias(Parser* parser)
+{
+    char* identifer = NULL;
+    Type* type = NULL;
+    Token token;
+
+    parser_expect_token(parser, TOKEN_ALIAS);
+
+    fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
+    exit(1);
+}
+
+Stmt* parser_parse_stmt_type(Parser* parser)
+{
+    fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
+    exit(1);
+}
+
 const char* stmt_type_name(StmtKind kind)
 {
     switch (kind)

@@ -110,6 +110,48 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
                 return NULL;
             }
 
+            // If it's the chain operator, we create an entirely different expression
+            if (binary_kind == EXPR_BINARY_CHAIN)
+            {
+                // We check if the rhs is a function call - if not, then it's an error
+                if (rhs->kind != EXPR_FN)
+                {
+                    parser_throw_compiler_error(parser, (CompileError)
+                    {
+                        .kind   = ERROR_ERROR ,
+                        .line   = -1          ,
+                        .column = -1          ,
+                        .length = -1          ,
+                        .msg    = "Expression parsing: Cannot chain non-functions.",
+                    });
+                }
+                return NULL;
+
+                // TODO: Fix this hack.
+                // Since we do cannot expand the list of function arguments that is already allocated to an arena, we have two choices:
+                // 1) We allocate an entirely different list, which is identical to the old one, but has an additional element.
+                //     Cons: 
+                //     * New memory is allocated, but the old memory sits there idle, which is wasteful.
+                //     Pros:
+                //     * Easy to implement
+                //     
+                // 2) Refactor the parser a bit so that we only memory for the list when we know for sure how many elements it has.
+                //     Cons:
+                //     * Seems difficult to implement, as it would require moving state up the parser from the function call expression, up to the chain operator.
+                //     Pros:
+                //     * We only use memory we have to.
+                //     
+                // I went with option 1) for now, but if I ever have to refactor this parser significantly, I should consider option 2).
+                // Ease of implementation is the main reason, but we already use significant amounts of memory (which could be optimized later).
+                rhs->expr.fn.argc++;
+
+                rhs->expr.fn.argv = create_new_argument_list(&parser->arena, rhs->expr.fn.argc, rhs->expr.fn.argv, lhs);
+
+                lhs = rhs;
+
+                continue;
+            }
+
             expr = (Expr)
             {
                 // TODO: Fix txt position information.
@@ -717,4 +759,22 @@ bool is_postfix(TokenType type, int* left_bp)
             *left_bp = -1;
             return false;
     }
+}
+
+
+Expr** create_new_argument_list(Arena* arena, int old_argc, Expr** expr, Expr* lhs)
+{
+    // rhs->expr.fn.argv = create_new_argument_list(&parser->arena, rhs->expr.fn.argv, lhs);
+
+    Expr** new_expr = NULL;
+
+    new_expr = (Expr**) arena_push_empty(arena, (old_argc + 1) * sizeof(Expr*));
+
+    for (int i = 0; i < old_argc; ++i)
+    {
+        new_expr[i] = expr[i];
+    }
+    new_expr[old_argc] = lhs;
+
+    return new_expr;
 }

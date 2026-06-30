@@ -178,6 +178,8 @@ ExprUnaryKind get_postfix_operator(TokenType type, int* right_bp               )
 bool is_infix(TokenType type);
 bool is_postfix(TokenType type, int* left_bp);
 
+Expr** create_new_argument_list(Arena* arena, int old_argc, Expr** expr, Expr* lhs);
+
 void print_expr_op(Expr* op);
 
 #endif
