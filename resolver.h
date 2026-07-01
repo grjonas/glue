@@ -15,8 +15,10 @@ typedef struct Decl     Decl    ;
 
 enum DeclKind
 {
-    DECL_LET,
-    DECL_FN ,
+    DECL_LET  ,
+    DECL_FN   ,
+    DECL_ALIAS,
+    DECL_TYPE ,
 };
 
 struct DeclLet
@@ -29,6 +31,23 @@ struct DeclFn
     Variable* variable  ;
     int argc;
     Variable** argv;
+};
+
+struct DeclAlias
+{
+    char* identifier;
+    Type* type;
+};
+
+struct DeclType
+{
+    char* identifier;
+    Type* type;
+};
+
+struct DeclTypeConstructor // Has to be declared after a 'DeclType'
+{
+    Variable* constructor;
 };
 
 // Declaration
@@ -45,40 +64,30 @@ struct Decl
 
 struct Resolver
 {
-    // Inputs (And outputs)
+    // Inputs
     const char* txt;
     Token* tokens;
     Stmt*  stmts;
 
+    // Memory-management
     Arena  arena;
     Arena  tmp_type_arena;
 
+    // Misc. state
     int loop_depth;
     bool inside_function;
     Type* fn_type;
 
+    // Outputs
     Decl**    declarations;
     Expr**    exprs;
-    Type**    types;
     char**    identifiers;
 
+    // Errs
     CompileError** errs;
 };
 
 Resolver resolver_init(Parser parser, Stmt* stmt);
 void resolver_free(Resolver* resolver);
-
-void  resolver_resolve_stmt(Resolver* resolver);
-void  resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type);
-
-Decl*  resolver_declare_let  (Resolver* resolver, char* identifier, Type* type);
-Decl*  resolver_declare_fn   (Resolver* resolver, StmtFn fn);
-
-char* resolver_get_identifier(Resolver* resolver, char* identifier);
-Variable* resolver_get_nearest_variable(Resolver* resolver, char* identifier);
-
-void resolver_throw_compiler_error(Resolver* resolver, CompileError err);
-
-Type* construct_fn_type(Arena* arena, StmtFn fn);
 
 #endif
