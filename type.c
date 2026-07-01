@@ -1,66 +1,164 @@
 #include "type.h"
 
-Type* parser_parse_type_list(Parser* parser)
+// 'bp' stands for binding power
+TypeExpr* parser_parse_type_expr_inner(Parser* parser, int min_bp)
 {
-    Type  type;
-    Type* rhs;
-    Token token;
+    TypeExpr type_expr;
 
-    token = parser_next(parser);
-    if (token.type != TOKEN_LEFT_SQUARE)
+    TypeExpr* lhs = NULL;
+    TypeExpr* rhs = NULL;
+
+    int left_bp  = 0;
+    int right_bp = 0;
+
+    Token token = parser_peek(parser);
+
+    switch (token.type)
     {
-        fprintf(stderr, "[%s:%d] Type parsing: Logical error, expected '[' token..\n", __FILE__, __LINE__);
-        exit(1);
+        case TOKEN_LEFT_SQUARE:
+            lhs = parser_parse_type_expr_list(parser);
+            break;
+
+        case TOKEN_LEFT_BRACE:
+            lhs = parser_parse_type_expr_struct(parser);
+            break;
+
+        default:
+            lhs = parser_parse_type_expr_primitive(parser);
+            if (lhs == NULL)
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Type parsing: Failed to parser primitive type expression.",
+                });
+                return NULL;
+            }
     }
 
-    rhs = parser_parse_type(parser);
-
-    type = (Type)
+    do
     {
-        .kind = TYPE_LIST     ,
-        .line = token.line    ,
-        .column = token.column,
-        .length = token.length,
-        .type.list = (TypeList)
-        {
-            .type = rhs,
-        }
-    };
+        token = parser_peek(parser);
 
-    return (Type*) arena_push(&parser->arena, &type, sizeof(Type));
+        if (token.type == TOKEN_MINUS_GREATER)
+        {
+            parser_next(parser);
+
+            left_bp  = 1;
+            right_bp = 2;
+
+            if (left_bp < min_bp)
+            {
+                break;
+            }
+
+            rhs = parser_parse_type_expr_inner(parser, right_bp);
+            if (rhs == NULL)
+            {
+                return NULL;
+            }
+
+            type_expr = (TypeExpr)
+            {
+                .kind   = TYPE_EXPR_FN,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.length,
+                .type_expr.fn = (TypeExprFunction)
+                {
+                    .left  = lhs,
+                    .right = rhs,
+                }
+            };
+
+            lhs = (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
+
+            continue;
+        }
+        else if (token.type == TOKEN_LEFT_PAREN)
+        {
+            parser_next(parser);
+
+            left_bp = 10;
+
+            if (left_bp < min_bp)
+            {
+                break;
+            }
+
+            rhs = parser_parse_type_expr_instance(parser);
+            assert(rhs->kind == TYPE_EXPR_INSTANCE);
+
+            rhs->type_expr.instance.caller = lhs;
+            lhs = rhs;
+
+            continue;
+        }
+        else
+        {
+            break;
+        }
+
+    }
+    while (true);
+
+    return lhs;
 }
 
-Type* parser_parse_type_struct(Parser* parser)
+TypeExpr* parser_parse_type_expr(Parser* parser)
 {
-    Type type;
-    int argc = 0;
-    TypeStructField** argv;
+    return parser_parse_type_expr_inner(parser, 0);
+}
+
+TypeExpr* parser_parse_type_expr_list(Parser* parser)
+{
+    TypeExpr  type_expr ;
+    TypeExpr* type_inner = NULL;
 
     Token token;
 
     token = parser_peek(parser);
-    if (token.type != TOKEN_LEFT_BRACE)
+    parser_expect_token(parser, TOKEN_LEFT_SQUARE);
+
+    type_inner = parser_parse_type_expr(parser);
+
+    type_expr = (TypeExpr)
     {
-        parser_throw_compiler_error(parser, (CompileError)
+        .kind   = TYPE_EXPR_LIST,
+        .line   = token.line    ,
+        .column = token.column  ,
+        .length = token.length  ,
+        .type_expr.list = (TypeExprList)
         {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Type parsing: Expected '{'.",
-        });
-        return NULL;
-    }
-    parser_next(parser);
+            .type = type_inner
+        }
+    };
 
-    if (token.type != TOKEN_LEFT_BRACE)
+    return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
+}
+
+TypeExpr* parser_parse_type_expr_struct(Parser* parser)
+{
+    TypeExpr type_expr;
+
+    int argc = 0;
+    TypeExprStructField** argv;
+
+    Token token;
+
+    parser_expect_token(parser, TOKEN_LEFT_BRACE);
+
+    if (token.type != TOKEN_RIGHT_BRACE)
     {
-        TypeStructField*  curr_arg = NULL;
-        TypeStructField** tmp_ptr = NULL;
+        TypeExprStructField*  curr_arg = NULL;
+        TypeExprStructField** tmp_ptr  = NULL;
 
-        char* identifier = NULL;
-        Type* field_type = NULL;
-        TypeStructField field;
+        char    * identifier = NULL;
+        TypeExpr* field_type = NULL;
+        TypeExprStructField field;
 
         // If it's not, then we parse an argument.
         // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
@@ -74,27 +172,24 @@ Type* parser_parse_type_struct(Parser* parser)
                 return NULL;
             }
 
-            token = parser_next(parser);
-            if (token.type != TOKEN_COLON)
-            {
-                return NULL;
-            }
+            parser_expect_token(parser, TOKEN_COLON);
 
-            field_type = parser_parse_type(parser);
+            field_type = parser_parse_type_expr(parser);
             if (field_type == NULL)
             {
                 return NULL;
             }
 
-            field = (TypeStructField)
+            field = (TypeExprStructField)
             {
                 .key    = identifier,
                 .value  = field_type,
             };
 
-            curr_arg = (TypeStructField*) arena_push(&parser->arena, &field, sizeof(TypeStructField));
+            curr_arg = (TypeExprStructField*) arena_push(&parser->arena, &field, sizeof(TypeExprStructField));
 
             arrput(argv, curr_arg);
+
             token = parser_peek(parser);
             if (token.type == TOKEN_COMMA)
             {
@@ -122,7 +217,7 @@ Type* parser_parse_type_struct(Parser* parser)
 
         tmp_ptr = argv;
         argc = arrlen(tmp_ptr);
-        argv = (TypeStructField**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(TypeStructField*));
+        argv = (TypeExprStructField**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(TypeExprStructField*));
         arrfree(tmp_ptr);
     }
     else
@@ -133,50 +228,38 @@ Type* parser_parse_type_struct(Parser* parser)
         argv = NULL;
     }
 
-    type = (Type)
+    type_expr = (TypeExpr)
     {
-        .kind       = TYPE_STRUCT ,
-        .line       = token.line  ,
-        .column     = token.column,
-        .length     = token.line  ,
-        .type.structt = (TypeStruct)
+        .kind       = TYPE_EXPR_STRUCT,
+        .line       = token.line      ,
+        .column     = token.column    ,
+        .length     = token.line      ,
+        .type_expr.structt = (TypeExprStruct)
         {
             .argc = argc,
             .argv = argv,
         }
     };
 
-    return (Type*) arena_push(&parser->arena, &type, sizeof(Type));
+    return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
 
-Type* parser_parse_type_generic(Parser* parser)
- {
-    Token token;
+TypeExpr* parser_parse_type_expr_instance(Parser* parser)
+{
     int argc = 0;
-    Type** argv = NULL;
-    Type type;
+    TypeExpr** argv = NULL;
+    TypeExpr   type_expr;
 
-    token = parser_peek(parser);
-    if (token.type != TOKEN_LEFT_PAREN)
-    {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Type parsing: Expected '('.",
-        });
-        return NULL;
-    }
-    parser_next(parser);
+    Token token;
+
+    parser_expect_token(parser, TOKEN_LEFT_PAREN);
 
     token = parser_peek(parser);
     // We check to see if the function is a prcedure or not.
     if (token.type != TOKEN_RIGHT_PAREN)
     {
-        Type* curr_arg = NULL;
-        Type** tmp_ptr;
+        TypeExpr* curr_arg = NULL;
+        TypeExpr** tmp_ptr = NULL;
 
         // If it's not, then we parse an argument.
         // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
@@ -184,7 +267,7 @@ Type* parser_parse_type_generic(Parser* parser)
         // On TOKEN_LEFT_PAREN, we exit the loop.
         while (true)
         {
-            curr_arg = parser_parse_type(parser);
+            curr_arg = parser_parse_type_expr(parser);
             if (curr_arg == NULL)
             {
                 return NULL;
@@ -218,7 +301,7 @@ Type* parser_parse_type_generic(Parser* parser)
 
         tmp_ptr = argv;
         argc = arrlen(tmp_ptr);
-        argv = (Type**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(Type*));
+        argv = (TypeExpr**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(TypeExpr*));
         arrfree(tmp_ptr);
     }
     else
@@ -229,48 +312,57 @@ Type* parser_parse_type_generic(Parser* parser)
         argv = NULL;
     }
 
-    type = (Type)
+    type_expr = (TypeExpr)
     {
-        .kind       = TYPE_GENERIC,
-        .line       = token.line  ,
-        .column     = token.column,
-        .length     = token.line  ,
-        .type.generic = (TypeGeneric)
+        .kind       = TYPE_EXPR_INSTANCE,
+        .line       = token.line        ,
+        .column     = token.column      ,
+        .length     = token.line        ,
+        .type_expr.instance = (TypeExprInstance)
         {
-            .identifier = NULL,
-            .argc = argc      ,
-            .argv = argv      ,
+            .caller = NULL,
+            .argc   = argc,
+            .argv   = argv,
         }
     };
 
-    return (Type*) arena_push(&parser->arena, &type, sizeof(Type));
+    return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
 
 // Type
-Type* parser_parse_type_primitive(Parser* parser)
+TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
 {
-    Type type;
+    TypeExpr type_expr;
 
     Token token;
 
-    token = parser_next(parser);
+    token = parser_peek(parser);
     switch(token.type)
     {
         case TOKEN_NIL_T:
-            type.kind = TYPE_NIL ;
+            type_expr.kind = TYPE_EXPR_NIL ;
             break;
+
         case TOKEN_BOOL :
-            type.kind = TYPE_BOOL;
+            type_expr.kind = TYPE_EXPR_BOOL;
             break;
+
         case TOKEN_INT  :
-            type.kind = TYPE_INT;
+            type_expr.kind = TYPE_EXPR_INT;
             break;
+
         case TOKEN_REAL :
-            type.kind = TYPE_REAL;
+            type_expr.kind = TYPE_EXPR_REAL;
             break;
+
+        case TOKEN_STRING:
+            type_expr.kind = TYPE_EXPR_STRING;
+            break;
+
         case TOKEN_IDENTIFIER:
-            type.kind = TYPE_VARIABLE;
+            type_expr.kind = TYPE_EXPR_IDENTIFIER;
             break;
+
         default:
             parser_throw_compiler_error(parser, (CompileError)
             {
@@ -282,117 +374,15 @@ Type* parser_parse_type_primitive(Parser* parser)
             });
             return NULL;
     }
+    parser_next(parser);
 
-    type = (Type)
+    type_expr = (TypeExpr)
     {
         .line           = token.line  ,
         .column         = token.column,
         .length         = token.length,
-        .type.none      = NULL        ,
+        .type_expr.none = NULL        ,
     };
 
-    return (Type*) arena_push(&parser->arena, &type, sizeof(Type));
+    return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
-
-Type* parser_parse_type(Parser* parser)
-{
-    Type* lhs = NULL;
-    Type* rhs;
-
-    Token token;
-
-    token = parser_peek(parser);
-    switch (token.type)
-    {
-        case TOKEN_LEFT_BRACE:
-            lhs = parser_parse_type_struct(parser);
-            break;
-
-        case TOKEN_LEFT_SQUARE:
-            lhs = parser_parse_type_list(parser);
-            break;
-
-        default:
-            // TODO: Currently, we allocate a primitive, and if we manage to parse a 'type function',
-            // then we allocate a new function, so we drop the old value and have a new function value.
-            // We still allocate a primitive type though, which is means we use memory for no reason.
-            // Fix this later.
-            lhs = parser_parse_type_primitive(parser);
-            token = parser_peek(parser);
-            if (token.type == TOKEN_LEFT_PAREN)
-            {
-                if (lhs->kind == TYPE_VARIABLE)
-                {
-                    rhs = parser_parse_type_generic(parser);
-                    // TODO: Set identifier later.
-                    rhs->type.generic.identifier = NULL;
-                    // rhs->type.fn.identifier = lhs->identifier;
-                    rhs->line       = lhs->line      ;
-                    rhs->column     = lhs->column    ;
-                    rhs->length     = lhs->length    ;
-                }
-                else
-                {
-                    parser_throw_compiler_error(parser, (CompileError)
-                    {
-                        .kind   = ERROR_ERROR ,
-                        .line   = token.line  ,
-                        .column = token.column,
-                        .length = token.line  ,
-                        .msg    = "Type parsing: Primitive type is not a type 'function'.",
-                    });
-                    return NULL;
-                }
-            }
-    }
-
-    return lhs;
-}
-
-// Type* construct_type_unknown(Arena* arena)
-// {
-//     Type type;
-// 
-//     type = (Type)
-//     {
-//         .kind           = TYPE_UNKNOWN,
-//         .type.primitive = NULL        ,
-//     };
-//     return (Type*) arena_push(arena, &type, sizeof(Type));
-// }
-// 
-// Type* construct_type_primitive(Arena* arena, TypeKind kind)
-// {
-//     Type type;
-// 
-//     if (kind <= TYPE_PRIMITIVE_SEPERATOR || TYPE_DERIVATIVE_SEPERATOR <= kind)
-//     {
-//         fprintf(stderr, "[%s:%d] Type construction: Cannot construct primitive type by passing a non-primitive TypeKind.\n", __FILE__, __LINE__);
-//         exit(1);
-//     }
-// 
-//     type = (Type)
-//     {
-//         .kind           = kind,
-//         .type.primitive = NULL,
-//     };
-//     return (Type*) arena_push(arena, &type, sizeof(Type));
-// }
-// 
-// Type* construct_type_function(Arena* arena, int argc, Type* argv, Type* return_type)
-// {
-//     Type type;
-// 
-//     type = (Type)
-//     {
-//         .kind    = TYPE_FN,
-//         .type.fn = (TypeFunction)
-//         {
-//             .argc        = argc       ,
-//             .argv        = argv       ,
-//             .return_type = return_type,
-//         };
-//     };
-// 
-//     return arena_push(arena, &type, sizeof(Type));
-// }

@@ -3,100 +3,107 @@
 
 #include "parser.h"
 
-typedef struct Type             Type          ;
-typedef enum   TypeKind         TypeKind      ;
+typedef struct Type Type;
 
-typedef struct TypeList        TypeList       ;
-typedef struct TypeStructField TypeStructField;
-typedef struct TypeStruct      TypeStruct     ;
-typedef struct TypeGeneric     TypeGeneric    ;
-typedef struct TypeFunction    TypeFunction   ;
-
-// Type
-enum TypeKind
+// Not implemented yet
+struct Type
 {
-    // Special
-    TYPE_ERROR     ,
-    TYPE_UNKNOWN   ,
-    TYPE_VARIABLE  ,
-    TYPE_ALIAS     ,
-
-    TYPE_PRIMITIVE_SEPERATOR,
-
-    // Built-in primitives
-    TYPE_NIL       ,
-    TYPE_BOOL      ,
-    TYPE_INT       , // i64 - for now at least
-    TYPE_REAL      , // f64 - for now at least
-
-    TYPE_DERIVATIVE_SEPERATOR,
-
-    // Built-in derivative
-    TYPE_LIST      ,
-    TYPE_STRUCT    ,
-    TYPE_FN        ,
-
-    TYPE_MISC_SEPERATOR,
-
-    TYPE_GENERIC   ,
+    void* none;
 };
 
-struct TypeList
+// TODO: We need to establish a difference between a 'type expression' - the type as written in a function signature, and contains positional, and other relevant information,
+// and the 'type proper', which contains the actual type information.
+typedef struct TypeExpr            TypeExpr           ;
+typedef enum   TypeExprKind        TypeExprKind       ;
+
+typedef struct TypeExprIdentifier  TypeExprIdentifier ;
+typedef struct TypeExprNil         TypeExprNil        ;
+typedef struct TypeExprBool        TypeExprBool       ;
+typedef struct TypeExprInt         TypeExprInt        ;
+typedef struct TypeExprReal        TypeExprReal       ;
+typedef struct TypeExprString      TypeExprString     ;
+typedef struct TypeExprList        TypeExprList       ;
+typedef struct TypeExprStructField TypeExprStructField;
+typedef struct TypeExprStruct      TypeExprStruct     ;
+typedef struct TypeExprFunction    TypeExprFunction   ; // example: map : (a -> b) -> [a] -> [b]
+typedef struct TypeExprInstance    TypeExprInstance   ; // example: Maybe(a), which can be instantiated as such - Maybe(Int), etc.
+
+enum TypeExprKind
 {
-    Type* type;
+    TYPE_EXPR_IDENTIFIER,
+    TYPE_EXPR_NIL       ,
+    TYPE_EXPR_BOOL      ,
+    TYPE_EXPR_INT       ,
+    TYPE_EXPR_REAL      ,
+    TYPE_EXPR_STRING    ,
+    TYPE_EXPR_LIST      ,
+    TYPE_EXPR_STRUCT    ,
+    TYPE_EXPR_FN        ,
+    TYPE_EXPR_INSTANCE  ,
 };
 
-struct TypeGeneric
+struct TypeExprIdentifier
 {
     char* identifier;
-    int   argc;
-    Type** argv;
 };
 
-struct TypeFunction
+struct TypeExprList
 {
-    int argc;
-    Type** argv;
+    TypeExpr* type;
 };
 
-struct TypeStructField
+struct TypeExprStructField
 {
     char* key;
-    Type* value;
+    TypeExpr* value;
 };
 
-struct TypeStruct
+struct TypeExprStruct
 {
     int argc;
-    TypeStructField** argv;
+    TypeExprStructField** argv;
+};
+
+struct TypeExprFunction
+{
+    TypeExpr* left ;
+    TypeExpr* right;
+};
+
+struct TypeExprInstance
+{
+    TypeExpr* caller;
+    int argc;
+    TypeExpr** argv;
 };
 
 // Holds type information.
-// Each 'Type' object is considered a seperate 'variable', which is why if the kind of type is TYPE_VARIABLE, there is not type id of any kind.
-struct Type
+// Each 'TypeExpr' object is considered a seperate 'variable', which is why if the kind of type is TYPE_VARIABLE, there is not type id of any kind.
+struct TypeExpr
 {
-    TypeKind kind;
+    TypeExprKind kind;
     int line  ;
     int column;
     int length;
 
     union
     {
-        void        * none     ; // Primitives and variables don't need any data, so they're just NULL void pointers;
-        TypeList      list     ;
-        TypeStruct    structt  ;
-        TypeGeneric   generic  ;
-        TypeFunction  fn       ;
+        void             * none     ; // Primitives don't need any data, so they're just NULL void pointers;
+        TypeExprIdentifier identifier;
+        TypeExprList       list      ;
+        TypeExprStruct     structt   ;
+        TypeExprFunction   fn        ;
+        TypeExprInstance   instance  ;
     }
-    type;
+    type_expr;
 };
 
-// Type parsing
-Type* parser_parse_type(Parser* parser);
+TypeExpr* parser_parse_type_expr          (Parser* parser);
 
-Type* parser_parse_type_primitive(Parser* parser);
-Type* parser_parse_type_list(Parser* parser);
-Type* parser_parse_type_struct(Parser* parser);
-Type* parser_parse_type_function(Parser* parser);
+TypeExpr* parser_parse_type_expr_primitive(Parser* parser);
+TypeExpr* parser_parse_type_expr_list     (Parser* parser);
+TypeExpr* parser_parse_type_expr_struct   (Parser* parser);
+TypeExpr* parser_parse_type_expr_function (Parser* parser);
+TypeExpr* parser_parse_type_expr_instance (Parser* parser);
 
 #endif

@@ -44,6 +44,7 @@ const char* token_type_name(TokenType type)
         case TOKEN_MINUS:           return "TOKEN_MINUS";
         case TOKEN_MINUS_EQUAL:     return "TOKEN_MINUS_EQUAL";
         case TOKEN_MINUS_MINUS:     return "TOKEN_MINUS_MINUS";
+        case TOKEN_MINUS_GREATER:   return "TOKEN_MINUS_GREATER";
 
         case TOKEN_STAR:            return "TOKEN_STAR";
         case TOKEN_STAR_EQUAL:      return "TOKEN_STAR_EQUAL";
@@ -271,6 +272,8 @@ Token scanner_scan_token(Scanner* scanner)
                 return scanner_make_token(scanner, TOKEN_MINUS_EQUAL  , 0, 2);
             else if (scanner_match(scanner, '-'))
                 return scanner_make_token(scanner, TOKEN_MINUS_MINUS  , 0, 2);
+            else if (scanner_match(scanner, '>'))
+                return scanner_make_token(scanner, TOKEN_MINUS_GREATER, 0, 2);
             else
                 return scanner_make_token(scanner, TOKEN_MINUS        , 0, 1);
         case '*':
