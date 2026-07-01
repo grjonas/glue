@@ -43,9 +43,9 @@ struct StmtBlock
 
 struct StmtLet
 {
-    char  * identifier;
-    Type  * type      ;
-    Expr*   expr      ;
+    char     * identifier;
+    TypeExpr * type ;
+    Expr*      expr      ;
 };
 
 // I'm thinking that if the condition is NULL, then it's an 'else' statement.
@@ -66,17 +66,17 @@ struct StmtWhile
 
 struct StmtFn
 {
-    char     *  identifier ;
+    char      * identifier ;
     int         argc       ;
     StmtFnArg** argv       ;
-    Type     *  return_type;
-    Stmt     *  body       ;
+    TypeExpr  * return_type;
+    Stmt      * body       ;
 };
 
 struct StmtFnArg
 {
-    char*   identifier;
-    Type*   type      ;
+    char*     identifier;
+    TypeExpr* type      ;
 };
 
 struct StmtReturn
@@ -86,7 +86,7 @@ struct StmtReturn
 
 struct StmtAlias
 {
-    Type* type;
+    TypeExpr* type;
 };
 
 // Tagged Union

@@ -210,8 +210,8 @@ Stmt* parser_parse_stmt_let(Parser* parser)
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
 
-    char* identifier = NULL;
-    Type* type       = NULL;
+    char*     identifier = NULL;
+    TypeExpr* type   = NULL;
     Expr* expr       = NULL;
 
     Token token;
@@ -258,7 +258,7 @@ Stmt* parser_parse_stmt_let(Parser* parser)
     {
         parser_next(parser);
 
-        type = parser_parse_type(parser);
+        type = parser_parse_type_expr(parser);
         if (type == NULL)
         {
             parser_throw_compiler_error(parser, (CompileError)
@@ -528,7 +528,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     char*       identifier  = NULL;
     int         argc        = 0   ;
     StmtFnArg** argv        = NULL;
-    Type*       return_type = NULL;
+    TypeExpr*   return_type = NULL;
     Stmt     *  body        = NULL;
 
     Token token;
@@ -665,7 +665,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     // if (token.type == TOKEN_COLON)
     // {
         // parser_next(parser);
-        // return_type = parser_parse_type(parser);
+        // return_type = parser_parse_type_expr(parser);
         // if (return_type == NULL)
         // {
             // parser_throw_compiler_error(parser, (CompileError)
@@ -714,7 +714,7 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
 
     Token token;
     char* identifier       = NULL;
-    Type* type             = NULL;
+    TypeExpr* type             = NULL;
 
     stmt_fn_arg = (StmtFnArg)
     {
@@ -742,7 +742,7 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
     {
         parser_next(parser);
 
-        type = parser_parse_type(parser);
+        type = parser_parse_type_expr(parser);
         if (type == NULL)
         {
             parser_throw_compiler_error(parser, (CompileError)
@@ -798,7 +798,7 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
 {
     Stmt stmt;
     char* identifier = NULL;
-    Type* type = NULL;
+    TypeExpr* type = NULL;
     Token token;
 
     // Parse keyword
@@ -821,7 +821,7 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
     }
 
     // Parse type
-    type = parser_parse_type(parser);
+    type = parser_parse_type_expr(parser);
     if (type == NULL)
     {
         parser_throw_compiler_error(parser, (CompileError)

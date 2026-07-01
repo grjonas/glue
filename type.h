@@ -3,16 +3,8 @@
 
 #include "parser.h"
 
-typedef struct Type Type;
-
-// Not implemented yet
-struct Type
-{
-    void* none;
-};
-
-// TODO: We need to establish a difference between a 'type expression' - the type as written in a function signature, and contains positional, and other relevant information,
-// and the 'type proper', which contains the actual type information.
+// 'type expression' - the type as written in a function signature, and contains positional, and other relevant information,
+// 'type proper' - contains the actual type information.
 typedef struct TypeExpr            TypeExpr           ;
 typedef enum   TypeExprKind        TypeExprKind       ;
 
@@ -72,7 +64,7 @@ struct TypeExprFunction
 
 struct TypeExprInstance
 {
-    TypeExpr* caller;
+    char* caller;
     int argc;
     TypeExpr** argv;
 };
@@ -105,5 +97,89 @@ TypeExpr* parser_parse_type_expr_list     (Parser* parser);
 TypeExpr* parser_parse_type_expr_struct   (Parser* parser);
 TypeExpr* parser_parse_type_expr_function (Parser* parser);
 TypeExpr* parser_parse_type_expr_instance (Parser* parser);
+
+typedef struct Type            Type           ;
+typedef enum   TypeKind        TypeKind       ;
+
+typedef struct TypeList        TypeList       ;
+typedef struct TypeStruct      TypeStruct     ;
+typedef struct TypeStructField TypeStructField;
+typedef struct TypeFn          TypeFn         ;
+typedef struct TypeAlias       TypeAlias      ;
+typedef struct TypeNewType     TypeNewType    ;
+
+enum TypeKind
+{
+    // Primitive types
+    TYPE_NIL     ,
+    TYPE_BOOL    ,
+    TYPE_INT     ,
+    TYPE_REAL    ,
+    TYPE_STRING  ,
+
+    // Derivative types
+    TYPE_LIST    ,
+    TYPE_STRUCT  ,
+    TYPE_FN      ,
+
+    // Special types
+    TYPE_VARIABLE, // a type representing a yet unknown type.
+    TYPE_ALIAS   , // a type representing an alias to an existing type.
+    TYPE_NEW_TYPE, // a type representing a newly defined type.
+};
+
+struct TypeList
+{
+    Type* type;
+};
+
+struct TypeStructField
+{
+    char* key  ;
+    Type* value;
+};
+
+struct TypeStruct
+{
+    int field_num;
+    TypeStructField** fields;
+};
+
+struct TypeFn
+{
+    Type* left ;
+    Type* right;
+};
+
+struct TypeAlias
+{
+    Type* type;
+};
+
+struct TypeNewType
+{
+    int    parameter_num  ;
+    int    constructor_num;
+    Type** parameters     ; // All of kind TYPE_VARIABLE
+    Type** constructors   ; // All of kind TYPE_FN, where the rightmost node_ptr is equal of the 'TypeNewType' itself.
+};
+
+// Not implemented yet
+struct Type
+{
+    TypeKind kind;
+    union
+    {
+        void      * none    ; // Primitives and variable. (should be set to NULL in that case).
+        TypeList    list    ;
+        TypeStruct  structt ;
+        TypeFn      fn      ;
+        TypeAlias   alias   ;
+        TypeNewType new_type;
+    }
+    type;
+};
+
+Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr);
 
 #endif
