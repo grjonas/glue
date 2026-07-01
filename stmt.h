@@ -16,6 +16,7 @@ typedef struct StmtWhile    StmtWhile   ;
 typedef struct StmtFnArg    StmtFnArg   ;
 typedef struct StmtFn       StmtFn      ;
 typedef struct StmtReturn   StmtReturn  ;
+typedef struct StmtAlias    StmtAlias   ;
 
 // Stmt
 enum StmtKind
@@ -31,6 +32,7 @@ enum StmtKind
     STMT_CONTINUE         ,
     STMT_FN               ,
     STMT_RETURN           ,
+    STMT_ALIAS            ,
 };
 
 struct StmtBlock
@@ -46,6 +48,9 @@ struct StmtLet
     Expr*   expr      ;
 };
 
+// I'm thinking that if the condition is NULL, then it's an 'else' statement.
+// Otherwise, it's an 'elif' statement.
+// Though this may be a bit fragile, so I'm not sure yet.
 struct StmtIf
 {
     Expr    * condition;
@@ -53,9 +58,6 @@ struct StmtIf
     Stmt    * next     ; // else or elif
 };
 
-// I'm thinking that if the condition is NULL, then it's an 'else' statement.
-// Otherwise, it's an 'elif' statement.
-// Though this may be a bit fragile, so I'm not sure yet.
 struct StmtWhile
 {
     Expr* condition;
@@ -82,6 +84,11 @@ struct StmtReturn
     Expr* expr;
 };
 
+struct StmtAlias
+{
+    Type* type;
+};
+
 // Tagged Union
 struct Stmt
 {
@@ -100,6 +107,7 @@ struct Stmt
         StmtWhile  whilee ;
         StmtFn     fn     ;
         StmtReturn returnn;
+        StmtAlias  alias  ;
         void*      none   ; // For statements that are just singular tokens such as 'break' or 'continue'.
     }
     stmt;
@@ -120,6 +128,7 @@ Stmt     * parser_parse_stmt_expr    (Parser* parser);
 Stmt     * parser_parse_stmt_break   (Parser* parser);
 Stmt     * parser_parse_stmt_continue(Parser* parser);
 Stmt     * parser_parse_stmt_return  (Parser* parser);
+Stmt     * parser_parse_stmt_alias   (Parser* parser);
 
 void print_stmt(Stmt* stmt);
 const char* stmt_type_name(StmtKind kind);

@@ -100,6 +100,9 @@ Stmt* parser_parse_stmt(Parser* parser)
         case TOKEN_RETURN:
             return parser_parse_stmt_return(parser);
 
+        case TOKEN_ALIAS:
+            return parser_parse_stmt_alias(parser);
+
         default:
             return parser_parse_stmt_expr(parser);
             // fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
@@ -646,7 +649,6 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     }
 
     int old_errs = arrlen(parser->errs);
-    return_type = parser_parse_type(parser);
     if (arrlen(parser->errs) > old_errs)
     {
         parser_throw_compiler_error(parser, (CompileError)
@@ -660,23 +662,23 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         return NULL;
     }
 
-    if (token.type == TOKEN_COLON)
-    {
-        parser_next(parser);
-        return_type = parser_parse_type(parser);
-        if (return_type == NULL)
-        {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Failed to parse function return type.",
-            });
-            return NULL;
-        }
-    }
+    // if (token.type == TOKEN_COLON)
+    // {
+        // parser_next(parser);
+        // return_type = parser_parse_type(parser);
+        // if (return_type == NULL)
+        // {
+            // parser_throw_compiler_error(parser, (CompileError)
+            // {
+                // .kind   = ERROR_ERROR ,
+                // .line   = token.line  ,
+                // .column = token.column,
+                // .length = token.line  ,
+                // .msg    = "Statement parsing: Failed to parse function return type.",
+            // });
+            // return NULL;
+        // }
+    // }
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
@@ -794,14 +796,58 @@ Stmt* parser_parse_stmt_expr(Parser* parser)
 
 Stmt* parser_parse_stmt_alias(Parser* parser)
 {
-    char* identifer = NULL;
+    Stmt stmt;
+    char* identifier = NULL;
     Type* type = NULL;
     Token token;
 
+    // Parse keyword
+    token = parser_peek(parser);
     parser_expect_token(parser, TOKEN_ALIAS);
 
-    fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
-    exit(1);
+    // Parse identifier
+    identifier = parser_parse_identifier(parser);
+    if (identifier== NULL)
+    {
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Failed to parse identifier in 'alias' statement.",
+        });
+        return NULL;
+    }
+
+    // Parse type
+    type = parser_parse_type(parser);
+    if (type == NULL)
+    {
+        parser_throw_compiler_error(parser, (CompileError)
+        {
+            .kind   = ERROR_ERROR ,
+            .line   = token.line  ,
+            .column = token.column,
+            .length = token.line  ,
+            .msg    = "Statement parsing: Failed to parse type in 'alias' statement.",
+        });
+        return NULL;
+    }
+
+    stmt = (Stmt)
+    {
+        .kind   = STMT_ALIAS  ,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+        .stmt.alias = (StmtAlias)
+        {
+            .type = type,
+        }
+    };
+
+    return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
 Stmt* parser_parse_stmt_type(Parser* parser)

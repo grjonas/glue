@@ -67,6 +67,7 @@ const char* token_type_name(TokenType type)
         case TOKEN_INT:             return "TOKEN_INT";
         case TOKEN_REAL:            return "TOKEN_REAL";
         case TOKEN_LET:             return "TOKEN_LET";
+        case TOKEN_ALIAS:           return "TOKEN_ALIAS";
         case TOKEN_TYPE:            return "TOKEN_TYPE";
         case TOKEN_EFFECT:          return "TOKEN_EFFECT";
         case TOKEN_NIL_V:           return "TOKEN_NIL_V";
@@ -397,9 +398,11 @@ Token scanner_scan_token(Scanner* scanner)
                             rt = scanner_scan_identifier(scanner);
                         break;
 
-                    case 'a': // and
+                    case 'a': // and, alias
                         if (scanner_match_string(scanner, "nd", 1))
                             rt = scanner_make_token(scanner, TOKEN_AND, 0, 2);
+                        else if (scanner_match_string(scanner, "lias", 1))
+                            rt = scanner_make_token(scanner, TOKEN_ALIAS, 0, 4);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;
