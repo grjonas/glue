@@ -4,6 +4,7 @@
 #include "scanner.h"
 #include "parser.h"
 #include "expr.h"
+#include "decl.h"
 
 typedef struct Stmt         Stmt        ;
 
@@ -26,7 +27,6 @@ enum StmtKind
     STMT_LET              ,
     STMT_EXPR             ,
     STMT_IF               ,
-    // STMT_ELSE             ,
     STMT_WHILE            ,
     STMT_BREAK            ,
     STMT_CONTINUE         ,
@@ -44,7 +44,8 @@ struct StmtBlock
 struct StmtLet
 {
     char     * identifier;
-    TypeExpr * type ;
+    Decl     * decl      ;
+    TypeExpr * type      ;
     Expr*      expr      ;
 };
 
@@ -67,6 +68,7 @@ struct StmtWhile
 struct StmtFn
 {
     char      * identifier ;
+    Decl      * decl       ;
     int         argc       ;
     StmtFnArg** argv       ;
     TypeExpr  * return_type;
@@ -75,7 +77,8 @@ struct StmtFn
 
 struct StmtFnArg
 {
-    char*     identifier;
+    char    * identifier;
+    Decl    * decl      ;
     TypeExpr* type      ;
 };
 

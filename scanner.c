@@ -93,7 +93,6 @@ const char* token_type_name(TokenType type)
         case TOKEN_RETURN:          return "TOKEN_RETURN";
         case TOKEN_MATCH:           return "TOKEN_MATCH";
         case TOKEN_HANDLE:          return "TOKEN_HANDLE";
-        case TOKEN_PRINT:           return "TOKEN_PRINT";
 
         // Special.
         case TOKEN_ERROR:           return "TOKEN_ERROR";
@@ -477,12 +476,12 @@ Token scanner_scan_token(Scanner* scanner)
                             rt = scanner_scan_identifier(scanner);
                         break;
 
-                    case 'p': // print
-                        if (scanner_match_string(scanner, "rint", 1))
-                            rt = scanner_make_token(scanner, TOKEN_PRINT, 0, 4);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
+                    // case 'p': // print
+                    //     if (scanner_match_string(scanner, "rint", 1))
+                    //         rt = scanner_make_token(scanner, TOKEN_PRINT, 0, 4);
+                    //     else
+                    //         rt = scanner_scan_identifier(scanner);
+                    //     break;
 
                     default:
                         rt = scanner_scan_identifier(scanner);

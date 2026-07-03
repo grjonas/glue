@@ -351,6 +351,13 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
     Token token;
 
     token = parser_peek(parser);
+    type_expr = (TypeExpr)
+    {
+        .line           = token.line  ,
+        .column         = token.column,
+        .length         = token.length,
+    };
+
     switch(token.type)
     {
         case TOKEN_NIL_T:
@@ -375,6 +382,8 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
 
         case TOKEN_IDENTIFIER:
             type_expr.kind = TYPE_EXPR_IDENTIFIER;
+            type_expr.type_expr.identifier.identifier =
+                copy_string_to_arena(&parser->arena, token.start, token.length);
             break;
 
         default:
@@ -389,14 +398,6 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
             return NULL;
     }
     parser_next(parser);
-
-    type_expr = (TypeExpr)
-    {
-        .line           = token.line  ,
-        .column         = token.column,
-        .length         = token.length,
-        .type_expr.none = NULL        ,
-    };
 
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }

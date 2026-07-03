@@ -233,6 +233,7 @@ Stmt* parser_parse_stmt_let(Parser* parser)
         .stmt.let = (StmtLet)
         {
             .identifier = NULL,
+            .decl       = NULL,
             .type       = NULL,
             .expr       = NULL,
         },
@@ -550,6 +551,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         .stmt.fn = (StmtFn)
         {
             .identifier  = NULL,
+            .decl        = NULL,
             .argc        = 0   ,
             .argv        = NULL,
             .return_type = NULL,
@@ -698,6 +700,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     stmt.stmt.fn = (StmtFn)
     {
         .identifier  = identifier ,
+        .decl        = NULL       ,
         .argc        = argc       ,
         .argv        = argv       ,
         .return_type = return_type,
@@ -720,6 +723,7 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
     stmt_fn_arg = (StmtFnArg)
     {
         .identifier = NULL,
+        .decl       = NULL,
         .type       = NULL,
     };
 

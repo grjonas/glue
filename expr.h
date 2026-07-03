@@ -39,7 +39,6 @@ enum ExprPrimaryKind
     EXPR_PRIMARY_STRUCT    ,
     EXPR_PRIMARY_FN        ,
     EXPR_PRIMARY_IDENTIFIER,
-    EXPR_PRIMARY_PRINT     ,
     EXPR_PRIMARY_DECL      ,
     // EXPR_PRIMARY_VARIABLE  ,
 };

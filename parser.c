@@ -103,6 +103,27 @@ bool parser_skip(Parser* parser, bool (*predicate)(TokenType))
     return ret;
 }
 
+char* copy_string_to_arena(Arena* arena, const char* str, int length)
+{
+    char* new_str = NULL;
+    char* tmp_ptr = NULL;
+
+    new_str = calloc(length + 1, sizeof(char));
+    if (new_str  == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Failed to allocate memory.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    memcpy(new_str, str, (size_t) length * sizeof(char));
+
+    tmp_ptr = new_str;
+    new_str = (char*) arena_push(arena, new_str, (size_t) (length + 1) * sizeof(char));
+    free(tmp_ptr);
+
+    return new_str;
+}
+
 // Identifier
 char* parser_parse_identifier(Parser* parser)
 {
@@ -110,27 +131,8 @@ char* parser_parse_identifier(Parser* parser)
     Token token;
 
     token = parser_peek(parser);
-    if (token.type == TOKEN_IDENTIFIER)
-    {
-        int   length;
-        char* tmp_ptr;
-
-        parser_next(parser);
-
-        length = token.length + 1;
-        identifier = calloc(length, sizeof(char));
-        if (identifier == NULL)
-        {
-            fprintf(stderr, "[%s:%d] Failed to allocate memory.\n", __FILE__, __LINE__);
-            exit(1);
-        }
-
-        memcpy(identifier, token.start, (size_t) (length - 1) * sizeof(char));
-
-        tmp_ptr = identifier;
-        identifier = (char*) arena_push(&parser->arena, identifier, (size_t) length * sizeof(char));
-        free(tmp_ptr);
-    }
+    parser_expect_token(parser, TOKEN_IDENTIFIER);
+    identifier = copy_string_to_arena(&parser->arena, token.start, token.length);
 
     return identifier;
 }

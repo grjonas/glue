@@ -1,23 +1,22 @@
 #include "resolver.h"
 
-Resolver resolver_init(Parser parser, Stmt* stmts)
+Resolver resolver_init(Parser* parser, Stmt* stmts)
 {
+    // Parser cleanup
+    arrfree(parser->errs);
+
     Resolver resolver = (Resolver)
     {
-        .txt             = parser.txt   ,
-        .tokens          = parser.tokens,
-        .stmts           = stmts        ,
-        .arena           = parser.arena ,
-        .tmp_type_arena  = NULL         ,
-        .loop_depth      = 0            ,
-        .inside_function = false        ,
-        .fn_type         = NULL         ,
-        .context         = NULL         ,
-        .declarations    = NULL         ,
-        .exprs           = NULL         ,
-        .identifiers     = NULL         ,
-        .types           = NULL         ,
-        .errs            = NULL         ,
+        .txt             = parser->txt   ,
+        .tokens          = parser->tokens,
+        .stmts           = stmts         ,
+        .arena           = parser->arena ,
+        .loop_depth      = 0             ,
+        .inside_function = false         ,
+        .context         = NULL          ,
+        .declarations    = NULL          ,
+        .identifiers     = NULL          ,
+        .errs            = NULL          ,
     };
     return resolver;
 }
@@ -27,13 +26,10 @@ void resolver_free(Resolver* resolver)
     free((char*)resolver->txt);
     arrfree(resolver->tokens);
     arena_free(&resolver->arena);
-    arena_free(&resolver->tmp_type_arena);
 
     arrfree(resolver->context     );
     arrfree(resolver->declarations);
-    arrfree(resolver->exprs       );
     arrfree(resolver->identifiers );
-    arrfree(resolver->types       );
     arrfree(resolver->errs        );
 
     *resolver = (Resolver)
@@ -42,15 +38,11 @@ void resolver_free(Resolver* resolver)
         .tokens          = NULL                    ,
         .stmts           = NULL                    ,
         .arena           = resolver->arena         ,
-        .tmp_type_arena  = resolver->tmp_type_arena,
         .loop_depth      = 0                       ,
         .inside_function = false                   ,
-        .fn_type         = NULL                    ,
         .context         = NULL                    ,
         .declarations    = NULL                    ,
-        .exprs           = NULL                    ,
         .identifiers     = NULL                    ,
-        .types           = NULL                    ,
         .errs            = NULL                    ,
     };
 }
@@ -108,20 +100,27 @@ void resolver_resolve_stmt(Resolver* resolver)
             type_expr  = curr_stmt->stmt.let.type      ;
             expr       = curr_stmt->stmt.let.expr      ;
 
-            type = resolver_resolve_type_expr(resolver, type_expr);
-            if (type == NULL)
+            if (type_expr != NULL)
             {
-                resolver->stmts = NULL;
-                return;
+                type = resolver_resolve_type_expr(resolver, type_expr);
+                if (type == NULL)
+                {
+                    resolver->stmts = NULL;
+                    return;
+                }
             }
             decl = resolver_declare_let(resolver, identifier, type);
             resolver_push_decl_to_context(resolver, decl);
+            curr_stmt->stmt.let.decl = decl;
 
-            resolver_resolve_expr(resolver, &expr);
-            if (expr == NULL)
+            if (expr != NULL)
             {
-                resolver->stmts = NULL;
-                return;
+                resolver_resolve_expr(resolver, &expr);
+                if (expr == NULL)
+                {
+                    resolver->stmts = NULL;
+                    return;
+                }
             }
             break;
 
@@ -140,13 +139,15 @@ void resolver_resolve_stmt(Resolver* resolver)
             expr = curr_stmt->stmt.iff.condition;
             stmt = curr_stmt->stmt.iff.body     ;
 
-            resolver_resolve_expr(resolver, &expr);
-            if (expr == NULL)
+            if (expr != NULL)
             {
-                resolver->stmts = NULL;
-                return;
+                resolver_resolve_expr(resolver, &expr);
+                if (expr == NULL)
+                {
+                    resolver->stmts = NULL;
+                    return;
+                }
             }
-
             snapshot = resolver_get_context_snapshot(resolver);
             resolver->stmts = stmt     ;
 
@@ -209,55 +210,30 @@ void resolver_resolve_stmt(Resolver* resolver)
                 return;
             }
             break;
-
-        case STMT_FN      :
-            fn = curr_stmt->stmt.fn;
+        case STMT_FN:
+            fn   = curr_stmt->stmt.fn;
             stmt = fn.body;
 
-            // Type* new_fn_type = resolver_declare_fn(resolver, fn)->decl.fn.variable->type; // What the hell is this?? xdddddd
+            // Does not return NULL
             type = resolver_resolve_stmt_fn_type(resolver, fn);
-            if (type == NULL)
-            {
-                resolver->stmts = NULL;
-                return;
-            }
+
             decl = resolver_declare_let(resolver, fn.identifier, type);
             resolver_push_decl_to_context(resolver, decl);
 
             bool inside_function = resolver->inside_function;
-            Type* fn_type = resolver->fn_type;
 
             snapshot = resolver_get_context_snapshot(resolver);
             resolver->stmts = stmt;
             resolver->inside_function = true;
-            resolver->fn_type = type;
 
-            for (int i = 0; i < fn.argc; ++i)
-            {
-                type = resolver_resolve_type_expr(resolver, fn.argv[i]->type);
-                if (type == NULL)
-                {
-                    resolver_throw_compiler_error(resolver, (CompileError)
-                    {
-                        .kind   = ERROR_ERROR      ,
-                        .line   = curr_stmt->line  ,
-                        .column = curr_stmt->column,
-                        .length = curr_stmt->line  ,
-                        .msg    = "Statement resolution: Could not resolve function atgument type expression to type..",
-                    });
-                    resolver->stmts = NULL;
-                    return;
-                }
-                decl = resolver_declare_let(resolver, fn.argv[i]->identifier, type);
-                resolver_push_decl_to_context(resolver, decl);
-            }
+            // Assigning types to argument.
+            resolver_declare_fn_params(resolver, fn, type);
 
             resolver_resolve_stmt(resolver);
 
             resolver_restore_context_snapshot(resolver, snapshot);
             resolver->stmts = curr_stmt;
             resolver->inside_function = inside_function;
-            resolver->fn_type = fn_type;
             break;
 
         case STMT_RETURN  :
@@ -304,6 +280,9 @@ void resolver_resolve_stmt(Resolver* resolver)
 // TODO: Once we begin implementing inference, update this code.
 void resolver_resolve_expr(Resolver* resolver, Expr** expr)
 {
+    assert(expr  != NULL);
+    assert(*expr != NULL);
+
     char* identifier = NULL;
     Decl* decl       = NULL;
     ExprPrimaryStruct expr_struct;
@@ -377,13 +356,11 @@ void resolver_resolve_expr(Resolver* resolver, Expr** expr)
             exit(1);
     }
 
-    resolve_push_expr(resolver, expr);
+    // resolve_push_expr(resolver, *expr);
 }
 
 Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
 {
-    assert(type_expr != NULL);
-
     Type   type;
     Type*  type_ptr;
     Type** polymorphic_argv = NULL;
@@ -394,6 +371,11 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
     TypeExprStructField** argv = NULL;
     bool should_push_to_arena = true;
     Decl* decl = NULL;
+
+    if (type_expr == NULL)
+    {
+        return resolver_create_type_variable(resolver);
+    }
 
     switch (type_expr->kind)
     {
@@ -520,13 +502,14 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                     });
                     return NULL;
                 }
-                should_push_to_arena = false;
             }
             else
             {
                 decl = resolver_declare_type_variable(resolver, identifier);
                 resolver_push_decl_to_context(resolver, decl);
+                type_ptr = decl->type;
             }
+            should_push_to_arena = false;
 
             break;
 
@@ -586,7 +569,7 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
     if (should_push_to_arena)
     {
         type_ptr = (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
-        arrput(resolver->types, type_ptr);
+        // arrput(resolver->types, type_ptr);
         return type_ptr;
     }
     else
@@ -594,7 +577,6 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
         return type_ptr;
     }
 }
-
 
 int  resolver_get_context_snapshot(Resolver* resolver)
 {
@@ -619,40 +601,39 @@ void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
 }
 
 
-void resolve_push_expr(Resolver* resolver, Expr* expr)
-{
-    arrput(resolver->exprs, expr);
-}
-
 Type* resolver_resolve_stmt_fn_type(Resolver* resolver, StmtFn fn)
 {
     Type* return_type = NULL;
     Type* node_ptr    = NULL;
     Type  type;
 
+    TypeExpr* te = fn.return_type;
+    Type    * t  = te != NULL
+        ? resolver_resolve_type_expr(resolver, te)
+        : resolver_create_type_variable(resolver);
+
+    type = (Type)
+    {
+        .kind    = TYPE_FN,
+        .type.fn = (TypeFn)
+        {
+            .left  = NULL,
+            .right = t   ,
+        }
+    };
+    return_type = (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
+    node_ptr = return_type;
+
     for (int i = 0; i < fn.argc; ++i)
     {
         TypeExpr* te = fn.argv[i]->type;
-        Type    * t  = resolver_resolve_type_expr(resolver, te);
+        Type    * t  = te != NULL
+            ? resolver_resolve_type_expr(resolver, te)
+            : resolver_create_type_variable(resolver);
 
         if (i == 0)
         {
-            type = (Type)
-            {
-                .kind    = TYPE_FN,
-                .type.fn = (TypeFn)
-                {
-                    .left  = t   ,
-                    .right = NULL,
-                }
-            };
-
-            return_type = (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
-            node_ptr = return_type;
-        }
-        else if (i == 1)
-        {
-            node_ptr->type.fn.right = t;
+            node_ptr->type.fn.left = t;
         }
         else
         {
@@ -661,8 +642,8 @@ Type* resolver_resolve_stmt_fn_type(Resolver* resolver, StmtFn fn)
                 .kind    = TYPE_FN,
                 .type.fn = (TypeFn)
                 {
-                    .left  = node_ptr->type.fn.right,
-                    .right = t,
+                    .left  = t,
+                    .right = node_ptr->type.fn.right,
                 }
             };
 
@@ -715,6 +696,29 @@ Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type)
     arrput(resolver->declarations, decl_ptr);
 
     return decl_ptr;
+}
+
+void resolver_declare_fn_params(Resolver* resolver, StmtFn fn, Type* fn_type)
+{
+    assert(fn_type->kind == TYPE_FN);
+    assert(fn.argc == 0 ? fn_type->type.fn.left == NULL : true);
+
+    char* identifier = NULL;
+    Type* type       = NULL;
+    Type* node       = fn_type;
+    Decl* decl       = NULL;
+
+    for (int i = 0; i < fn.argc; ++i)
+    {
+        assert(node->kind == TYPE_FN);
+
+        identifier = fn.argv[i]->identifier;
+
+        type = node->type.fn.left;
+        decl = resolver_declare_let(resolver, identifier, type);
+        resolver_push_decl_to_context(resolver, decl);
+        node = node->type.fn.right;
+    }
 }
 
 Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
@@ -776,9 +780,8 @@ void resolver_throw_compiler_error(Resolver* resolver, CompileError err)
     arrput(resolver->errs, err_ptr);
 }
 
-Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
+Type* resolver_create_type_variable(Resolver* resolver)
 {
-    Decl decl;
     Type type;
 
     type = (Type)
@@ -787,79 +790,19 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
         .type.none = NULL         ,
     };
 
+    return (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
+}
+
+Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
+{
+    Decl decl;
+
     decl = (Decl)
     {
         .kind       = DECL_TYPE_VARIABLE,
         .identifier = identifier        ,
-        .type       = (Type*) arena_push(&resolver->arena, &type, sizeof(Type)),
+        .type       = resolver_create_type_variable(resolver)
     };
 
     return (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
-}
-
-// Type inference
-void resolver_infer_expr(Resolver* resolver, Expr* expr)
-{
-    switch (expr->kind)
-    {
-        case EXPR_PRIMARY:
-            switch (expr->expr.primary.kind)
-            {
-                case EXPR_PRIMARY_IDENTIFIER:
-                    assert(false);
-                    break;
-
-                case EXPR_PRIMARY_UNKNOWN   :
-                    assert(false);
-                    break;
-
-                case EXPR_PRIMARY_NIL       :
-                    expr->type = resolver_;
-                    break;
-
-                case EXPR_PRIMARY_BOOLEAN   :
-                    break;
-
-                case EXPR_PRIMARY_STRING    :
-                    break;
-
-                case EXPR_PRIMARY_NATURAL   :
-                    break;
-
-                case EXPR_PRIMARY_INTEGER   :
-                    break;
-
-                case EXPR_PRIMARY_REAL      :
-                    break;
-
-                case EXPR_PRIMARY_STRUCT    :
-                    break;
-
-                case EXPR_PRIMARY_FN        :
-                    assert(false);
-                    break;
-
-                case EXPR_PRIMARY_IDENTIFIER:
-                    break;
-
-                case EXPR_PRIMARY_PRINT     :
-                    break;
-
-                case EXPR_PRIMARY_VARIABLE  :
-                    break;
-            }
-            break;
-
-        case EXPR_BINARY:
-            break;
-
-        case EXPR_UNARY:
-            break;
-
-        case EXPR_FN:
-            break;
-
-        default:
-            assert(false);
-    }
 }

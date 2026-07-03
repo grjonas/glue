@@ -67,9 +67,11 @@ int main(int argc, char** argv)
 
     parser_free(&parser);
 
-    Resolver resolver = resolver_init(parser, stmt);
+    Resolver resolver = resolver_init(&parser, stmt);
 
     resolver_resolve_stmt(&resolver);
+
+    arena_print_memory_usage(&resolver.arena);
 
     resolver_free(&resolver);
 

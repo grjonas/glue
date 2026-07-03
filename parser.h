@@ -42,6 +42,7 @@ Token parser_next(Parser* parser);
 Token parser_jump(Parser* parser, int new_state);
 Token parser_restore(Parser* parser, int old_state);
 bool parser_skip(Parser* parser, bool (*predicate)(TokenType));
+char* copy_string_to_arena(Arena* arena, const char* str, int length);
 char     * parser_parse_identifier (Parser* parser);
 bool parser_expect_token(Parser* parser, TokenType type);
 
