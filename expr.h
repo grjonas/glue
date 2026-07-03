@@ -3,6 +3,7 @@
 
 #include "parser.h"
 #include "type.h"
+#include "decl.h"
 
 typedef struct Expr            Expr           ;
 typedef struct ExprPrimary     ExprPrimary    ;
@@ -18,14 +19,6 @@ typedef enum   ExprBinaryKind  ExprBinaryKind ;
 typedef struct ExprPrimaryStructField ExprPrimaryStructField;
 typedef struct ExprPrimaryStruct      ExprPrimaryStruct;
 // typedef enum   ExprFnKind      ExprFnKind     ;
-typedef struct Variable Variable;
-
-struct Variable
-{
-    char* identifier;
-    Type* type;
-};
-
 enum ExprKind
 {
     EXPR_PRIMARY,
@@ -47,7 +40,8 @@ enum ExprPrimaryKind
     EXPR_PRIMARY_FN        ,
     EXPR_PRIMARY_IDENTIFIER,
     EXPR_PRIMARY_PRINT     ,
-    EXPR_PRIMARY_VARIABLE  ,
+    EXPR_PRIMARY_DECL      ,
+    // EXPR_PRIMARY_VARIABLE  ,
 };
 
 enum ExprUnaryKind
@@ -112,7 +106,7 @@ struct ExprPrimary
         char* real               ; // These will have to be changed later i think.
         ExprPrimaryStruct structt;
         char* obj                ; // Some kind of other object.
-        Variable variable;
+        Decl* decl;
     }
     primary;
 };

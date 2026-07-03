@@ -94,7 +94,7 @@ void resolver_resolve_stmt(Resolver* resolver)
             snapshot = resolver_get_context_snapshot(resolver);
             for (int i = 0; i < size; ++i)
             {
-                Stmt* stmt = body[0];
+                Stmt* stmt = body[i];
 
                 resolver->stmts = stmt     ;
                 resolver_resolve_stmt(resolver);
@@ -117,7 +117,7 @@ void resolver_resolve_stmt(Resolver* resolver)
             decl = resolver_declare_let(resolver, identifier, type);
             resolver_push_decl_to_context(resolver, decl);
 
-            resolver_resolve_expr(resolver, expr, NULL);
+            resolver_resolve_expr(resolver, &expr);
             if (expr == NULL)
             {
                 resolver->stmts = NULL;
@@ -128,7 +128,7 @@ void resolver_resolve_stmt(Resolver* resolver)
         case STMT_EXPR    :
             expr = curr_stmt->stmt.expr;
 
-            resolver_resolve_expr(resolver, expr, NULL);
+            resolver_resolve_expr(resolver, &expr);
             if (expr == NULL)
             {
                 resolver->stmts = NULL;
@@ -140,7 +140,7 @@ void resolver_resolve_stmt(Resolver* resolver)
             expr = curr_stmt->stmt.iff.condition;
             stmt = curr_stmt->stmt.iff.body     ;
 
-            resolver_resolve_expr(resolver, expr, NULL);
+            resolver_resolve_expr(resolver, &expr);
             if (expr == NULL)
             {
                 resolver->stmts = NULL;
@@ -160,7 +160,7 @@ void resolver_resolve_stmt(Resolver* resolver)
             expr = curr_stmt->stmt.whilee.condition;
             stmt = curr_stmt->stmt.whilee.body     ;
 
-            resolver_resolve_expr(resolver, expr, NULL);
+            resolver_resolve_expr(resolver, &expr);
             if (expr == NULL)
             {
                 resolver->stmts = NULL;
@@ -261,7 +261,7 @@ void resolver_resolve_stmt(Resolver* resolver)
             break;
 
         case STMT_RETURN  :
-            assert(curr_stmt->kind = STMT_RETURN);
+            assert(curr_stmt->kind == STMT_RETURN);
 
             // TODO: Somehow bind this to it's respective function declaration.
             if (!resolver->inside_function)
@@ -281,7 +281,7 @@ void resolver_resolve_stmt(Resolver* resolver)
             expr = curr_stmt->stmt.returnn.expr;
             if (expr != NULL)
             {
-                resolver_resolve_expr(resolver, expr, resolver->fn_type);
+                resolver_resolve_expr(resolver, &expr);
                 if (expr == NULL)
                 {
                     resolver->stmts = NULL;
@@ -302,20 +302,20 @@ void resolver_resolve_stmt(Resolver* resolver)
 // 1) If type != NULL, then we bind then the type of the expression is equal to type.
 // 2) Set variable to the most recent instance of identifier.
 // TODO: Once we begin implementing inference, update this code.
-void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
+void resolver_resolve_expr(Resolver* resolver, Expr** expr)
 {
     char* identifier = NULL;
     Decl* decl       = NULL;
     ExprPrimaryStruct expr_struct;
 
-    switch (expr->kind)
+    switch ((*expr)->kind)
     {
         case EXPR_PRIMARY:
             // TODO: expand this later to functions, once we implement them.
-            switch (expr->expr.primary.kind)
+            switch ((*expr)->expr.primary.kind)
             {
                 case EXPR_PRIMARY_IDENTIFIER:
-                    identifier = expr->expr.primary.primary.identifier;
+                    identifier = (*expr)->expr.primary.primary.identifier;
 
                     decl = resolver_get_decl_by_identifier(resolver, identifier);
                     if (decl == NULL)
@@ -323,21 +323,30 @@ void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
                         expr = NULL;
                         return;
                     }
-
-                    expr->expr.primary.kind = EXPR_PRIMARY_VARIABLE;
-                    expr->expr.primary.primary.variable = (Variable)
+                    else if (decl->kind != DECL_LET)
                     {
-                        .identifier = identifier,
-                        .type       = NULL      , // TODO: Add unification here once we begin implementation of inference.
-                    };
+                        resolver_throw_compiler_error(resolver, (CompileError)
+                        {
+                            .kind   = ERROR_ERROR      ,
+                            .line   = (*expr)->line  ,
+                            .column = (*expr)->column,
+                            .length = (*expr)->length,
+                            .msg    = "Type resolution: Could not resolve expression identifier to variable declaration.",
+                        });
+                        expr = NULL;
+                        return;
+                    }
+
+                    (*expr)->expr.primary.kind = EXPR_PRIMARY_DECL;
+                    (*expr)->expr.primary.primary.decl = decl     ;
                     break;
 
                 case EXPR_PRIMARY_STRUCT:
-                    expr_struct = expr->expr.primary.primary.structt;
+                    expr_struct = (*expr)->expr.primary.primary.structt;
                     for (int i = 0; i < expr_struct.argc; ++i)
                     {
                         ExprPrimaryStructField f = *(expr_struct.argv[i]);
-                        resolver_resolve_expr(resolver, f.value, NULL);
+                        resolver_resolve_expr(resolver, &f.value);
                     }
                     break;
 
@@ -346,20 +355,20 @@ void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
             break;
 
         case EXPR_UNARY:
-            resolver_resolve_expr(resolver, expr->expr.unary.unary, NULL);
+            resolver_resolve_expr(resolver, &(*expr)->expr.unary.unary);
             break;
 
         case EXPR_BINARY:
-            resolver_resolve_expr(resolver, expr->expr.binary.left , NULL);
-            resolver_resolve_expr(resolver, expr->expr.binary.right, NULL);
+            resolver_resolve_expr(resolver, &(*expr)->expr.binary.left);
+            resolver_resolve_expr(resolver, &(*expr)->expr.binary.right);
             break;
 
         case EXPR_FN:
-            resolver_resolve_expr(resolver, expr->expr.fn.caller, NULL);
-            for (int i = 0; i < expr->expr.fn.argc; ++i)
+            resolver_resolve_expr(resolver, &(*expr)->expr.fn.caller);
+            for (int i = 0; i < (*expr)->expr.fn.argc; ++i)
             {
-                Expr* e = expr->expr.fn.argv[i];
-                resolver_resolve_expr(resolver, e, NULL);
+                Expr* e = (*expr)->expr.fn.argv[i];
+                resolver_resolve_expr(resolver, &e);
             }
             break;
 
@@ -368,10 +377,7 @@ void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
             exit(1);
     }
 
-    if (type != NULL)
-    {
-        expr->type = type;
-    }
+    resolve_push_expr(resolver, expr);
 }
 
 Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
@@ -499,7 +505,6 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                     || decl->kind == DECL_ALIAS
                     || (decl->kind == DECL_TYPE && type_get_polymorphic_parameter_num(decl->var.type) == 0)
                 )
-                // decl->decl.var->type->type.parameter_num == 0
                 {
                     type_ptr = decl->var.type;
                 }
@@ -613,6 +618,12 @@ void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
     arrput(resolver->context, decl);
 }
 
+
+void resolve_push_expr(Resolver* resolver, Expr* expr)
+{
+    arrput(resolver->exprs, expr);
+}
+
 Type* resolver_resolve_stmt_fn_type(Resolver* resolver, StmtFn fn)
 {
     Type* return_type = NULL;
@@ -679,8 +690,10 @@ char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
         }
     }
 
-    new_id = (char*) arena_push(&resolver->arena, identifier, id_len * sizeof(char));
+    new_id = (char*) arena_push_empty(&resolve->arena, (id_len + 1) * sizeof(char));
     arrput(resolver->identifiers, new_id);
+
+    memcpy(new_id, identifier, id_len);
 
     return new_id;
 }
@@ -769,6 +782,13 @@ void resolver_throw_compiler_error(Resolver* resolver, CompileError err)
 Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
 {
     Decl decl;
+    Type type;
+
+    type = (Type)
+    {
+        .kind      = TYPE_VARIABLE,
+        .type.none = NULL         ,
+    };
 
     decl = (Decl)
     {
@@ -776,9 +796,76 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
         .var  = (Variable)
         {
             .identifier = identifier,
-            .type       = NULL      ,
+            .type       = (Type*) arena_push(&resolver->arena, &type, sizeof(Type)),
         }
     };
 
     return (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+}
+
+// Type inference
+void resolver_infer_expr(Resolver* resolver, Expr* expr)
+{
+    switch (expr->kind)
+    {
+        case EXPR_PRIMARY:
+            switch (expr->expr.primary.kind)
+            {
+                case EXPR_PRIMARY_IDENTIFIER:
+                    assert(false);
+                    break;
+
+                case EXPR_PRIMARY_UNKNOWN   :
+                    assert(false);
+                    break;
+
+                case EXPR_PRIMARY_NIL       :
+                    expr->type = resolver_;
+                    break;
+
+                case EXPR_PRIMARY_BOOLEAN   :
+                    break;
+
+                case EXPR_PRIMARY_STRING    :
+                    break;
+
+                case EXPR_PRIMARY_NATURAL   :
+                    break;
+
+                case EXPR_PRIMARY_INTEGER   :
+                    break;
+
+                case EXPR_PRIMARY_REAL      :
+                    break;
+
+                case EXPR_PRIMARY_STRUCT    :
+                    break;
+
+                case EXPR_PRIMARY_FN        :
+                    assert(false);
+                    break;
+
+                case EXPR_PRIMARY_IDENTIFIER:
+                    break;
+
+                case EXPR_PRIMARY_PRINT     :
+                    break;
+
+                case EXPR_PRIMARY_VARIABLE  :
+                    break;
+            }
+            break;
+
+        case EXPR_BINARY:
+            break;
+
+        case EXPR_UNARY:
+            break;
+
+        case EXPR_FN:
+            break;
+
+        default:
+            assert(false);
+    }
 }

@@ -4,72 +4,7 @@
 #include "dependencies.h"
 #include "stmt.h"
 #include "expr.h"
-
-typedef struct Resolver Resolver;
-
-typedef struct Decl                Decl               ;
-typedef enum   DeclKind            DeclKind           ;
-
-typedef struct DeclLet             DeclLet            ;
-// typedef struct DeclFn              DeclFn             ;
-typedef struct DeclTypeVariable    DeclTypeVariable   ;
-typedef struct DeclAlias           DeclAlias          ;
-typedef struct DeclTypeConstructor DeclTypeConstructor;
-typedef struct DeclType            DeclType           ;
-
-enum DeclKind
-{
-    DECL_LET             ,
-    // DECL_FN              ,
-    DECL_TYPE_VARIABLE   ,
-    DECL_ALIAS           ,
-    DECL_TYPE            ,
-    DECL_TYPE_CONSTRUCTOR,
-};
-
-// struct DeclLet
-// {
-// };
-// 
-// // struct DeclFn
-// // {
-// //     Variable  var;
-// //     int argc;
-// //     Variable** argv;
-// // };
-// 
-// struct DeclTypeVariable
-// {
-// };
-// 
-// struct DeclAlias
-// {
-// };
-// 
-// struct DeclType
-// {
-// };
-// 
-// struct DeclTypeConstructor // Has to be declared after a 'DeclType'
-// {
-// };
-// 
-// Declaration
-struct Decl
-{
-    DeclKind kind;
-    Variable var ;
-//     struct
-//     {
-//         DeclLet             let        ;
-//         // DeclFn              fn         ;
-//         DeclTypeVariable    type_var   ;
-//         DeclAlias           alias      ;
-//         DeclType            type       ;
-//         DeclTypeConstructor constructor;
-//     }
-//     decl;
-};
+#include "decl.h"
 
 struct Resolver
 {
@@ -103,7 +38,7 @@ Resolver resolver_init(Parser parser, Stmt* stmt);
 void resolver_free(Resolver* resolver);
 
 void resolver_resolve_stmt(Resolver* resolver);
-void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type);
+void resolver_resolve_expr(Resolver* resolver, Expr** expr);
 
 Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
 
@@ -111,6 +46,7 @@ int  resolver_get_context_snapshot(Resolver* resolver);
 void resolver_restore_context_snapshot(Resolver* resolver, int snapshot);
 
 void resolver_push_decl_to_context(Resolver* resolver, Decl* decl);
+void resolve_push_expr(Resolver* resolver, Expr* expr);
 
 Type* resolver_resolve_stmt_fn_type(Resolver* resolver, StmtFn fn);
 

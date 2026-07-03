@@ -125,7 +125,7 @@ char* parser_parse_identifier(Parser* parser)
             exit(1);
         }
 
-        memcpy(identifier, token.start, (size_t) length * sizeof(char));
+        memcpy(identifier, token.start, (size_t) (length - 1) * sizeof(char));
 
         tmp_ptr = identifier;
         identifier = (char*) arena_push(&parser->arena, identifier, (size_t) length * sizeof(char));
