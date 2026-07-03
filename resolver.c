@@ -503,10 +503,10 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                 (
                     decl->kind == DECL_TYPE_VARIABLE
                     || decl->kind == DECL_ALIAS
-                    || (decl->kind == DECL_TYPE && type_get_polymorphic_parameter_num(decl->var.type) == 0)
+                    || (decl->kind == DECL_TYPE && type_get_polymorphic_parameter_num(decl->type) == 0)
                 )
                 {
-                    type_ptr = decl->var.type;
+                    type_ptr = decl->type;
                 }
                 else
                 {
@@ -540,7 +540,7 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                 (
                     decl != NULL
                     && decl->kind == DECL_TYPE
-                    && type_get_polymorphic_parameter_num(decl->var.type) == argc
+                    && type_get_polymorphic_parameter_num(decl->type) == argc
                 )
             {
                 for (int i = 0; i < argc; ++i)
@@ -558,7 +558,7 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                     .kind = TYPE_MONOMORPHIC,
                     .type.monomorphic = (TypeMonomorphic)
                     {
-                        .polymorphic = decl->var.type,
+                        .polymorphic = decl->type,
                         .argc        = argc               ,
                         .argv        = polymorphic_argv   ,
                     }
@@ -690,7 +690,7 @@ char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
         }
     }
 
-    new_id = (char*) arena_push_empty(&resolve->arena, (id_len + 1) * sizeof(char));
+    new_id = (char*) arena_push_empty(&resolver->arena, (id_len + 1) * sizeof(char));
     arrput(resolver->identifiers, new_id);
 
     memcpy(new_id, identifier, id_len);
@@ -707,11 +707,8 @@ Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type)
     decl = (Decl)
     {
         .kind = DECL_LET ,
-        .var  = (Variable)
-        {
-            .identifier = existing_identifier,
-            .type       = type      ,
-        }
+        .identifier = existing_identifier,
+        .type       = type      ,
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
@@ -734,23 +731,23 @@ Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
         switch (decl->kind)
         {
             case DECL_LET:
-                id = decl->var.identifier;
+                id = decl->identifier;
                 break;
 
             case DECL_TYPE_VARIABLE:
-                id = decl->var.identifier;
+                id = decl->identifier;
                 break;
 
             case DECL_ALIAS:
-                id = decl->var.identifier;
+                id = decl->identifier;
                 break;
 
             case DECL_TYPE:
-                id = decl->var.identifier;
+                id = decl->identifier;
                 break;
 
             case DECL_TYPE_CONSTRUCTOR:
-                id = decl->var.identifier;
+                id = decl->identifier;
                 break;
 
             default:
@@ -792,12 +789,9 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
 
     decl = (Decl)
     {
-        .kind = DECL_TYPE_VARIABLE,
-        .var  = (Variable)
-        {
-            .identifier = identifier,
-            .type       = (Type*) arena_push(&resolver->arena, &type, sizeof(Type)),
-        }
+        .kind       = DECL_TYPE_VARIABLE,
+        .identifier = identifier        ,
+        .type       = (Type*) arena_push(&resolver->arena, &type, sizeof(Type)),
     };
 
     return (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
