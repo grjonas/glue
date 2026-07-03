@@ -5,6 +5,17 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
     // Parser cleanup
     arrfree(parser->errs);
 
+    *parser = (Parser)
+    {
+        .state   = PARSER_STATE_FREED   ,
+        .txt     = NULL                 ,
+        .tokens  = NULL                 ,
+        .start   = -1                   ,
+        .end     = -1                   ,
+        .current = -1                   ,
+        .errs    = NULL                 ,
+    };
+
     Resolver resolver = (Resolver)
     {
         .txt             = parser->txt   ,
