@@ -377,9 +377,9 @@ Expr* parser_parse_expr_struct(Parser* parser)
 
     while (true)
     {
-        char* identifier = NULL;
-        Type* type       = NULL;
-        Expr* value      = NULL;
+        char    * identifier = NULL;
+        TypeExpr* type       = NULL;
+        Expr    * value      = NULL;
 
         ExprPrimaryStructField  field     ;
         ExprPrimaryStructField* arg = NULL;
@@ -402,7 +402,7 @@ Expr* parser_parse_expr_struct(Parser* parser)
         if (token.type == TOKEN_COLON)
         {
             parser_next(parser);
-            type = parser_parse_type(parser);
+            type = parser_parse_type_expr(parser);
             if (type == NULL)
             {
                 return NULL;

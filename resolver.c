@@ -301,40 +301,47 @@ void resolver_resolve_stmt(Resolver* resolver)
 
 // 1) If type != NULL, then we bind then the type of the expression is equal to type.
 // 2) Set variable to the most recent instance of identifier.
-// TODO: Refactor this rickety ass code.
+// TODO: Once we begin implementing inference, update this code.
 void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
 {
+    char* identifier = NULL;
+    Decl* decl       = NULL;
+    ExprPrimaryStruct expr_struct;
+
     switch (expr->kind)
     {
         case EXPR_PRIMARY:
-            // TODO: expand this later functions, once we implement them.
-            if (expr->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER)
+            // TODO: expand this later to functions, once we implement them.
+            switch (expr->expr.primary.kind)
             {
-                char* identifier = expr->expr.primary.primary.identifier;
-                Decl* decl = NULL;
+                case EXPR_PRIMARY_IDENTIFIER:
+                    identifier = expr->expr.primary.primary.identifier;
 
-                decl = resolver_get_decl_by_identifier(resolver, identifier);
-                if (decl == NULL)
-                {
-                    expr = NULL;
-                    return;
-                }
+                    decl = resolver_get_decl_by_identifier(resolver, identifier);
+                    if (decl == NULL)
+                    {
+                        expr = NULL;
+                        return;
+                    }
 
-                expr->expr.primary.kind = EXPR_PRIMARY_VARIABLE;
-                expr->expr.primary.primary.variable = (Variable)
-                {
-                    .identifier = identifier,
-                    .type       = NULL      , // TODO: Add unification here once we begin implementation of inference.
-                };
-            }
-            else if (expr->expr.primary.kind == EXPR_PRIMARY_STRUCT)
-            {
-                ExprPrimaryStruct expr_struct = expr->expr.primary.primary.structt;
-                for (int i = 0; i < expr_struct.argc; ++i)
-                {
-                    ExprPrimaryStructField f = *(expr_struct.argv[i]);
-                    resolver_resolve_expr(resolver, f.value, f.type);
-                }
+                    expr->expr.primary.kind = EXPR_PRIMARY_VARIABLE;
+                    expr->expr.primary.primary.variable = (Variable)
+                    {
+                        .identifier = identifier,
+                        .type       = NULL      , // TODO: Add unification here once we begin implementation of inference.
+                    };
+                    break;
+
+                case EXPR_PRIMARY_STRUCT:
+                    expr_struct = expr->expr.primary.primary.structt;
+                    for (int i = 0; i < expr_struct.argc; ++i)
+                    {
+                        ExprPrimaryStructField f = *(expr_struct.argv[i]);
+                        resolver_resolve_expr(resolver, f.value, NULL);
+                    }
+                    break;
+
+                default:
             }
             break;
 

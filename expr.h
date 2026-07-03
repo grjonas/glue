@@ -86,9 +86,9 @@ enum ExprBinaryKind
 
 struct ExprPrimaryStructField
 {
-    char* key  ;
-    Type* type ;
-    Expr* value;
+    char    * key  ;
+    TypeExpr* type ;
+    Expr    * value;
 };
 
 struct ExprPrimaryStruct
