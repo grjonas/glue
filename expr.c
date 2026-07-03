@@ -424,7 +424,7 @@ Expr* parser_parse_expr_struct(Parser* parser)
                     .line   = token.line  ,
                     .column = token.column,
                     .length = token.line  ,
-                    .msg    = "Expression parsing: Failed to parse expression inside of parentheses.",
+                    .msg    = "Expression parsing: Failed to parse expression inside of brackets.",
                 });
             }
             return NULL;

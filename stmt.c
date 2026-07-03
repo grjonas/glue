@@ -598,6 +598,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         // On TOKEN_LEFT_PAREN, we exit the loop.
         while (true)
         {
+            // TODO: Make is so that arguments cannot have the same identifier as the function name.
             curr_arg = parser_parse_stmt_fn_arg(parser);
             if (curr_arg == NULL)
             {

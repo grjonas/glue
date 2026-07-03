@@ -112,7 +112,7 @@ struct ExprPrimary
         char* real               ; // These will have to be changed later i think.
         ExprPrimaryStruct structt;
         char* obj                ; // Some kind of other object.
-        Variable* variable;
+        Variable variable;
     }
     primary;
 };

@@ -2,7 +2,7 @@
 
 Resolver resolver_init(Parser parser, Stmt* stmts)
 {
-    return (Resolver)
+    Resolver resolver = (Resolver)
     {
         .txt             = parser.txt   ,
         .tokens          = parser.tokens,
@@ -12,11 +12,14 @@ Resolver resolver_init(Parser parser, Stmt* stmts)
         .loop_depth      = 0            ,
         .inside_function = false        ,
         .fn_type         = NULL         ,
+        .context         = NULL         ,
         .declarations    = NULL         ,
         .exprs           = NULL         ,
         .identifiers     = NULL         ,
+        .types           = NULL         ,
         .errs            = NULL         ,
     };
+    return resolver;
 }
 
 void resolver_free(Resolver* resolver)
@@ -26,9 +29,11 @@ void resolver_free(Resolver* resolver)
     arena_free(&resolver->arena);
     arena_free(&resolver->tmp_type_arena);
 
+    arrfree(resolver->context     );
     arrfree(resolver->declarations);
     arrfree(resolver->exprs       );
     arrfree(resolver->identifiers );
+    arrfree(resolver->types       );
     arrfree(resolver->errs        );
 
     *resolver = (Resolver)
@@ -41,11 +46,732 @@ void resolver_free(Resolver* resolver)
         .loop_depth      = 0                       ,
         .inside_function = false                   ,
         .fn_type         = NULL                    ,
+        .context         = NULL                    ,
         .declarations    = NULL                    ,
         .exprs           = NULL                    ,
         .identifiers     = NULL                    ,
+        .types           = NULL                    ,
         .errs            = NULL                    ,
     };
 }
 
+// On error - stmts is set to NULL.
+void resolver_resolve_stmt(Resolver* resolver)
+{
+    Stmt* curr_stmt  = NULL;
 
+    char    * identifier = NULL;
+    TypeExpr* type_expr  = NULL;
+    Expr    * expr       = NULL;
+    Stmt    * stmt       = NULL;
+    int       size       = 0   ;
+    Stmt   ** body       = NULL;
+    StmtFn    fn               ;
+
+    Type    * type       = NULL;
+    Decl    * decl       = NULL;
+
+    int snapshot = 0;
+
+    curr_stmt = resolver->stmts;
+    if (curr_stmt == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Variable resolution: Found NULL statement.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    switch (curr_stmt->kind)
+    {
+        case STMT_ERR     :
+            fprintf(stderr, "[%s:%d] Variable resolution: Found statement of kind STMT_ERR.\n", __FILE__, __LINE__);
+            exit(1);
+            break;
+
+        case STMT_BLOCK   :
+            size = curr_stmt->stmt.block.size;
+            body = curr_stmt->stmt.block.body;
+
+            snapshot = resolver_get_context_snapshot(resolver);
+            for (int i = 0; i < size; ++i)
+            {
+                Stmt* stmt = body[0];
+
+                resolver->stmts = stmt     ;
+                resolver_resolve_stmt(resolver);
+                resolver->stmts = curr_stmt;
+            }
+            resolver_restore_context_snapshot(resolver, snapshot);
+            break;
+
+        case STMT_LET     :
+            identifier = curr_stmt->stmt.let.identifier;
+            type_expr  = curr_stmt->stmt.let.type      ;
+            expr       = curr_stmt->stmt.let.expr      ;
+
+            type = resolver_resolve_type_expr(resolver, type_expr);
+            if (type == NULL)
+            {
+                resolver->stmts = NULL;
+                return;
+            }
+            decl = resolver_declare_let(resolver, identifier, type);
+            resolver_push_decl_to_context(resolver, decl);
+
+            resolver_resolve_expr(resolver, expr, NULL);
+            if (expr == NULL)
+            {
+                resolver->stmts = NULL;
+                return;
+            }
+            break;
+
+        case STMT_EXPR    :
+            expr = curr_stmt->stmt.expr;
+
+            resolver_resolve_expr(resolver, expr, NULL);
+            if (expr == NULL)
+            {
+                resolver->stmts = NULL;
+                return;
+            }
+            break;
+
+        case STMT_IF      :
+            expr = curr_stmt->stmt.iff.condition;
+            stmt = curr_stmt->stmt.iff.body     ;
+
+            resolver_resolve_expr(resolver, expr, NULL);
+            if (expr == NULL)
+            {
+                resolver->stmts = NULL;
+                return;
+            }
+
+            snapshot = resolver_get_context_snapshot(resolver);
+            resolver->stmts = stmt     ;
+
+            resolver_resolve_stmt(resolver);
+
+            resolver_restore_context_snapshot(resolver, snapshot);
+            resolver->stmts = curr_stmt;
+            break;
+
+        case STMT_WHILE   :
+            expr = curr_stmt->stmt.whilee.condition;
+            stmt = curr_stmt->stmt.whilee.body     ;
+
+            resolver_resolve_expr(resolver, expr, NULL);
+            if (expr == NULL)
+            {
+                resolver->stmts = NULL;
+                return;
+            }
+
+            snapshot = resolver_get_context_snapshot(resolver);
+            resolver->stmts = stmt     ;
+            resolver->loop_depth++;
+
+            resolver_resolve_stmt(resolver);
+
+            resolver_restore_context_snapshot(resolver, snapshot);
+            resolver->stmts = curr_stmt;
+            resolver->loop_depth--;
+            break;
+
+        case STMT_BREAK   :
+            if (resolver->loop_depth <= 0)
+            {
+                resolver_throw_compiler_error(resolver, (CompileError)
+                {
+                    .kind   = ERROR_ERROR      ,
+                    .line   = curr_stmt->line  ,
+                    .column = curr_stmt->column,
+                    .length = curr_stmt->line  ,
+                    .msg    = "Statement resolution: Breaking while not in loop.",
+                });
+                resolver->stmts = NULL;
+                return;
+            }
+            break;
+
+        case STMT_CONTINUE:
+            if (resolver->loop_depth <= 0)
+            {
+                resolver_throw_compiler_error(resolver, (CompileError)
+                {
+                    .kind   = ERROR_ERROR      ,
+                    .line   = curr_stmt->line  ,
+                    .column = curr_stmt->column,
+                    .length = curr_stmt->line  ,
+                    .msg    = "Statement resolution: Continuing while not in loop.",
+                });
+                resolver->stmts = NULL;
+                return;
+            }
+            break;
+
+        case STMT_FN      :
+            fn = curr_stmt->stmt.fn;
+            stmt = fn.body;
+
+            // Type* new_fn_type = resolver_declare_fn(resolver, fn)->decl.fn.variable->type; // What the hell is this?? xdddddd
+            type = resolver_resolve_stmt_fn_type(resolver, fn);
+            if (type == NULL)
+            {
+                resolver->stmts = NULL;
+                return;
+            }
+            decl = resolver_declare_let(resolver, fn.identifier, type);
+            resolver_push_decl_to_context(resolver, decl);
+
+            bool inside_function = resolver->inside_function;
+            Type* fn_type = resolver->fn_type;
+
+            snapshot = resolver_get_context_snapshot(resolver);
+            resolver->stmts = stmt;
+            resolver->inside_function = true;
+            resolver->fn_type = type;
+
+            for (int i = 0; i < fn.argc; ++i)
+            {
+                type = resolver_resolve_type_expr(resolver, fn.argv[i]->type);
+                if (type == NULL)
+                {
+                    resolver_throw_compiler_error(resolver, (CompileError)
+                    {
+                        .kind   = ERROR_ERROR      ,
+                        .line   = curr_stmt->line  ,
+                        .column = curr_stmt->column,
+                        .length = curr_stmt->line  ,
+                        .msg    = "Statement resolution: Could not resolve function atgument type expression to type..",
+                    });
+                    resolver->stmts = NULL;
+                    return;
+                }
+                decl = resolver_declare_let(resolver, fn.argv[i]->identifier, type);
+                resolver_push_decl_to_context(resolver, decl);
+            }
+
+            resolver_resolve_stmt(resolver);
+
+            resolver_restore_context_snapshot(resolver, snapshot);
+            resolver->stmts = curr_stmt;
+            resolver->inside_function = inside_function;
+            resolver->fn_type = fn_type;
+            break;
+
+        case STMT_RETURN  :
+            assert(curr_stmt->kind = STMT_RETURN);
+
+            // TODO: Somehow bind this to it's respective function declaration.
+            if (!resolver->inside_function)
+            {
+                resolver_throw_compiler_error(resolver, (CompileError)
+                {
+                    .kind   = ERROR_ERROR      ,
+                    .line   = curr_stmt->line  ,
+                    .column = curr_stmt->column,
+                    .length = curr_stmt->line  ,
+                    .msg    = "Statement resolution: Cannot return while not in function.",
+                });
+                resolver->stmts = NULL;
+                return;
+            }
+
+            expr = curr_stmt->stmt.returnn.expr;
+            if (expr != NULL)
+            {
+                resolver_resolve_expr(resolver, expr, resolver->fn_type);
+                if (expr == NULL)
+                {
+                    resolver->stmts = NULL;
+                    return;
+                }
+            }
+            break;
+
+        default:
+            fprintf(stderr, "[%s:%d] Variable resolution: Found statement of unknown kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+
+    // return curr_stmt;
+    resolver->stmts = curr_stmt;
+}
+
+// 1) If type != NULL, then we bind then the type of the expression is equal to type.
+// 2) Set variable to the most recent instance of identifier.
+// TODO: Refactor this rickety ass code.
+void resolver_resolve_expr(Resolver* resolver, Expr* expr, Type* type)
+{
+    switch (expr->kind)
+    {
+        case EXPR_PRIMARY:
+            // TODO: expand this later functions, once we implement them.
+            if (expr->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER)
+            {
+                char* identifier = expr->expr.primary.primary.identifier;
+                Decl* decl = NULL;
+
+                decl = resolver_get_decl_by_identifier(resolver, identifier);
+                if (decl == NULL)
+                {
+                    expr = NULL;
+                    return;
+                }
+
+                expr->expr.primary.kind = EXPR_PRIMARY_VARIABLE;
+                expr->expr.primary.primary.variable = (Variable)
+                {
+                    .identifier = identifier,
+                    .type       = NULL      , // TODO: Add unification here once we begin implementation of inference.
+                };
+            }
+            else if (expr->expr.primary.kind == EXPR_PRIMARY_STRUCT)
+            {
+                ExprPrimaryStruct expr_struct = expr->expr.primary.primary.structt;
+                for (int i = 0; i < expr_struct.argc; ++i)
+                {
+                    ExprPrimaryStructField f = *(expr_struct.argv[i]);
+                    resolver_resolve_expr(resolver, f.value, f.type);
+                }
+            }
+            break;
+
+        case EXPR_UNARY:
+            resolver_resolve_expr(resolver, expr->expr.unary.unary, NULL);
+            break;
+
+        case EXPR_BINARY:
+            resolver_resolve_expr(resolver, expr->expr.binary.left , NULL);
+            resolver_resolve_expr(resolver, expr->expr.binary.right, NULL);
+            break;
+
+        case EXPR_FN:
+            resolver_resolve_expr(resolver, expr->expr.fn.caller, NULL);
+            for (int i = 0; i < expr->expr.fn.argc; ++i)
+            {
+                Expr* e = expr->expr.fn.argv[i];
+                resolver_resolve_expr(resolver, e, NULL);
+            }
+            break;
+
+        default:
+            fprintf(stderr, "[%s:%d] Variable resolution: Found expression of unknown kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+
+    if (type != NULL)
+    {
+        expr->type = type;
+    }
+}
+
+Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
+{
+    assert(type_expr != NULL);
+
+    Type   type;
+    Type*  type_ptr;
+    Type** polymorphic_argv = NULL;
+    TypeExpr** type_expr_argv = NULL;
+    TypeStructField** fields = NULL;
+    char* identifier = NULL;
+    int argc = 0;
+    TypeExprStructField** argv = NULL;
+    bool should_push_to_arena = true;
+    Decl* decl = NULL;
+
+    switch (type_expr->kind)
+    {
+        case TYPE_EXPR_NIL:
+            type = (Type)
+            {
+                .kind      = TYPE_NIL,
+                .type.none = NULL    ,
+            };
+            break;
+
+        case TYPE_EXPR_BOOL:
+            type = (Type)
+            {
+                .kind      = TYPE_BOOL,
+                .type.none = NULL     ,
+            };
+            break;
+
+        case TYPE_EXPR_INT:
+            type = (Type)
+            {
+                .kind      = TYPE_INT ,
+                .type.none = NULL     ,
+            };
+            break;
+
+        case TYPE_EXPR_REAL:
+            type = (Type)
+            {
+                .kind      = TYPE_REAL,
+                .type.none = NULL     ,
+            };
+            break;
+
+        case TYPE_EXPR_STRING:
+            type = (Type)
+            {
+                .kind      = TYPE_STRING,
+                .type.none = NULL       ,
+            };
+            break;
+
+        case TYPE_EXPR_LIST:
+            type = (Type)
+            {
+                .kind = TYPE_LIST,
+                .type.list = (TypeList)
+                {
+                    .type = resolver_resolve_type_expr(resolver, type_expr->type_expr.list.type),
+                }
+            };
+            break;
+
+        case TYPE_EXPR_STRUCT:
+            argc = type_expr->type_expr.structt.argc;
+            argv = type_expr->type_expr.structt.argv;
+
+            for (int i = 0; i < argc; ++i) 
+            {
+                TypeExprStructField* f = argv[i];
+                TypeStructField converted_field = (TypeStructField)
+                {
+                    .key   = f->key,
+                    .value = resolver_resolve_type_expr(resolver, f->value),
+                };
+                TypeStructField* new_field = (TypeStructField*) arena_push(&resolver->arena, &converted_field, sizeof(TypeStructField));
+                arrput(fields, new_field);
+            }
+
+            type = (Type)
+            {
+                .kind = TYPE_STRUCT,
+                .type.structt = (TypeStruct)
+                {
+                    .field_num = argc,
+                    .fields    = (TypeStructField**) arena_push(&resolver->arena, fields, argc * sizeof(TypeStructField*)),
+                }
+            };
+
+            arrfree(fields);
+            fields = NULL;
+            break;
+
+        case TYPE_EXPR_FN:
+            type = (Type)
+            {
+                .kind = TYPE_FN,
+                .type.fn = (TypeFn)
+                {
+                    .left  = resolver_resolve_type_expr(resolver, type_expr->type_expr.fn.left ),
+                    .right = resolver_resolve_type_expr(resolver, type_expr->type_expr.fn.right),
+                }
+            };
+            break;
+
+        case TYPE_EXPR_IDENTIFIER:
+            // In context, search for most recent declaration with said identifier
+            // If a declaration is found, get it's respective type variable, and assign it to type.
+            // Else, we create a new type variable declaration.
+            identifier = type_expr->type_expr.identifier.identifier;
+
+            decl = resolver_get_decl_by_identifier(resolver, identifier);
+            if (decl != NULL)
+            {
+                if
+                (
+                    decl->kind == DECL_TYPE_VARIABLE
+                    || decl->kind == DECL_ALIAS
+                    || (decl->kind == DECL_TYPE && type_get_polymorphic_parameter_num(decl->var.type) == 0)
+                )
+                // decl->decl.var->type->type.parameter_num == 0
+                {
+                    type_ptr = decl->var.type;
+                }
+                else
+                {
+                    resolver_throw_compiler_error(resolver, (CompileError)
+                    {
+                        .kind   = ERROR_ERROR      ,
+                        .line   = type_expr->line  ,
+                        .column = type_expr->column,
+                        .length = type_expr->length,
+                        .msg    = "Type resolution: Type variable can only be a type variable, an alias or a new type with no parameters.",
+                    });
+                    return NULL;
+                }
+                should_push_to_arena = false;
+            }
+            else
+            {
+                decl = resolver_declare_type_variable(resolver, identifier);
+                resolver_push_decl_to_context(resolver, decl);
+            }
+
+            break;
+
+        case TYPE_EXPR_INSTANCE:
+            identifier       = type_expr->type_expr.instance.caller;
+            argc             = type_expr->type_expr.instance.argc  ;
+            type_expr_argv   = type_expr->type_expr.instance.argv  ;
+
+            decl = resolver_get_decl_by_identifier(resolver, identifier);
+            if
+                (
+                    decl != NULL
+                    && decl->kind == DECL_TYPE
+                    && type_get_polymorphic_parameter_num(decl->var.type) == argc
+                )
+            {
+                for (int i = 0; i < argc; ++i)
+                {
+                    TypeExpr* te = type_expr_argv[i];
+                    Type*     t  = resolver_resolve_type_expr(resolver, te);
+                    arrput(polymorphic_argv, t);
+                }
+                Type** tmp_ptr = polymorphic_argv;
+                polymorphic_argv = (Type**) arena_push(&resolver->arena, polymorphic_argv, argc * sizeof(Type*));
+                arrfree(tmp_ptr);
+
+                type = (Type)
+                {
+                    .kind = TYPE_MONOMORPHIC,
+                    .type.monomorphic = (TypeMonomorphic)
+                    {
+                        .polymorphic = decl->var.type,
+                        .argc        = argc               ,
+                        .argv        = polymorphic_argv   ,
+                    }
+                };
+            }
+            else
+            {
+                resolver_throw_compiler_error(resolver, (CompileError)
+                {
+                    .kind   = ERROR_ERROR      ,
+                    .line   = type_expr->line  ,
+                    .column = type_expr->column,
+                    .length = type_expr->line  ,
+                    .msg    = "Type resolution: Could not find declaration of new type that also has the required number of parameters.",
+                });
+                return NULL;
+            }
+
+            break;
+
+        default:
+            assert(false);
+    }
+
+    if (should_push_to_arena)
+    {
+        type_ptr = (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
+        arrput(resolver->types, type_ptr);
+        return type_ptr;
+    }
+    else
+    {
+        return type_ptr;
+    }
+}
+
+
+int  resolver_get_context_snapshot(Resolver* resolver)
+{
+    return arrlen(resolver->context);
+}
+
+void resolver_restore_context_snapshot(Resolver* resolver, int snapshot)
+{
+    int curr_snapshot = arrlen(resolver->context);
+
+    assert(curr_snapshot >= snapshot);
+
+    for (int i = 0; i < curr_snapshot - snapshot; ++i)
+    {
+        (void) arrpop(resolver->context);
+    }
+}
+
+void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
+{
+    arrput(resolver->context, decl);
+}
+
+Type* resolver_resolve_stmt_fn_type(Resolver* resolver, StmtFn fn)
+{
+    Type* return_type = NULL;
+    Type* node_ptr    = NULL;
+    Type  type;
+
+    for (int i = 0; i < fn.argc; ++i)
+    {
+        TypeExpr* te = fn.argv[i]->type;
+        Type    * t  = resolver_resolve_type_expr(resolver, te);
+
+        if (i == 0)
+        {
+            type = (Type)
+            {
+                .kind    = TYPE_FN,
+                .type.fn = (TypeFn)
+                {
+                    .left  = t   ,
+                    .right = NULL,
+                }
+            };
+
+            return_type = (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
+            node_ptr = return_type;
+        }
+        else if (i == 1)
+        {
+            node_ptr->type.fn.right = t;
+        }
+        else
+        {
+            type = (Type)
+            {
+                .kind    = TYPE_FN,
+                .type.fn = (TypeFn)
+                {
+                    .left  = node_ptr->type.fn.right,
+                    .right = t,
+                }
+            };
+
+            Type* tmp = (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
+            node_ptr->type.fn.right = tmp;
+            node_ptr = tmp;
+        }
+    }
+
+    return return_type;
+}
+
+char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
+{
+    int id_len = strlen(identifier);
+    int len = arrlen(resolver->identifiers);
+    char* new_id = NULL;
+
+    for (int i = 0; i < len; ++i)
+    {
+        char* id = resolver->identifiers[i];
+        if (memcmp(id, identifier, id_len) == 0)
+        {
+            return id;
+        }
+    }
+
+    new_id = (char*) arena_push(&resolver->arena, identifier, id_len * sizeof(char));
+    arrput(resolver->identifiers, new_id);
+
+    return new_id;
+}
+
+Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type)
+{
+    Decl decl;
+    Decl* decl_ptr;
+    char* existing_identifier = resolver_get_existing_identifier(resolver, identifier);
+
+    decl = (Decl)
+    {
+        .kind = DECL_LET ,
+        .var  = (Variable)
+        {
+            .identifier = existing_identifier,
+            .type       = type      ,
+        }
+    };
+
+    decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+    arrput(resolver->declarations, decl_ptr);
+
+    return decl_ptr;
+}
+
+Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
+{
+    int id_len = strlen(identifier);
+    int len = arrlen(resolver->context);
+    Decl* decl = NULL;
+    char* id   = NULL;
+
+    for (int i = len - 1; 0 <= i; --i)
+    {
+        decl = resolver->context[i];
+        id   = NULL;
+        switch (decl->kind)
+        {
+            case DECL_LET:
+                id = decl->var.identifier;
+                break;
+
+            case DECL_TYPE_VARIABLE:
+                id = decl->var.identifier;
+                break;
+
+            case DECL_ALIAS:
+                id = decl->var.identifier;
+                break;
+
+            case DECL_TYPE:
+                id = decl->var.identifier;
+                break;
+
+            case DECL_TYPE_CONSTRUCTOR:
+                id = decl->var.identifier;
+                break;
+
+            default:
+        }
+
+        if (strlen(id) == id_len && memcmp(id, identifier, id_len) == 0)
+        {
+            return decl;
+        }
+    }
+
+    return NULL;
+}
+
+int type_get_polymorphic_parameter_num(Type* type)
+{
+    assert(type->kind == TYPE_POLYMORPHIC);
+
+    return type->type.polymorphic.parameter_num;
+}
+
+void resolver_throw_compiler_error(Resolver* resolver, CompileError err)
+{
+    CompileError* err_ptr = NULL;
+    err_ptr = (CompileError*) arena_push(&resolver->arena, &err, sizeof(CompileError));
+    arrput(resolver->errs, err_ptr);
+}
+
+Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
+{
+    Decl decl;
+
+    decl = (Decl)
+    {
+        .kind = DECL_TYPE_VARIABLE,
+        .var  = (Variable)
+        {
+            .identifier = identifier,
+            .type       = NULL      ,
+        }
+    };
+
+    return (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+}

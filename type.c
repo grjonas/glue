@@ -401,141 +401,141 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
 
-Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr)
-{
-    assert(type_expr != NULL);
-
-    Type type;
-    TypeStructField** fields = NULL;
-
-    // Old
-    int argc = 0;
-    TypeExprStructField** argv= NULL;
-
-    switch (type_expr->kind)
-    {
-        case TYPE_EXPR_IDENTIFIER:
-            type = (Type)
-            {
-                .kind      = TYPE_VARIABLE,
-                .type.none = NULL         ,
-            };
-
-            break;
-
-        case TYPE_EXPR_NIL:
-            type = (Type)
-            {
-                .kind      = TYPE_NIL,
-                .type.none = NULL    ,
-            };
-            break;
-
-        case TYPE_EXPR_BOOL:
-            type = (Type)
-            {
-                .kind      = TYPE_BOOL,
-                .type.none = NULL     ,
-            };
-            break;
-
-        case TYPE_EXPR_INT:
-            type = (Type)
-            {
-                .kind      = TYPE_INT ,
-                .type.none = NULL     ,
-            };
-            break;
-
-        case TYPE_EXPR_REAL:
-            type = (Type)
-            {
-                .kind      = TYPE_REAL,
-                .type.none = NULL     ,
-            };
-            break;
-
-        case TYPE_EXPR_STRING:
-            type = (Type)
-            {
-                .kind      = TYPE_STRING,
-                .type.none = NULL       ,
-            };
-            break;
-
-        case TYPE_EXPR_LIST:
-            type = (Type)
-            {
-                .kind = TYPE_LIST,
-                .type.list = (TypeList)
-                {
-                    .type = type_convert_type_expr_to_type(arena, type_expr->type_expr.list.type),
-                }
-            };
-            break;
-
-        case TYPE_EXPR_STRUCT:
-            argc = type_expr->type_expr.structt.argc;
-            argv = type_expr->type_expr.structt.argv;
-
-            for (int i = 0; i < argc; ++i) 
-            {
-                TypeExprStructField* f = argv[i];
-                TypeStructField converted_field = (TypeStructField)
-                {
-                    .key   = f->key,
-                    .value = type_convert_type_expr_to_type(arena, f->value),
-                };
-                TypeStructField* new_field = (TypeStructField*) arena_push(arena, &converted_field, sizeof(TypeStructField));
-                arrput(fields, new_field);
-            }
-
-            type = (Type)
-            {
-                .kind = TYPE_STRUCT,
-                .type.structt = (TypeStruct)
-                {
-                    .field_num = argc,
-                    .fields    = (TypeStructField**) arena_push(arena, fields, argc * sizeof(TypeStructField*)),
-                }
-            };
-
-            arrfree(fields);
-            fields = NULL;
-            break;
-
-        case TYPE_EXPR_FN:
-            type = (Type)
-            {
-                .kind = TYPE_FN,
-                .type.fn = (TypeFn)
-                {
-                    .left  = type_convert_type_expr_to_type(arena, type_expr->type_expr.fn.left ),
-                    .right = type_convert_type_expr_to_type(arena, type_expr->type_expr.fn.right),
-                }
-            };
-            break;
-
-        case TYPE_EXPR_INSTANCE:
-            // struct TypeExprInstance
-            // {
-                // TypeExpr* caller;
-                // int argc;
-                // TypeExpr** argv;
-            // };
-
-            // type = (Type)
-            // {
-                // .kind = TYPE_
-            // };
-
-            fprintf(stderr, "Type conversion: Not implemented yet.\n");
-            exit(1);
-            break;
-
-        default:
-            assert(false);
-    }
-
-    return (Type*) arena_push(arena, &type, sizeof(Type));
-}
+// Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr)
+// {
+//     assert(type_expr != NULL);
+// 
+//     Type type;
+//     TypeStructField** fields = NULL;
+// 
+//     // Old
+//     int argc = 0;
+//     TypeExprStructField** argv= NULL;
+// 
+//     switch (type_expr->kind)
+//     {
+//         case TYPE_EXPR_IDENTIFIER:
+//             type = (Type)
+//             {
+//                 .kind      = TYPE_VARIABLE,
+//                 .type.none = NULL         ,
+//             };
+// 
+//             break;
+// 
+//         case TYPE_EXPR_NIL:
+//             type = (Type)
+//             {
+//                 .kind      = TYPE_NIL,
+//                 .type.none = NULL    ,
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_BOOL:
+//             type = (Type)
+//             {
+//                 .kind      = TYPE_BOOL,
+//                 .type.none = NULL     ,
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_INT:
+//             type = (Type)
+//             {
+//                 .kind      = TYPE_INT ,
+//                 .type.none = NULL     ,
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_REAL:
+//             type = (Type)
+//             {
+//                 .kind      = TYPE_REAL,
+//                 .type.none = NULL     ,
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_STRING:
+//             type = (Type)
+//             {
+//                 .kind      = TYPE_STRING,
+//                 .type.none = NULL       ,
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_LIST:
+//             type = (Type)
+//             {
+//                 .kind = TYPE_LIST,
+//                 .type.list = (TypeList)
+//                 {
+//                     .type = type_convert_type_expr_to_type(arena, type_expr->type_expr.list.type),
+//                 }
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_STRUCT:
+//             argc = type_expr->type_expr.structt.argc;
+//             argv = type_expr->type_expr.structt.argv;
+// 
+//             for (int i = 0; i < argc; ++i) 
+//             {
+//                 TypeExprStructField* f = argv[i];
+//                 TypeStructField converted_field = (TypeStructField)
+//                 {
+//                     .key   = f->key,
+//                     .value = type_convert_type_expr_to_type(arena, f->value),
+//                 };
+//                 TypeStructField* new_field = (TypeStructField*) arena_push(arena, &converted_field, sizeof(TypeStructField));
+//                 arrput(fields, new_field);
+//             }
+// 
+//             type = (Type)
+//             {
+//                 .kind = TYPE_STRUCT,
+//                 .type.structt = (TypeStruct)
+//                 {
+//                     .field_num = argc,
+//                     .fields    = (TypeStructField**) arena_push(arena, fields, argc * sizeof(TypeStructField*)),
+//                 }
+//             };
+// 
+//             arrfree(fields);
+//             fields = NULL;
+//             break;
+// 
+//         case TYPE_EXPR_FN:
+//             type = (Type)
+//             {
+//                 .kind = TYPE_FN,
+//                 .type.fn = (TypeFn)
+//                 {
+//                     .left  = type_convert_type_expr_to_type(arena, type_expr->type_expr.fn.left ),
+//                     .right = type_convert_type_expr_to_type(arena, type_expr->type_expr.fn.right),
+//                 }
+//             };
+//             break;
+// 
+//         case TYPE_EXPR_INSTANCE:
+//             // struct TypeExprInstance
+//             // {
+//                 // TypeExpr* caller;
+//                 // int argc;
+//                 // TypeExpr** argv;
+//             // };
+// 
+//             // type = (Type)
+//             // {
+//                 // .kind = TYPE_
+//             // };
+// 
+//             fprintf(stderr, "Type conversion: Not implemented yet.\n");
+//             exit(1);
+//             break;
+// 
+//         default:
+//             assert(false);
+//     }
+// 
+//     return (Type*) arena_push(arena, &type, sizeof(Type));
+// }

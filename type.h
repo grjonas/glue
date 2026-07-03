@@ -106,26 +106,28 @@ typedef struct TypeStruct      TypeStruct     ;
 typedef struct TypeStructField TypeStructField;
 typedef struct TypeFn          TypeFn         ;
 typedef struct TypeAlias       TypeAlias      ;
-typedef struct TypeNewType     TypeNewType    ;
+typedef struct TypePolymorphic TypePolymorphic;
+typedef struct TypeMonomorphic TypeMonomorphic;
 
 enum TypeKind
 {
     // Primitive types
-    TYPE_NIL     ,
-    TYPE_BOOL    ,
-    TYPE_INT     ,
-    TYPE_REAL    ,
-    TYPE_STRING  ,
+    TYPE_NIL        ,
+    TYPE_BOOL       ,
+    TYPE_INT        ,
+    TYPE_REAL       ,
+    TYPE_STRING     ,
 
     // Derivative types
-    TYPE_LIST    ,
-    TYPE_STRUCT  ,
-    TYPE_FN      ,
+    TYPE_LIST       ,
+    TYPE_STRUCT     ,
+    TYPE_FN         ,
 
     // Special types
-    TYPE_VARIABLE, // a type representing a yet unknown type.
-    TYPE_ALIAS   , // a type representing an alias to an existing type.
-    TYPE_NEW_TYPE, // a type representing a newly defined type.
+    TYPE_VARIABLE   , // a type representing a yet unknown type.
+    TYPE_ALIAS      , // a type representing an alias to an existing type.
+    TYPE_POLYMORPHIC, // a type representing a newly defined type.
+    TYPE_MONOMORPHIC, // an instantiated polymorphic type
 };
 
 struct TypeList
@@ -156,12 +158,19 @@ struct TypeAlias
     Type* type;
 };
 
-struct TypeNewType
+struct TypePolymorphic
 {
     int    parameter_num  ;
     int    constructor_num;
     Type** parameters     ; // All of kind TYPE_VARIABLE
     Type** constructors   ; // All of kind TYPE_FN, where the rightmost node_ptr is equal of the 'TypeNewType' itself.
+};
+
+struct TypeMonomorphic
+{
+    Type*  polymorphic;
+    int    argc;
+    Type** argv;
 };
 
 // Not implemented yet
@@ -170,16 +179,17 @@ struct Type
     TypeKind kind;
     union
     {
-        void      * none    ; // Primitives and variable. (should be set to NULL in that case).
-        TypeList    list    ;
-        TypeStruct  structt ;
-        TypeFn      fn      ;
-        TypeAlias   alias   ;
-        TypeNewType new_type;
+        void          * none       ; // Primitives and variable. (should be set to NULL in that case).
+        TypeList        list       ;
+        TypeStruct      structt    ;
+        TypeFn          fn         ;
+        TypeAlias       alias      ;
+        TypePolymorphic polymorphic;
+        TypeMonomorphic monomorphic;
     }
     type;
 };
 
-Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr);
+// Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr);
 
 #endif

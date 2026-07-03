@@ -38,4 +38,6 @@ void arena_free(Arena* arena);
 void* arena_push(Arena* arena, void* obj, size_t size);
 void* arena_push_empty(Arena* arena, size_t size);
 
+void arena_print_memory_usage(Arena* arena);
+
 #endif

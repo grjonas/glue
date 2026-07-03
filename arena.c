@@ -232,3 +232,17 @@ void* arena_push_empty(Arena* arena, size_t size)
     free(mem);
     return ret;
 }
+
+void arena_print_memory_usage(Arena* arena)
+{
+    size_t total_size = 0;
+
+    printf("ARENA MEMORY USAGE:\n");
+    for (int i = 0; i < arena->size; ++i)
+    {
+        size_t curr_size = arena->body->capacity;
+        printf("%lu\n", curr_size);
+        total_size += curr_size;
+    }
+    printf("TOTAL: %lu\n", total_size);
+}
