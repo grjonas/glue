@@ -174,9 +174,10 @@ Stmt* parser_parse_stmt_block(Parser* parser)
 
         while ((stmt_ptr = parser_parse_stmt(parser)) != NULL)
         {
-            printf("yay\n");
+            printf("[%s:%d] Stmt\n", __FILE__, __LINE__);
             arrput(stmts, stmt_ptr);
         }
+        printf("\n");
 
         if (stmts != NULL)
         {
@@ -848,7 +849,8 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
         .length = token.length,
         .stmt.alias = (StmtAlias)
         {
-            .type = type,
+            .identifier = identifier,
+            .type       = type      ,
         }
     };
 
@@ -859,23 +861,4 @@ Stmt* parser_parse_stmt_type(Parser* parser)
 {
     fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
     exit(1);
-}
-
-const char* stmt_type_name(StmtKind kind)
-{
-    switch (kind)
-    {
-        case STMT_ERR:               return "STMT_ERR";
-        case STMT_LET:               return "STMT_LET";
-        case STMT_EXPR:              return "STMT_EXPR";
-        case STMT_IF:                return "STMT_IF";
-        // case STMT_ELIF:              return "STMT_ELIF";
-        // case STMT_ELSE:              return "STMT_ELSE";
-        case STMT_WHILE:             return "STMT_WHILE";
-        case STMT_BREAK:             return "STMT_BREAK";
-        case STMT_CONTINUE:          return "STMT_CONTINUE";
-        case STMT_FN:                return "STMT_FN";
-        case STMT_RETURN:            return "STMT_RETURN";
-        default:                     return "UNKNOWN";
-    }
 }

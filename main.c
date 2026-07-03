@@ -5,6 +5,7 @@
 #include "type.h"
 #include "expr.h"
 #include "resolver.h"
+#include "print.h"
 
 // Returns a null-terminated string that has the file's contents.
 // Needs to be freed.
@@ -65,13 +66,13 @@ int main(int argc, char** argv)
     if (arr_len > 0)
         exit(1);
 
-    parser_free(&parser);
-
     Resolver resolver = resolver_init(&parser, stmt);
 
     resolver_resolve_stmt(&resolver);
 
     arena_print_memory_usage(&resolver.arena);
+
+    stmt_print(stdout, resolver.stmts);
 
     resolver_free(&resolver);
 

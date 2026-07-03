@@ -89,7 +89,8 @@ struct StmtReturn
 
 struct StmtAlias
 {
-    TypeExpr* type;
+    char    * identifier;
+    TypeExpr* type      ;
 };
 
 // Tagged Union
@@ -132,8 +133,5 @@ Stmt     * parser_parse_stmt_break   (Parser* parser);
 Stmt     * parser_parse_stmt_continue(Parser* parser);
 Stmt     * parser_parse_stmt_return  (Parser* parser);
 Stmt     * parser_parse_stmt_alias   (Parser* parser);
-
-void print_stmt(Stmt* stmt);
-const char* stmt_type_name(StmtKind kind);
 
 #endif

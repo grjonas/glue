@@ -367,6 +367,7 @@ void resolver_resolve_expr(Resolver* resolver, Expr** expr)
             exit(1);
     }
 
+    (*expr)->type = resolver_create_type_variable(resolver);
     // resolve_push_expr(resolver, *expr);
 }
 

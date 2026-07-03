@@ -21,25 +21,25 @@ Inferer inferer_init(Resolver* resolver)
 
     return (Inferer)
     {
-        .txt         = resolver->txt         ,
-        .tokens      = resolver->tokens      ,
-        .stmts       = resolver->stmts       ,
-        .decl        = resolver->declarations,
-        .identifiers = identifiers           ,
-        .arena       = arena                 ,
-        .errs        = NULL                  ,
+        .txt          = resolver->txt         ,
+        .tokens       = resolver->tokens      ,
+        .stmts        = resolver->stmts       ,
+        .declarations = resolver->declarations,
+        .identifiers  = resolver->identifiers ,
+        .arena        = resolver->arena       ,
+        .errs         = NULL                  ,
     };
 }
 
 void    inferer_free(Inferer* inferer  )
 {
-    free((char*) resolver->txt);
-    arrfree(resolver->tokens);
-    arrfree(resolver->stmts);
-    arrfree(resolver->declarations);
-    arrfree(resolver->identifiers);
-    arena_free(&resolver->arena);
-    arrfree(resolver->errs);
+    free((char*) inferer->txt);
+    arrfree(inferer->tokens);
+    arrfree(inferer->stmts);
+    arrfree(inferer->declarations);
+    arrfree(inferer->identifiers);
+    arena_free(&inferer->arena);
+    arrfree(inferer->errs);
 
     *inferer = (Inferer)
     {
@@ -51,3 +51,5 @@ void    inferer_free(Inferer* inferer  )
         .errs         = NULL,
     };
 }
+
+

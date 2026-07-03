@@ -3,7 +3,7 @@
 
 #include "resolver.h"
 
-typedef struct Inferer Inferer
+typedef struct Inferer Inferer;
 
 struct Inferer
 {
