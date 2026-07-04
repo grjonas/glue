@@ -78,7 +78,7 @@ void resolver_resolve_stmt(Resolver* resolver)
     Type    * type       = NULL;
     Decl    * decl       = NULL;
 
-    int snapshot = 0;
+    Snapshot snapshot;
 
     curr_stmt = resolver->stmts;
     if (curr_stmt == NULL)
@@ -115,6 +115,10 @@ void resolver_resolve_stmt(Resolver* resolver)
             type_expr  = curr_stmt->stmt.let.type      ;
             expr       = curr_stmt->stmt.let.expr      ;
 
+            decl = resolver_declare_let(resolver, identifier, NULL);
+            resolver_push_decl_to_context(resolver, decl);
+
+            snapshot = resolver_get_context_snapshot(resolver);
             if (type_expr != NULL)
             {
                 type = resolver_resolve_type_expr(resolver, type_expr);
@@ -124,8 +128,7 @@ void resolver_resolve_stmt(Resolver* resolver)
                     return;
                 }
             }
-            decl = resolver_declare_let(resolver, identifier, type);
-            resolver_push_decl_to_context(resolver, decl);
+            decl_set_type(decl, type);
             curr_stmt->stmt.let.decl = decl;
 
             if (expr != NULL)
@@ -137,6 +140,8 @@ void resolver_resolve_stmt(Resolver* resolver)
                     return;
                 }
             }
+
+            resolver_restore_context_snapshot(resolver, snapshot);
             break;
 
         case STMT_EXPR    :
@@ -230,25 +235,27 @@ void resolver_resolve_stmt(Resolver* resolver)
             stmt = fn.body;
 
             // Does not return NULL
-            type = resolver_resolve_stmt_fn_type(resolver, fn);
-
-            decl = resolver_declare_let(resolver, fn.identifier, type);
+            decl = resolver_declare_let(resolver, fn.identifier, NULL);
+            curr_stmt->stmt.fn.decl = decl;
             resolver_push_decl_to_context(resolver, decl);
 
-            bool inside_function = resolver->inside_function;
-
             snapshot = resolver_get_context_snapshot(resolver);
+
+            type = resolver_resolve_stmt_fn_type(resolver, fn);
+            decl_set_type(decl, type);
+
+            bool inside_function = resolver->inside_function;
             resolver->stmts = stmt;
             resolver->inside_function = true;
 
             // Assigning types to argument.
             resolver_declare_fn_params(resolver, fn, type);
-
             resolver_resolve_stmt(resolver);
 
-            resolver_restore_context_snapshot(resolver, snapshot);
             resolver->stmts = curr_stmt;
             resolver->inside_function = inside_function;
+
+            resolver_restore_context_snapshot(resolver, snapshot);
             break;
 
         case STMT_RETURN  :
@@ -371,7 +378,7 @@ void resolver_resolve_expr(Resolver* resolver, Expr** expr)
             exit(1);
     }
 
-    (*expr)->type = resolver_create_type_variable(resolver);
+    // (*expr)->type = resolver_create_type_variable(resolver);
     // resolve_push_expr(resolver, *expr);
 }
 
@@ -594,21 +601,35 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
     }
 }
 
-int  resolver_get_context_snapshot(Resolver* resolver)
+Snapshot resolver_get_context_snapshot(Resolver* resolver)
 {
-    return arrlen(resolver->context);
+    return (Snapshot)
+    {
+        .context_length   = arrlen(resolver->context) ,
+        // .decl_id          = resolver->decl_id         ,
+        // .type_variable_id = resolver->type_variable_id,
+    };
 }
 
-void resolver_restore_context_snapshot(Resolver* resolver, int snapshot)
+void resolver_restore_context_snapshot(Resolver* resolver, Snapshot snapshot)
 {
-    int curr_snapshot = arrlen(resolver->context);
+    Snapshot curr_snapshot  = (Snapshot)
+    {
+        .context_length   = arrlen(resolver->context) ,
+        // .decl_id          = resolver->decl_id         ,
+        // .type_variable_id = resolver->type_variable_id,
+    };
 
-    assert(curr_snapshot >= snapshot);
+    assert(curr_snapshot.context_length >= snapshot.context_length);
+    // assert(curr_snapshot.decl_id >= snapshot.decl_id);
+    // assert(curr_snapshot.type_variable_id >= snapshot.type_variable_id);
 
-    for (int i = 0; i < curr_snapshot - snapshot; ++i)
+    for (int i = 0; i < curr_snapshot.context_length - snapshot.context_length; ++i)
     {
         (void) arrpop(resolver->context);
     }
+    // resolver->decl_id = snapshot.decl_id;
+    // resolver->type_variable_id = snapshot.type_variable_id;
 }
 
 void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
@@ -715,6 +736,11 @@ Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type)
     return decl_ptr;
 }
 
+void decl_set_type(Decl* decl, Type* type)
+{
+    decl->type = type;
+}
+
 void resolver_declare_fn_params(Resolver* resolver, StmtFn fn, Type* fn_type)
 {
     assert(fn_type->kind == TYPE_FN);
@@ -733,6 +759,7 @@ void resolver_declare_fn_params(Resolver* resolver, StmtFn fn, Type* fn_type)
 
         type = node->type.fn.left;
         decl = resolver_declare_let(resolver, identifier, type);
+        fn.argv[i]->decl = decl;
         resolver_push_decl_to_context(resolver, decl);
         node = node->type.fn.right;
     }
@@ -812,7 +839,8 @@ Type* resolver_create_type_variable(Resolver* resolver)
 
 Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
 {
-    Decl decl;
+    Decl  decl;
+    Decl* decl_ptr = NULL;
 
     decl = (Decl)
     {
@@ -822,5 +850,7 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
         .id         = resolver->decl_id++                    ,
     };
 
-    return (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+    decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+    arrput(resolver->declarations, decl_ptr);
+    return decl_ptr;
 }

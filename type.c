@@ -158,7 +158,7 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
     TypeExpr type_expr;
 
     int argc = 0;
-    TypeExprStructField** argv;
+    TypeExprStructField** argv = NULL;
 
     Token token;
 

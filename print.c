@@ -277,7 +277,7 @@ void expr_primary_print(FILE* file, ExprPrimary primary)
             {
                 ExprPrimaryStructField* field = primary.primary.structt.argv[i];
 
-                fprintf(file, "%s", field->key);
+                fprintf(file, "%s", field->key == NULL ? "[NULL]" : field->key);
                 if (field->type != NULL)
                 {
                     fprintf(file, " : ");
@@ -303,7 +303,7 @@ void expr_primary_print(FILE* file, ExprPrimary primary)
             return;
 
         case EXPR_PRIMARY_IDENTIFIER:
-            fprintf(file, "%s", primary.primary.identifier);
+            fprintf(file, "id:%s", primary.primary.identifier);
             return;
 
         case EXPR_PRIMARY_DECL      :

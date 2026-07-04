@@ -384,19 +384,7 @@ Expr* parser_parse_expr_struct(Parser* parser)
         ExprPrimaryStructField  field     ;
         ExprPrimaryStructField* arg = NULL;
 
-        token = parser_next(parser);
-        if (token.type != TOKEN_IDENTIFIER)
-        {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Expression parsing: Failed to parse struct field name.",
-            });
-            return NULL;
-        }
+        identifier = parser_parse_identifier(parser);
 
         token = parser_peek(parser);
         if (token.type == TOKEN_COLON)

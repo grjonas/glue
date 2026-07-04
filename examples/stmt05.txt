@@ -34,3 +34,5 @@ do
 end
 
 fn duble(boolean : Bool, fun : Real -> z); return fun
+
+let str : { a : Int, b : Real } = { a = 0, b : Real = 0 }

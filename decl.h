@@ -4,8 +4,6 @@
 #include "expr.h"
 #include "type.h"
 
-typedef struct Resolver Resolver;
-
 typedef struct Decl                Decl               ;
 typedef enum   DeclKind            DeclKind           ;
 
