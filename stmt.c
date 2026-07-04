@@ -64,9 +64,6 @@ Stmt* parser_parse_stmts(Parser* parser)
 // TODO: Implement length calculations when parsing.
 Stmt* parser_parse_stmt(Parser* parser)
 {
-    // Stmt     * stmt       = NULL;
-    // Expr     * expr       = NULL;
-
     Token token;
 
     parser_skip(parser, is_newline);
@@ -105,8 +102,6 @@ Stmt* parser_parse_stmt(Parser* parser)
 
         default:
             return parser_parse_stmt_expr(parser);
-            // fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
-            // exit(1);
     }
 }
 
@@ -652,37 +647,38 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         parser_next(parser);
     }
 
-    int old_errs = arrlen(parser->errs);
-    if (arrlen(parser->errs) > old_errs)
-    {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Failed to parse function return type.",
-        });
-        return NULL;
-    }
+//    int old_errs = arrlen(parser->errs);
+//    if (arrlen(parser->errs) > old_errs)
+//    {
+//        parser_throw_compiler_error(parser, (CompileError)
+//        {
+//            .kind   = ERROR_ERROR ,
+//            .line   = token.line  ,
+//            .column = token.column,
+//            .length = token.line  ,
+//            .msg    = "Statement parsing: Failed to parse function return type.",
+//        });
+//        return NULL;
+//    }
 
-    // if (token.type == TOKEN_COLON)
-    // {
-        // parser_next(parser);
-        // return_type = parser_parse_type_expr(parser);
-        // if (return_type == NULL)
-        // {
-            // parser_throw_compiler_error(parser, (CompileError)
-            // {
-                // .kind   = ERROR_ERROR ,
-                // .line   = token.line  ,
-                // .column = token.column,
-                // .length = token.line  ,
-                // .msg    = "Statement parsing: Failed to parse function return type.",
-            // });
-            // return NULL;
-        // }
-    // }
+    token = parser_peek(parser);
+    if (token.type == TOKEN_COLON)
+    {
+        parser_next(parser);
+        return_type = parser_parse_type_expr(parser);
+        if (return_type == NULL)
+        {
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Failed to parse function return type.",
+            });
+            return NULL;
+        }
+    }
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
