@@ -328,16 +328,31 @@ void expr_print(FILE* file, Expr* expr)
     {
         case EXPR_PRIMARY:
             expr_primary_print(file, expr->expr.primary);
+            if (expr->type != NULL)
+            {
+                fprintf(file, " : ");
+                type_print(file, expr->type);
+            }
             break;
 
         case EXPR_UNARY  :
             fprintf(file, "( %s ", expr_unary_kind_name(expr->expr.unary.kind));
+            if (expr->type != NULL)
+            {
+                fprintf(file, ": ");
+                type_print(file, expr->type);
+            }
             expr_print(file, expr->expr.unary.unary);
             fprintf(file, ")");
             break;
 
         case EXPR_BINARY :
             fprintf(file, "( %s ", expr_binary_kind_name(expr->expr.binary.kind));
+            if (expr->type != NULL)
+            {
+                fprintf(file,": ");
+                type_print(file, expr->type);
+            }
             expr_print(file, expr->expr.binary.left);
             fprintf(file, " ");
             expr_print(file, expr->expr.binary.right);
@@ -346,6 +361,11 @@ void expr_print(FILE* file, Expr* expr)
 
         case EXPR_FN     :
             expr_print(file, expr->expr.fn.caller);
+            if (expr->type != NULL)
+            {
+                fprintf(file," : ");
+                type_print(file, expr->type);
+            }
             fprintf(file, "(");
 
             for (int i = 0; i < expr->expr.fn.argc; ++i)
@@ -467,27 +487,32 @@ void type_print(FILE* file, Type* type)
             return;
 
         case TYPE_STRUCT     :
-            fprintf(file, "[TYPE]");
+            fprintf(file, "[TYPE_STRUCT]");
             return;
 
         case TYPE_FN         :
-            fprintf(file, "[TYPE]");
+            TypeFn type_fn = type->type.fn;
+            if (type_fn.left->kind == TYPE_FN) fprintf(file, "(");
+            type_print(file, type_fn.left);
+            if (type_fn.left->kind == TYPE_FN) fprintf(file, ")");
+            fprintf(file, " -> ");
+            type_print(file, type_fn.right);
             return;
 
         case TYPE_VARIABLE   :
-            fprintf(file, "[TYPE]");
+            fprintf(file, "@%d", type->type.variable.id);
             return;
 
         case TYPE_ALIAS      :
-            fprintf(file, "[TYPE]");
+            fprintf(file, "[TYPE_ALIAS]");
             return;
 
         case TYPE_POLYMORPHIC:
-            fprintf(file, "[TYPE]");
+            fprintf(file, "[TYPE_POLYMORPHIC]");
             return;
 
         case TYPE_MONOMORPHIC:
-            fprintf(file, "[TYPE]");
+            fprintf(file, "[TYPE_MONOMORPHIC]");
             return;
     }
 
@@ -530,7 +555,7 @@ void decl_print(FILE* file, Decl* decl)
                 fprintf(file, "[DECL]");
         }
 
-        fprintf(file, ": %s", decl->identifier == NULL? "[NULL]" : decl->identifier);
+        fprintf(file, ": %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
         if (decl->type != NULL)
         {
             fprintf(file, " : ");

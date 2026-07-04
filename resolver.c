@@ -18,16 +18,18 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
 
     Resolver resolver = (Resolver)
     {
-        .txt             = parser->txt   ,
-        .tokens          = parser->tokens,
-        .stmts           = stmts         ,
-        .arena           = parser->arena ,
-        .loop_depth      = 0             ,
-        .inside_function = false         ,
-        .context         = NULL          ,
-        .declarations    = NULL          ,
-        .identifiers     = NULL          ,
-        .errs            = NULL          ,
+        .txt              = parser->txt   ,
+        .tokens           = parser->tokens,
+        .stmts            = stmts         ,
+        .arena            = parser->arena ,
+        .type_variable_id = 0             ,
+        .decl_id          = 0             ,
+        .loop_depth       = 0             ,
+        .inside_function  = false         ,
+        .context          = NULL          ,
+        .declarations     = NULL          ,
+        .identifiers      = NULL          ,
+        .errs             = NULL          ,
     };
     return resolver;
 }
@@ -45,16 +47,18 @@ void resolver_free(Resolver* resolver)
 
     *resolver = (Resolver)
     {
-        .txt             = NULL                    ,
-        .tokens          = NULL                    ,
-        .stmts           = NULL                    ,
-        .arena           = resolver->arena         ,
-        .loop_depth      = 0                       ,
-        .inside_function = false                   ,
-        .context         = NULL                    ,
-        .declarations    = NULL                    ,
-        .identifiers     = NULL                    ,
-        .errs            = NULL                    ,
+        .txt              = NULL           ,
+        .tokens           = NULL           ,
+        .stmts            = NULL           ,
+        .arena            = resolver->arena,
+        .type_variable_id = 0              ,
+        .decl_id          = 0              ,
+        .loop_depth       = 0              ,
+        .inside_function  = false          ,
+        .context          = NULL           ,
+        .declarations     = NULL           ,
+        .identifiers      = NULL           ,
+        .errs             = NULL           ,
     };
 }
 
@@ -699,9 +703,10 @@ Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type)
 
     decl = (Decl)
     {
-        .kind = DECL_LET ,
+        .kind       = DECL_LET           ,
         .identifier = existing_identifier,
-        .type       = type      ,
+        .type       = type               ,
+        .id         = resolver->decl_id++,
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
@@ -798,8 +803,8 @@ Type* resolver_create_type_variable(Resolver* resolver)
 
     type = (Type)
     {
-        .kind      = TYPE_VARIABLE,
-        .type.none = NULL         ,
+        .kind             = TYPE_VARIABLE               ,
+        .type.variable.id = resolver->type_variable_id++,
     };
 
     return (Type*) arena_push(&resolver->arena, &type, sizeof(Type));
@@ -813,7 +818,8 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
     {
         .kind       = DECL_TYPE_VARIABLE,
         .identifier = identifier        ,
-        .type       = resolver_create_type_variable(resolver)
+        .type       = resolver_create_type_variable(resolver),
+        .id         = resolver->decl_id++                    ,
     };
 
     return (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));

@@ -59,6 +59,7 @@ struct Decl
     DeclKind kind;
     char* identifier;
     Type* type      ;
+    int   id        ;
 //     struct
 //     {
 //         DeclLet             let        ;

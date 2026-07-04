@@ -101,6 +101,7 @@ TypeExpr* parser_parse_type_expr_instance (Parser* parser);
 typedef struct Type            Type           ;
 typedef enum   TypeKind        TypeKind       ;
 
+typedef struct TypeVariable    TypeVariable   ;
 typedef struct TypeList        TypeList       ;
 typedef struct TypeStruct      TypeStruct     ;
 typedef struct TypeStructField TypeStructField;
@@ -128,6 +129,11 @@ enum TypeKind
     TYPE_ALIAS      , // a type representing an alias to an existing type.
     TYPE_POLYMORPHIC, // a type representing a newly defined type.
     TYPE_MONOMORPHIC, // an instantiated polymorphic type
+};
+
+struct TypeVariable
+{
+    int id;
 };
 
 struct TypeList
@@ -180,6 +186,7 @@ struct Type
     union
     {
         void          * none       ; // Primitives and variable. (should be set to NULL in that case).
+        TypeVariable    variable   ;
         TypeList        list       ;
         TypeStruct      structt    ;
         TypeFn          fn         ;

@@ -72,7 +72,16 @@ int main(int argc, char** argv)
 
     arena_print_memory_usage(&resolver.arena);
 
-    stmt_print(stdout, resolver.stmts);
+    FILE* file = stdout;
+    fprintf(file, "Declarations:\n");
+    for (int i = 0; i < arrlen(resolver.declarations); ++i)
+    {
+        Decl* d = resolver.declarations[i];
+        fprintf(file, "    ");
+        decl_print(file, d);
+        fprintf(file, "\n");
+    }
+    stmt_print(file, resolver.stmts);
 
     resolver_free(&resolver);
 

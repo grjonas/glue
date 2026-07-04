@@ -17,6 +17,8 @@ struct Resolver
     Arena  arena;
 
     // Misc. state
+    int type_variable_id;
+    int decl_id;
     int loop_depth;
     bool inside_function;
     Decl** context; // Works similiar to a stack - when we recursively try to resolve a statement,
