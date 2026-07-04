@@ -62,23 +62,261 @@ void resolver_free(Resolver* resolver)
     };
 }
 
+void resolver_resolve_stmt_block(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    int    size = 0   ;
+    Stmt** body = NULL;
+    Snapshot snapshot ;
+
+    size = curr_stmt->stmt.block.size;
+    body = curr_stmt->stmt.block.body;
+
+    snapshot = resolver_get_context_snapshot(resolver);
+    for (int i = 0; i < size; ++i)
+    {
+        Stmt* stmt = body[i];
+
+        resolver->stmts = stmt     ;
+        resolver_resolve_stmt(resolver);
+        resolver->stmts = curr_stmt;
+    }
+    resolver_restore_context_snapshot(resolver, snapshot);
+}
+
+void resolver_resolve_stmt_let(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    Decl    * decl       = NULL;
+    char    * identifier = NULL;
+    TypeExpr* type_expr  = NULL;
+    Expr    * expr       = NULL;
+    Type    * type       = NULL;
+    Snapshot snapshot;
+
+    identifier = curr_stmt->stmt.let.identifier;
+    type_expr  = curr_stmt->stmt.let.type      ;
+    expr       = curr_stmt->stmt.let.expr      ;
+
+    decl = resolver_declare_let(resolver, identifier, NULL);
+    resolver_push_decl_to_context(resolver, decl);
+
+    snapshot = resolver_get_context_snapshot(resolver);
+    if (type_expr != NULL)
+    {
+        type = resolver_resolve_type_expr(resolver, type_expr);
+        if (type == NULL)
+        {
+            resolver->stmts = NULL;
+            return;
+        }
+    }
+    decl_set_type(decl, type);
+    curr_stmt->stmt.let.decl = decl;
+
+    if (expr != NULL)
+    {
+        resolver_resolve_expr(resolver, &expr);
+        if (expr == NULL)
+        {
+            resolver->stmts = NULL;
+            return;
+        }
+    }
+
+    resolver_restore_context_snapshot(resolver, snapshot);
+}
+
+void resolver_resolve_stmt_expr(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    Expr* expr = NULL;
+
+    expr = curr_stmt->stmt.expr;
+
+    resolver_resolve_expr(resolver, &expr);
+    if (expr == NULL)
+    {
+        resolver->stmts = NULL;
+        return;
+    }
+}
+
+void resolver_resolve_stmt_if(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    Expr* expr = NULL;
+    Stmt* stmt = NULL;
+    Snapshot snapshot;
+
+    expr = curr_stmt->stmt.iff.condition;
+    stmt = curr_stmt->stmt.iff.body     ;
+
+    if (expr != NULL)
+    {
+        resolver_resolve_expr(resolver, &expr);
+        if (expr == NULL)
+        {
+            resolver->stmts = NULL;
+            return;
+        }
+    }
+    snapshot = resolver_get_context_snapshot(resolver);
+    resolver->stmts = stmt     ;
+
+    resolver_resolve_stmt(resolver);
+
+    resolver_restore_context_snapshot(resolver, snapshot);
+    resolver->stmts = curr_stmt;
+}
+
+void resolver_resolve_stmt_while(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    Expr* expr = NULL;
+    Stmt* stmt = NULL;
+    Snapshot snapshot;
+
+    expr = curr_stmt->stmt.whilee.condition;
+    stmt = curr_stmt->stmt.whilee.body     ;
+
+    resolver_resolve_expr(resolver, &expr);
+    if (expr == NULL)
+    {
+        resolver->stmts = NULL;
+        return;
+    }
+
+    snapshot = resolver_get_context_snapshot(resolver);
+    resolver->stmts = stmt     ;
+    resolver->loop_depth++;
+
+    resolver_resolve_stmt(resolver);
+
+    resolver_restore_context_snapshot(resolver, snapshot);
+    resolver->stmts = curr_stmt;
+    resolver->loop_depth--;
+}
+
+void resolver_resolve_stmt_break(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    if (resolver->loop_depth <= 0)
+    {
+        resolver_throw_compiler_error(resolver, (CompileError)
+        {
+            .kind   = ERROR_ERROR      ,
+            .line   = curr_stmt->line  ,
+            .column = curr_stmt->column,
+            .length = curr_stmt->line  ,
+            .msg    = "Statement resolution: Breaking while not in loop.",
+        });
+        resolver->stmts = NULL;
+        return;
+    }
+}
+
+void resolver_resolve_stmt_continue(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    if (resolver->loop_depth <= 0)
+    {
+        resolver_throw_compiler_error(resolver, (CompileError)
+        {
+            .kind   = ERROR_ERROR      ,
+            .line   = curr_stmt->line  ,
+            .column = curr_stmt->column,
+            .length = curr_stmt->line  ,
+            .msg    = "Statement resolution: Continuing while not in loop.",
+        });
+        resolver->stmts = NULL;
+        return;
+    }
+}
+
+void resolver_resolve_stmt_fn(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    StmtFn fn;
+    Stmt*  stmt = NULL;
+    Decl*  decl = NULL;
+    Type*  type = NULL;
+    Snapshot snapshot;
+
+    fn   = curr_stmt->stmt.fn;
+    stmt = fn.body;
+
+    // Does not return NULL
+    decl = resolver_declare_let(resolver, fn.identifier, NULL);
+    curr_stmt->stmt.fn.decl = decl;
+    resolver_push_decl_to_context(resolver, decl);
+
+    snapshot = resolver_get_context_snapshot(resolver);
+
+    type = resolver_resolve_stmt_fn_type(resolver, fn);
+    decl_set_type(decl, type);
+
+    bool inside_function = resolver->inside_function;
+    resolver->stmts = stmt;
+    resolver->inside_function = true;
+
+    // Assigning types to argument.
+    resolver_declare_fn_params(resolver, fn, type);
+    resolver_resolve_stmt(resolver);
+
+    resolver->stmts = curr_stmt;
+    resolver->inside_function = inside_function;
+
+    resolver_restore_context_snapshot(resolver, snapshot);
+}
+
+void resolver_resolve_stmt_return(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    Expr* expr = NULL;
+
+    assert(curr_stmt->kind == STMT_RETURN);
+
+    // TODO: Somehow bind this to it's respective function declaration.
+    if (!resolver->inside_function)
+    {
+        resolver_throw_compiler_error(resolver, (CompileError)
+        {
+            .kind   = ERROR_ERROR      ,
+            .line   = curr_stmt->line  ,
+            .column = curr_stmt->column,
+            .length = curr_stmt->line  ,
+            .msg    = "Statement resolution: Cannot return while not in function.",
+        });
+        resolver->stmts = NULL;
+        return;
+    }
+
+    expr = curr_stmt->stmt.returnn.expr;
+    if (expr != NULL)
+    {
+        resolver_resolve_expr(resolver, &expr);
+        if (expr == NULL)
+        {
+            resolver->stmts = NULL;
+            return;
+        }
+    }
+}
+
 // On error - stmts is set to NULL.
 void resolver_resolve_stmt(Resolver* resolver)
 {
     Stmt* curr_stmt  = NULL;
-
-    char    * identifier = NULL;
-    TypeExpr* type_expr  = NULL;
-    Expr    * expr       = NULL;
-    Stmt    * stmt       = NULL;
-    int       size       = 0   ;
-    Stmt   ** body       = NULL;
-    StmtFn    fn               ;
-
-    Type    * type       = NULL;
-    Decl    * decl       = NULL;
-
-    Snapshot snapshot;
 
     curr_stmt = resolver->stmts;
     if (curr_stmt == NULL)
@@ -95,197 +333,39 @@ void resolver_resolve_stmt(Resolver* resolver)
             break;
 
         case STMT_BLOCK   :
-            size = curr_stmt->stmt.block.size;
-            body = curr_stmt->stmt.block.body;
-
-            snapshot = resolver_get_context_snapshot(resolver);
-            for (int i = 0; i < size; ++i)
-            {
-                Stmt* stmt = body[i];
-
-                resolver->stmts = stmt     ;
-                resolver_resolve_stmt(resolver);
-                resolver->stmts = curr_stmt;
-            }
-            resolver_restore_context_snapshot(resolver, snapshot);
+            resolver_resolve_stmt_block(resolver);
             break;
 
         case STMT_LET     :
-            identifier = curr_stmt->stmt.let.identifier;
-            type_expr  = curr_stmt->stmt.let.type      ;
-            expr       = curr_stmt->stmt.let.expr      ;
-
-            decl = resolver_declare_let(resolver, identifier, NULL);
-            resolver_push_decl_to_context(resolver, decl);
-
-            snapshot = resolver_get_context_snapshot(resolver);
-            if (type_expr != NULL)
-            {
-                type = resolver_resolve_type_expr(resolver, type_expr);
-                if (type == NULL)
-                {
-                    resolver->stmts = NULL;
-                    return;
-                }
-            }
-            decl_set_type(decl, type);
-            curr_stmt->stmt.let.decl = decl;
-
-            if (expr != NULL)
-            {
-                resolver_resolve_expr(resolver, &expr);
-                if (expr == NULL)
-                {
-                    resolver->stmts = NULL;
-                    return;
-                }
-            }
-
-            resolver_restore_context_snapshot(resolver, snapshot);
+            resolver_resolve_stmt_let(resolver);
             break;
 
         case STMT_EXPR    :
-            expr = curr_stmt->stmt.expr;
-
-            resolver_resolve_expr(resolver, &expr);
-            if (expr == NULL)
-            {
-                resolver->stmts = NULL;
-                return;
-            }
+            resolver_resolve_stmt_expr(resolver);
             break;
 
         case STMT_IF      :
-            expr = curr_stmt->stmt.iff.condition;
-            stmt = curr_stmt->stmt.iff.body     ;
-
-            if (expr != NULL)
-            {
-                resolver_resolve_expr(resolver, &expr);
-                if (expr == NULL)
-                {
-                    resolver->stmts = NULL;
-                    return;
-                }
-            }
-            snapshot = resolver_get_context_snapshot(resolver);
-            resolver->stmts = stmt     ;
-
-            resolver_resolve_stmt(resolver);
-
-            resolver_restore_context_snapshot(resolver, snapshot);
-            resolver->stmts = curr_stmt;
+            resolver_resolve_stmt_if(resolver);
             break;
 
         case STMT_WHILE   :
-            expr = curr_stmt->stmt.whilee.condition;
-            stmt = curr_stmt->stmt.whilee.body     ;
-
-            resolver_resolve_expr(resolver, &expr);
-            if (expr == NULL)
-            {
-                resolver->stmts = NULL;
-                return;
-            }
-
-            snapshot = resolver_get_context_snapshot(resolver);
-            resolver->stmts = stmt     ;
-            resolver->loop_depth++;
-
-            resolver_resolve_stmt(resolver);
-
-            resolver_restore_context_snapshot(resolver, snapshot);
-            resolver->stmts = curr_stmt;
-            resolver->loop_depth--;
+            resolver_resolve_stmt_while(resolver);
             break;
 
         case STMT_BREAK   :
-            if (resolver->loop_depth <= 0)
-            {
-                resolver_throw_compiler_error(resolver, (CompileError)
-                {
-                    .kind   = ERROR_ERROR      ,
-                    .line   = curr_stmt->line  ,
-                    .column = curr_stmt->column,
-                    .length = curr_stmt->line  ,
-                    .msg    = "Statement resolution: Breaking while not in loop.",
-                });
-                resolver->stmts = NULL;
-                return;
-            }
+            resolver_resolve_stmt_break(resolver);
             break;
 
         case STMT_CONTINUE:
-            if (resolver->loop_depth <= 0)
-            {
-                resolver_throw_compiler_error(resolver, (CompileError)
-                {
-                    .kind   = ERROR_ERROR      ,
-                    .line   = curr_stmt->line  ,
-                    .column = curr_stmt->column,
-                    .length = curr_stmt->line  ,
-                    .msg    = "Statement resolution: Continuing while not in loop.",
-                });
-                resolver->stmts = NULL;
-                return;
-            }
+            resolver_resolve_stmt_continue(resolver);
             break;
+
         case STMT_FN:
-            fn   = curr_stmt->stmt.fn;
-            stmt = fn.body;
-
-            // Does not return NULL
-            decl = resolver_declare_let(resolver, fn.identifier, NULL);
-            curr_stmt->stmt.fn.decl = decl;
-            resolver_push_decl_to_context(resolver, decl);
-
-            snapshot = resolver_get_context_snapshot(resolver);
-
-            type = resolver_resolve_stmt_fn_type(resolver, fn);
-            decl_set_type(decl, type);
-
-            bool inside_function = resolver->inside_function;
-            resolver->stmts = stmt;
-            resolver->inside_function = true;
-
-            // Assigning types to argument.
-            resolver_declare_fn_params(resolver, fn, type);
-            resolver_resolve_stmt(resolver);
-
-            resolver->stmts = curr_stmt;
-            resolver->inside_function = inside_function;
-
-            resolver_restore_context_snapshot(resolver, snapshot);
+            resolver_resolve_stmt_fn(resolver);
             break;
 
         case STMT_RETURN  :
-            assert(curr_stmt->kind == STMT_RETURN);
-
-            // TODO: Somehow bind this to it's respective function declaration.
-            if (!resolver->inside_function)
-            {
-                resolver_throw_compiler_error(resolver, (CompileError)
-                {
-                    .kind   = ERROR_ERROR      ,
-                    .line   = curr_stmt->line  ,
-                    .column = curr_stmt->column,
-                    .length = curr_stmt->line  ,
-                    .msg    = "Statement resolution: Cannot return while not in function.",
-                });
-                resolver->stmts = NULL;
-                return;
-            }
-
-            expr = curr_stmt->stmt.returnn.expr;
-            if (expr != NULL)
-            {
-                resolver_resolve_expr(resolver, &expr);
-                if (expr == NULL)
-                {
-                    resolver->stmts = NULL;
-                    return;
-                }
-            }
+            resolver_resolve_stmt_return(resolver);
             break;
 
         default:
@@ -293,7 +373,6 @@ void resolver_resolve_stmt(Resolver* resolver)
             exit(1);
     }
 
-    // return curr_stmt;
     resolver->stmts = curr_stmt;
 }
 
