@@ -70,6 +70,23 @@ int main(int argc, char** argv)
 
     resolver_resolve_stmt(&resolver);
 
+    arr_len = arrlen(resolver.errs);
+    for (int i = 0; i < arr_len; ++i)
+    {
+        CompileError t = *(resolver.errs[i]);
+
+        fprintf(
+            stderr,
+            "[%d:%d:%d]: %s\n",
+            t.line  ,
+            t.column,
+            t.length,
+            t.msg   
+        );
+    }
+    if (arr_len > 0)
+        exit(1);
+
     arena_print_memory_usage(&resolver.arena);
 
     FILE* file = stdout;

@@ -32,3 +32,5 @@ do
 
 	i = i + 1
 end
+
+fn duble(boolean : Bool, fun : Real -> z); return fun

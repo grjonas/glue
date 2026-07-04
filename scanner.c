@@ -557,6 +557,16 @@ void scanner_scan_tokens(Scanner* scanner)
         }
         scanner_add_token(scanner, token);
     }
+
+    for (int i = 0; i < arrlen(scanner->token_list); ++i)
+    {
+        Token t = scanner->token_list[i];
+        if (t.type == TOKEN_COMMENT)
+        {
+            arrdel(scanner->token_list, i);
+            i--;
+        }
+    }
 }
 
 Token scanner_scan_string(Scanner* scanner)
@@ -717,7 +727,8 @@ bool is_identifier_middle(char c)
 
 bool is_identifier_end(char c)
 {
-    if (is_alpha(c) || c == '_' || c == '?')
+    // if (is_alpha(c) || c == '_' || c == '?')
+    if (is_alpha(c) || c == '_')
         return true;
     return false;
 }

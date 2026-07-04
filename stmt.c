@@ -174,10 +174,10 @@ Stmt* parser_parse_stmt_block(Parser* parser)
 
         while ((stmt_ptr = parser_parse_stmt(parser)) != NULL)
         {
-            printf("[%s:%d] Stmt\n", __FILE__, __LINE__);
+            //printf("[%s:%d] Stmt\n", __FILE__, __LINE__);
             arrput(stmts, stmt_ptr);
         }
-        printf("\n");
+        //printf("\n");
 
         if (stmts != NULL)
         {

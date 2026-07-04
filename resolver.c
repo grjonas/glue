@@ -681,7 +681,7 @@ char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
     for (int i = 0; i < len; ++i)
     {
         char* id = resolver->identifiers[i];
-        if (memcmp(id, identifier, id_len) == 0)
+        if (strlen(id) == id_len && memcmp(id, identifier, id_len) == 0)
         {
             return id;
         }
