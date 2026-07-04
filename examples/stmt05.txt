@@ -5,7 +5,7 @@ do
 	let i : Int = 1
 	
 	let a : Int = 0
-	let b : Int = 1
+	let b = 1
 	let c : Int
 	
 	while i < n
@@ -19,8 +19,10 @@ do
 	return c
 end
 
-let i : Int = 0
+let i
 let n : Int = 0
+
+i = 0
 
 while true
 do

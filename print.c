@@ -80,11 +80,11 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
             decl       = show_stmt->stmt.let.decl      ;
             expr       = show_stmt->stmt.let.expr      ;
 
-            fprintf(file, " %s : ", identifier);
-            type_expr_print(file, type_expr);
-            fprintf(file, " <");
+            fprintf(file, " %s", identifier);
             decl_print(file, decl);
-            fprintf(file, "> = ");
+            fprintf(file, " : ");
+            type_expr_print(file, type_expr);
+            fprintf(file, " = ");
             expr_print     (file, expr     );
             fprintf(file, "\n");
             break;
@@ -128,16 +128,17 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
         case STMT_FN      :
             stmt_fn = show_stmt->stmt.fn;
 
-            fprintf(file, " %s(", stmt_fn.identifier);
+            fprintf(file, " %s", stmt_fn.identifier);
+            decl_print(file, stmt_fn.decl);
+            fprintf(file, "(");
 
             for (int i = 0; i < stmt_fn.argc; ++i)
             {
                 StmtFnArg* arg = stmt_fn.argv[i];
-                fprintf(file, "%s : ", arg->identifier);
-                type_expr_print(file, arg->type);
-                fprintf(file, " <");
+                fprintf(file, "%s", arg->identifier);
                 decl_print(file, arg->decl);
-                fprintf(file, ">");
+                fprintf(file, " : ");
+                type_expr_print(file, arg->type);
 
                 if (i + 1 < stmt_fn.argc)
                 {
@@ -147,9 +148,7 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
 
             fprintf(file, ") : ");
             type_expr_print(file, stmt_fn.return_type);
-            fprintf(file, " <");
-            decl_print(file, stmt_fn.decl);
-            fprintf(file, ">\n");
+            fprintf(file, "\n");
             stmt_print_inner(file, stmt_fn.body, depth + 1);
 
             break;
@@ -197,7 +196,7 @@ const char* expr_primary_kind_name(ExprPrimaryKind primary)
         case EXPR_PRIMARY_DECL      : return "EP_DECL";
     }
 
-    return "UNKNOWN";
+    return "[EXPR_PRIMARY]";
 }
 
 const char* expr_unary_kind_name(ExprUnaryKind unary)
@@ -209,7 +208,7 @@ const char* expr_unary_kind_name(ExprUnaryKind unary)
         case EXPR_UNARY_NEGATE : return "EU_NEGATE";
     }
 
-    return "UNKNOWN";
+    return "[EXPR_UNARY]";
 }
 
 const char* expr_binary_kind_name(ExprBinaryKind binary)
@@ -237,7 +236,82 @@ const char* expr_binary_kind_name(ExprBinaryKind binary)
         case EXPR_BINARY_INDEX        : return "EB_INDEX";
     }
 
-    return "UNKNOWN";
+    return "[EXPR_BINARY]";
+}
+
+void expr_primary_print(FILE* file, ExprPrimary primary)
+{
+    switch (primary.kind)
+    {
+        case EXPR_PRIMARY_UNKNOWN   :
+            fprintf(file, "[EP_UNKNOWN]");
+            break; // not return
+
+        case EXPR_PRIMARY_NIL       :
+            fprintf(file, "nil");
+            return;
+
+        case EXPR_PRIMARY_BOOLEAN   :
+            fprintf(file, primary.primary.boolean ? "true" : "false");
+            return;
+
+        case EXPR_PRIMARY_STRING    :
+            fprintf(file, "\"%s\"", primary.primary.string);
+            return;
+
+        case EXPR_PRIMARY_NATURAL   :
+            fprintf(file, "%s", primary.primary.natural);
+            return;
+
+        case EXPR_PRIMARY_INTEGER   :
+            fprintf(file, "%s", primary.primary.integer);
+            return;
+
+        case EXPR_PRIMARY_REAL      :
+            fprintf(file, "%s", primary.primary.real);
+            return;
+
+        case EXPR_PRIMARY_STRUCT    :
+            fprintf(file, "{ ");
+            for (int i = 0; i < primary.primary.structt.argc; ++i)
+            {
+                ExprPrimaryStructField* field = primary.primary.structt.argv[i];
+
+                fprintf(file, "%s", field->key);
+                if (field->type != NULL)
+                {
+                    fprintf(file, " : ");
+                    type_expr_print(file, field->type);
+                }
+                if (field->value != NULL)
+                {
+                    fprintf(file, " = ");
+                    expr_print(file, field->value);
+                }
+
+
+                if (i + 1 < primary.primary.structt.argc)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, " }");
+            return;
+
+        case EXPR_PRIMARY_FN        :
+            fprintf(file, "[EXPR_PRIMARY_FN]");
+            return;
+
+        case EXPR_PRIMARY_IDENTIFIER:
+            fprintf(file, "%s", primary.primary.identifier);
+            return;
+
+        case EXPR_PRIMARY_DECL      :
+            decl_print(file, primary.primary.decl);
+            return;
+    }
+
+    fprintf(file, "[EXPR_PRIMARY]");
 }
 
 void expr_print(FILE* file, Expr* expr)
@@ -253,7 +327,7 @@ void expr_print(FILE* file, Expr* expr)
     switch (expr->kind)
     {
         case EXPR_PRIMARY:
-            fprintf(file, "[EXPR_PRIMARY]");
+            expr_primary_print(file, expr->expr.primary);
             break;
 
         case EXPR_UNARY  :
@@ -264,16 +338,14 @@ void expr_print(FILE* file, Expr* expr)
 
         case EXPR_BINARY :
             fprintf(file, "( %s ", expr_binary_kind_name(expr->expr.binary.kind));
-            expr_print(file, expr->expr.binary.right);
-            fprintf(file, " ");
             expr_print(file, expr->expr.binary.left);
+            fprintf(file, " ");
+            expr_print(file, expr->expr.binary.right);
             fprintf(file, ")");
             break;
 
         case EXPR_FN     :
-            fprintf(file, "(");
             expr_print(file, expr->expr.fn.caller);
-            fprintf(file, ")");
             fprintf(file, "(");
 
             for (int i = 0; i < expr->expr.fn.argc; ++i)
@@ -293,15 +365,178 @@ void expr_print(FILE* file, Expr* expr)
 
 void type_expr_print(FILE* file, TypeExpr* type_expr)
 {
-    fprintf(file, "[TYPE_EXPR]");
-}
+    if (type_expr == NULL)
+    {
+        fprintf(file, "[TE_NULL]");
+        return;
+    }
 
-void decl_print(FILE* file, Decl* decl)
-{
-    fprintf(file, "[DECL]");
+    switch (type_expr->kind)
+    {
+        case TYPE_EXPR_IDENTIFIER:
+            fprintf(file, "%s", type_expr->type_expr.identifier.identifier);
+            return;
+
+        case TYPE_EXPR_NIL       :
+            fprintf(file, "Nil");
+            return;
+
+        case TYPE_EXPR_BOOL      :
+            fprintf(file, "Bool");
+            return;
+
+        case TYPE_EXPR_INT       :
+            fprintf(file, "Int");
+            return;
+
+        case TYPE_EXPR_REAL      :
+            fprintf(file, "Real");
+            return;
+
+        case TYPE_EXPR_STRING    :
+            fprintf(file, "String");
+            return;
+
+        case TYPE_EXPR_LIST      :
+            fprintf(file, "[");
+            type_expr_print(file, type_expr->type_expr.list.type);
+            fprintf(file, "]");
+            return;
+
+        case TYPE_EXPR_STRUCT    :
+            fprintf(file, "{ ");
+
+            for (int i = 0; i < type_expr->type_expr.structt.argc; ++i)
+            {
+                TypeExprStructField* field = type_expr->type_expr.structt.argv[i];
+                fprintf(file, "%s : ", field->key);
+                type_expr_print(file, field->value);
+                if (i + 1 < type_expr->type_expr.structt.argc)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+
+            fprintf(file, " }");
+            return;
+
+        case TYPE_EXPR_FN        :
+            return;
+
+        case TYPE_EXPR_INSTANCE  :
+            return;
+    }
+
+    fprintf(file, "[TYPE_EXPR]");
 }
 
 void type_print(FILE* file, Type* type)
 {
+    if (type == NULL)
+    {
+        fprintf(file, "[T_NULL]");
+        return;
+    }
+
+    switch (type->kind)
+    {
+        case TYPE_NIL        :
+            fprintf(file, "Nil");
+            return;
+
+        case TYPE_BOOL       :
+            fprintf(file, "Bool");
+            return;
+
+        case TYPE_INT        :
+            fprintf(file, "Int");
+            return;
+
+        case TYPE_REAL       :
+            fprintf(file, "Real");
+            return;
+
+        case TYPE_STRING     :
+            fprintf(file, "String");
+            return;
+
+        case TYPE_LIST       :
+            fprintf(file, "[");
+            type_print(file, type->type.list.type);
+            fprintf(file, "]");
+            return;
+
+        case TYPE_STRUCT     :
+            fprintf(file, "[TYPE]");
+            return;
+
+        case TYPE_FN         :
+            fprintf(file, "[TYPE]");
+            return;
+
+        case TYPE_VARIABLE   :
+            fprintf(file, "[TYPE]");
+            return;
+
+        case TYPE_ALIAS      :
+            fprintf(file, "[TYPE]");
+            return;
+
+        case TYPE_POLYMORPHIC:
+            fprintf(file, "[TYPE]");
+            return;
+
+        case TYPE_MONOMORPHIC:
+            fprintf(file, "[TYPE]");
+            return;
+    }
+
     fprintf(file, "[TYPE]");
+}
+
+void decl_print(FILE* file, Decl* decl)
+{
+    fprintf(file, "<");
+
+    if (decl == NULL)
+    {
+        fprintf(file, "[NULL]");
+    }
+    else
+    {
+        switch (decl->kind)
+        {
+            case DECL_LET             :
+                fprintf(file, "let");
+                break;
+
+            case DECL_TYPE_VARIABLE   :
+                fprintf(file, "type_var");
+                break;
+
+            case DECL_ALIAS           :
+                fprintf(file, "alias");
+                break;
+
+            case DECL_TYPE            :
+                fprintf(file, "type");
+                break;
+
+            case DECL_TYPE_CONSTRUCTOR:
+                fprintf(file, "constructor");
+                break;
+
+            default:
+                fprintf(file, "[DECL]");
+        }
+
+        fprintf(file, ": %s", decl->identifier == NULL? "[NULL]" : decl->identifier);
+        if (decl->type != NULL)
+        {
+            fprintf(file, " : ");
+            type_print(file, decl->type);
+        }
+    }
+
+    fprintf(file, ">");
 }
