@@ -507,12 +507,12 @@ void type_print(FILE* file, Type* type)
             fprintf(file, "[TYPE_ALIAS]");
             return;
 
-        case TYPE_POLYMORPHIC:
-            fprintf(file, "[TYPE_POLYMORPHIC]");
+        case TYPE_ABSTRACTION:
+            fprintf(file, "[TYPE_ABSTRACTION]");
             return;
 
-        case TYPE_MONOMORPHIC:
-            fprintf(file, "[TYPE_MONOMORPHIC]");
+        case TYPE_APPLICATION:
+            fprintf(file, "[TYPE_APPLICATION]");
             return;
     }
 

@@ -376,6 +376,55 @@ void resolver_resolve_stmt(Resolver* resolver)
     resolver->stmts = curr_stmt;
 }
 
+// TODO: expand this later to functions, once we implement them.
+void resolver_resolve_expr_primary(Resolver* resolver, Expr** expr)
+{
+    char * identifier = NULL;
+    Decl * decl       = NULL;
+    ExprPrimaryStruct expr_struct;
+
+    switch ((*expr)->expr.primary.kind)
+    {
+        case EXPR_PRIMARY_IDENTIFIER:
+            identifier = (*expr)->expr.primary.primary.identifier;
+
+            decl = resolver_get_decl_by_identifier(resolver, identifier);
+            if (decl == NULL)
+            {
+                expr = NULL;
+                return;
+            }
+            else if (decl->kind != DECL_LET)
+            {
+                resolver_throw_compiler_error(resolver, (CompileError)
+                {
+                    .kind   = ERROR_ERROR      ,
+                    .line   = (*expr)->line  ,
+                    .column = (*expr)->column,
+                    .length = (*expr)->length,
+                    .msg    = "Type resolution: Could not resolve expression identifier to variable declaration.",
+                });
+                expr = NULL;
+                return;
+            }
+
+            (*expr)->expr.primary.kind = EXPR_PRIMARY_DECL;
+            (*expr)->expr.primary.primary.decl = decl     ;
+            break;
+
+        case EXPR_PRIMARY_STRUCT:
+            expr_struct = (*expr)->expr.primary.primary.structt;
+            for (int i = 0; i < expr_struct.argc; ++i)
+            {
+                ExprPrimaryStructField f = *(expr_struct.argv[i]);
+                resolver_resolve_expr(resolver, &f.value);
+            }
+            break;
+
+        default:
+    }
+}
+
 // 1) If type != NULL, then we bind then the type of the expression is equal to type.
 // 2) Set variable to the most recent instance of identifier.
 // TODO: Once we begin implementing inference, update this code.
@@ -384,54 +433,10 @@ void resolver_resolve_expr(Resolver* resolver, Expr** expr)
     assert(expr  != NULL);
     assert(*expr != NULL);
 
-    char* identifier = NULL;
-    Decl* decl       = NULL;
-    ExprPrimaryStruct expr_struct;
-
     switch ((*expr)->kind)
     {
         case EXPR_PRIMARY:
-            // TODO: expand this later to functions, once we implement them.
-            switch ((*expr)->expr.primary.kind)
-            {
-                case EXPR_PRIMARY_IDENTIFIER:
-                    identifier = (*expr)->expr.primary.primary.identifier;
-
-                    decl = resolver_get_decl_by_identifier(resolver, identifier);
-                    if (decl == NULL)
-                    {
-                        expr = NULL;
-                        return;
-                    }
-                    else if (decl->kind != DECL_LET)
-                    {
-                        resolver_throw_compiler_error(resolver, (CompileError)
-                        {
-                            .kind   = ERROR_ERROR      ,
-                            .line   = (*expr)->line  ,
-                            .column = (*expr)->column,
-                            .length = (*expr)->length,
-                            .msg    = "Type resolution: Could not resolve expression identifier to variable declaration.",
-                        });
-                        expr = NULL;
-                        return;
-                    }
-
-                    (*expr)->expr.primary.kind = EXPR_PRIMARY_DECL;
-                    (*expr)->expr.primary.primary.decl = decl     ;
-                    break;
-
-                case EXPR_PRIMARY_STRUCT:
-                    expr_struct = (*expr)->expr.primary.primary.structt;
-                    for (int i = 0; i < expr_struct.argc; ++i)
-                    {
-                        ExprPrimaryStructField f = *(expr_struct.argv[i]);
-                        resolver_resolve_expr(resolver, &f.value);
-                    }
-                    break;
-
-                default:
-            }
+            resolver_resolve_expr_primary(resolver, expr);
             break;
 
         case EXPR_UNARY:
@@ -465,7 +470,7 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
 {
     Type   type;
     Type*  type_ptr;
-    Type** polymorphic_argv = NULL;
+    Type** application_argv = NULL;
     TypeExpr** type_expr_argv = NULL;
     TypeStructField** fields = NULL;
     char* identifier = NULL;
@@ -632,20 +637,20 @@ Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                 {
                     TypeExpr* te = type_expr_argv[i];
                     Type*     t  = resolver_resolve_type_expr(resolver, te);
-                    arrput(polymorphic_argv, t);
+                    arrput(application_argv, t);
                 }
-                Type** tmp_ptr = polymorphic_argv;
-                polymorphic_argv = (Type**) arena_push(&resolver->arena, polymorphic_argv, argc * sizeof(Type*));
+                Type** tmp_ptr = application_argv;
+                application_argv = (Type**) arena_push(&resolver->arena, application_argv, argc * sizeof(Type*));
                 arrfree(tmp_ptr);
 
                 type = (Type)
                 {
-                    .kind = TYPE_MONOMORPHIC,
-                    .type.monomorphic = (TypeMonomorphic)
+                    .kind = TYPE_APPLICATION,
+                    .type.application = (TypeApplication)
                     {
-                        .polymorphic = decl->type,
+                        .abstraction = decl->type,
                         .argc        = argc               ,
-                        .argv        = polymorphic_argv   ,
+                        .argv        = application_argv   ,
                     }
                 };
             }
@@ -891,9 +896,9 @@ Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
 
 int type_get_polymorphic_parameter_num(Type* type)
 {
-    assert(type->kind == TYPE_POLYMORPHIC);
+    assert(type->kind == TYPE_ABSTRACTION);
 
-    return type->type.polymorphic.parameter_num;
+    return type->type.abstraction.parameter_num;
 }
 
 void resolver_throw_compiler_error(Resolver* resolver, CompileError err)

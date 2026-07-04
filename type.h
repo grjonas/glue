@@ -107,8 +107,8 @@ typedef struct TypeStruct      TypeStruct     ;
 typedef struct TypeStructField TypeStructField;
 typedef struct TypeFn          TypeFn         ;
 typedef struct TypeAlias       TypeAlias      ;
-typedef struct TypePolymorphic TypePolymorphic;
-typedef struct TypeMonomorphic TypeMonomorphic;
+typedef struct TypeAbstraction TypeAbstraction;
+typedef struct TypeApplication TypeApplication;
 
 enum TypeKind
 {
@@ -127,8 +127,8 @@ enum TypeKind
     // Special types
     TYPE_VARIABLE   , // a type representing a yet unknown type.
     TYPE_ALIAS      , // a type representing an alias to an existing type.
-    TYPE_POLYMORPHIC, // a type representing a newly defined type.
-    TYPE_MONOMORPHIC, // an instantiated polymorphic type
+    TYPE_ABSTRACTION, // a type representing a newly defined type.
+    TYPE_APPLICATION, // application of abstraction
 };
 
 struct TypeVariable
@@ -164,7 +164,7 @@ struct TypeAlias
     Type* type;
 };
 
-struct TypePolymorphic
+struct TypeAbstraction
 {
     int    parameter_num  ;
     int    constructor_num;
@@ -172,9 +172,9 @@ struct TypePolymorphic
     Type** constructors   ; // All of kind TYPE_FN, where the rightmost node_ptr is equal of the 'TypeNewType' itself.
 };
 
-struct TypeMonomorphic
+struct TypeApplication
 {
-    Type*  polymorphic;
+    Type*  abstraction;
     int    argc;
     Type** argv;
 };
@@ -191,8 +191,8 @@ struct Type
         TypeStruct      structt    ;
         TypeFn          fn         ;
         TypeAlias       alias      ;
-        TypePolymorphic polymorphic;
-        TypeMonomorphic monomorphic;
+        TypeAbstraction abstraction;
+        TypeApplication application;
     }
     type;
 };
