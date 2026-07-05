@@ -2,6 +2,7 @@
 #include "scanner.h"
 #include "parser.h"
 #include "stmt.h"
+#include "type_expr.h"
 #include "type.h"
 #include "expr.h"
 #include "resolver.h"

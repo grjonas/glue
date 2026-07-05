@@ -54,15 +54,7 @@ void    inferer_free(Inferer* inferer  )
     };
 }
 
-/*
-    fn decide(c @1, a @2, b @3) @4
-        if c; return a else return b
-
-    fn add(a @5, b @6) @7; return a + b
-
-    let c @7 = decide(add(1,2) == 3, true, false)
-
-    fn hello(s)
-        return "Hello, " ++ s ++ "!"
-
- */
+void inferer_infer_expr(Inferer* infer, Expr** expr_ptr)
+{
+    assert(expr_ptr != NULL);
+}

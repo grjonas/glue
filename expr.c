@@ -156,7 +156,6 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
             {
                 // TODO: Fix txt position information.
                 .kind        = EXPR_BINARY ,
-                .type        = NULL        ,
                 .line        = token.line  ,
                 .column      = token.column,
                 .length      = token.length,
@@ -214,7 +213,6 @@ Expr* parser_parse_expr_prefix(Parser* parser)
     lhs = (Expr)
     {
         .kind   = EXPR_UNARY  ,
-        .type   = NULL        ,
         .line   = token.line  ,
         .column = token.column,
         .length = token.length,
@@ -352,7 +350,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
     expr = (Expr)
     {
         .kind         = EXPR_PRIMARY,
-        .type         = NULL        ,
         .line         = token.line  ,
         .column       = token.column,
         .length       = token.length,
@@ -459,7 +456,6 @@ Expr* parser_parse_expr_struct(Parser* parser)
     expr = (Expr)
     {
         .kind   = EXPR_PRIMARY,
-        .type   = NULL        ,
         .line   = -1          ,
         .column = -1          ,
         .length = -1          ,
@@ -553,7 +549,6 @@ Expr* parser_parse_expr_index(Parser* parser)
     {
         // TODO: Fix txt position information.
         .kind        = EXPR_BINARY ,
-        .type        = NULL        ,
         .line        = token.line  ,
         .column      = token.column,
         .length      = token.length,
@@ -652,7 +647,6 @@ Expr* parser_parse_expr_fn(Parser* parser)
     {
         // TODO: Fix txt position information.
         .kind        = EXPR_FN     ,
-        .type        = NULL        ,
         .line        = token.line  ,
         .column      = token.column,
         .length      = token.length,

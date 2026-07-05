@@ -22,7 +22,6 @@ typedef struct StmtAlias    StmtAlias   ;
 // Stmt
 enum StmtKind
 {
-    STMT_ERR              ,
     STMT_BLOCK            ,
     STMT_LET              ,
     STMT_EXPR             ,

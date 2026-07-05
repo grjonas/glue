@@ -2,7 +2,7 @@
 #define EXPR_H
 
 #include "parser.h"
-#include "type.h"
+#include "type_expr.h"
 #include "decl.h"
 
 typedef struct Expr            Expr           ;
@@ -133,7 +133,6 @@ struct ExprFn
 struct Expr
 {
     ExprKind kind;
-    Type*    type;
     int line  ;
     int column;
     int length;

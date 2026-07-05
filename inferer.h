@@ -3,6 +3,7 @@
 
 #include "resolver.h"
 
+// TODO: Don't forget to refactor inferer init and free after changing resolver.
 typedef struct Inferer Inferer;
 
 struct Inferer

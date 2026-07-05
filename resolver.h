@@ -45,27 +45,23 @@ struct Snapshot
 Resolver resolver_init(Parser* parser, Stmt* stmt);
 void resolver_free(Resolver* resolver);
 
-void resolver_resolve_stmt(Resolver* resolver);
-void resolver_resolve_expr(Resolver* resolver, Expr** expr);
+// 'true' indicates success, 'false' indicates failure.
+bool resolver_resolve_stmt     (Resolver* resolver);
+bool resolver_resolve_expr     (Resolver* resolver, Expr* expr);
+bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
 
-Type* resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
-
-Snapshot  resolver_get_context_snapshot(Resolver* resolver);
-void resolver_restore_context_snapshot(Resolver* resolver, Snapshot snapshot);
+Snapshot resolver_get_context_snapshot    (Resolver* resolver);
+void     resolver_restore_context_snapshot(Resolver* resolver, Snapshot snapshot);
 
 void resolver_push_decl_to_context(Resolver* resolver, Decl* decl);
 
-Type* resolver_resolve_stmt_fn_type(Resolver* resolver, StmtFn fn);
-Type* resolver_create_type_variable(Resolver* resolver);
-
-Decl* resolver_declare_let(Resolver* resolver, char* identifier, Type* type);
+Decl* resolver_declare_variable(Resolver* resolver, char* identifier);
 Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier);
 Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier);
-void resolver_declare_fn_params(Resolver* resolver, StmtFn fn, Type* fn_type);
-void decl_set_type(Decl* decl, Type* type);
-
-int   type_get_polymorphic_parameter_num(Type* type);
 
 void resolver_throw_compiler_error(Resolver* resolver, CompileError err);
 
+// resolver_declare_type_variable
+// resolver_resolve_stmt_fn_type
+// resolver_declare_fn_params
 #endif

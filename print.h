@@ -3,6 +3,7 @@
 
 #include "stmt.h"
 #include "expr.h"
+#include "type_expr.h"
 #include "type.h"
 #include "decl.h"
 

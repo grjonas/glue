@@ -1,0 +1,6 @@
+fn t(f : x -> y, a : x) : y
+do
+	# return f(a)
+end
+
+let hyllo : y -> x
