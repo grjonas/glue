@@ -74,7 +74,7 @@ Stmt* parser_parse_stmt(Parser* parser)
             return parser_parse_stmt_let(parser);
 
         case TOKEN_IF:
-            return parser_parse_stmt_if(parser);
+            return parser_parse_stmt_if(parser, TOKEN_IF);
 
         case TOKEN_WHILE:
             return parser_parse_stmt_while(parser);
@@ -297,22 +297,22 @@ Stmt* parser_parse_stmt_let(Parser* parser)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_if(Parser* parser)
+Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
 {
+    assert(type == TOKEN_IF || type == TOKEN_ELIF || type == TOKEN_ELSE);
+
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
 
     Expr* condition = NULL;
     Stmt* body      = NULL;
+    Stmt* next      = NULL;
 
     Token token;
 
-    token = parser_next(parser);
-    if (token.type != TOKEN_IF)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
-        exit(1);
-    }
+    token = parser_peek(parser);
+    if (!parser_expect_token(parser, type))
+        return NULL;
 
     stmt = (Stmt)
     {
@@ -329,20 +329,23 @@ Stmt* parser_parse_stmt_if(Parser* parser)
         }
     };
 
-    condition = parser_parse_expr(parser);
-    if (condition == NULL)
+    if (type != TOKEN_ELSE)
     {
-        parser_throw_compiler_error(parser, (CompileError)
+        condition = parser_parse_expr(parser);
+        if (condition == NULL)
         {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Could not find expression while parsing if statement condition.",
-        });
-        return NULL;
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Could not find expression while parsing if statement condition.",
+            });
+            return NULL;
+        }
+        stmt.stmt.iff.condition = condition;
     }
-    stmt.stmt.iff.condition = condition;
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
@@ -358,6 +361,30 @@ Stmt* parser_parse_stmt_if(Parser* parser)
         return NULL;
     }
     stmt.stmt.iff.body = body;
+
+    if (type != TOKEN_ELSE)
+    {
+        parser_skip(parser, is_newline);
+        token = parser_peek(parser);
+        if (token.type == TOKEN_ELIF)
+        {
+            next = parser_parse_stmt_if(parser, TOKEN_ELIF);
+            if (next == NULL)
+            {
+                return NULL;
+            }
+        }
+        else if (token.type == TOKEN_ELSE)
+        {
+            next = parser_parse_stmt_if(parser, TOKEN_ELSE);
+            if (next == NULL)
+            {
+                return NULL;
+            }
+        }
+    }
+    stmt.stmt.iff.next = next;
+
 
     // TODO: Implement else branch parsing
     stmt_ptr  = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
@@ -853,8 +880,204 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
+StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
+{
+    StmtTypeConstructor constructor;
+
+    char*      identifier = NULL;
+    int        type_num   = 0   ;
+    TypeExpr** types      = NULL;
+
+    TypeExpr*  type       = NULL;
+
+    Token token;
+
+    if (!parser_expect_token(parser, TOKEN_TYPE))
+        return NULL;
+
+    identifier = parser_parse_identifier(parser);
+    if (identifier == NULL)
+    {
+        return NULL;
+    }
+
+    if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
+        return NULL;
+
+    if (token.type != TOKEN_RIGHT_PAREN)
+    {
+        do
+        {
+            type = parser_parse_type_expr(parser);
+            if (type == NULL)
+            {
+                return NULL;
+            }
+            arrput(types, type);
+
+            token = parser_next(parser);
+            if (token.type == TOKEN_RIGHT_PAREN)
+            {
+                break;
+            }
+            else if (token.type == TOKEN_COMMA)
+            {
+                continue;
+            }
+            else
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Statement parsing: Unexpected token encountered",
+                });
+                return NULL;
+            }
+        }
+        while (true);
+    }
+
+    type_num = arrlen(types);
+    TypeExpr** tmp_ptr = types;
+    types = (TypeExpr**) arena_push(&parser->arena, types, type_num * sizeof(TypeExpr*));
+    arrfree(tmp_ptr);
+
+    constructor = (StmtTypeConstructor)
+    {
+        .identifier = identifier,
+        .type_num   = type_num  ,
+        .types      = types     ,
+    };
+
+    return (StmtTypeConstructor*) arena_push(&parser->arena, &constructor, sizeof(StmtTypeConstructor));
+}
+
 Stmt* parser_parse_stmt_type(Parser* parser)
 {
-    fprintf(stderr, "[%s:%d] Statement parsing: Unexpected token encountered.\n", __FILE__, __LINE__);
-    exit(1);
+    Stmt stmt;
+
+    char               *  identifier      = NULL;
+    int                   argc            = 0   ;
+    int                   constructor_num = 0   ;
+    char               ** argv            = NULL;
+    StmtTypeConstructor** constructors    = NULL;
+
+    char               *  arg             = NULL;
+    StmtTypeConstructor*  constructor     = NULL;
+
+    if (!parser_expect_token(parser, TOKEN_TYPE))
+        return NULL;
+
+    identifier = parser_parse_identifier(parser);
+    if (identifier == NULL)
+    {
+        return NULL;
+    }
+
+    if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
+        return NULL;
+
+    // parse argument list
+    Token token = parser_peek(parser);
+    if (token.type != TOKEN_RIGHT_PAREN)
+    {
+        do
+        {
+            arg = parser_parse_identifier(parser);
+            if (arg == NULL)
+            {
+                return NULL;
+            }
+            arrput(argv, arg);
+
+            token = parser_next(parser);
+            if (token.type == TOKEN_RIGHT_PAREN)
+            {
+                break;
+            }
+            else if (token.type == TOKEN_COMMA)
+            {
+                continue;
+            }
+            else
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Statement parsing: Unexpected token encountered",
+                });
+                return NULL;
+            }
+        }
+        while (true);
+    }
+
+    argc = arrlen(argv);
+    char** tmp_ids = argv;
+    argv = (char**) arena_push(&parser->arena, argv, argc * sizeof(char*));
+    arrfree(tmp_ids);
+
+    // parse contructors
+    do
+    {
+        token = parser_peek(parser);
+
+        if (token.type == TOKEN_PIPE)
+        {
+            constructor = parser_parse_stmt_type_constructor(parser);
+            if (constructor == NULL)
+            {
+                return NULL;
+            }
+            arrput(constructors, constructor);
+        }
+        else if (token.type == TOKEN_END)
+        {
+            parser_next(parser);
+            break;
+        }
+        else
+        {
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Statement parsing: Failed to parse type in 'alias' statement.",
+            });
+            return NULL;
+        }
+
+    }
+    while (true);
+
+    constructor_num = arrlen(constructors);
+    StmtTypeConstructor** tmp_ptr  = constructors;
+    constructors = (StmtTypeConstructor**) arena_push(&parser->arena, constructors, constructor_num * sizeof(StmtTypeConstructor*));
+    arrfree(tmp_ptr);
+
+    stmt = (Stmt)
+    {
+        .kind = STMT_TYPE,
+        .line   = -1,
+        .column = -1,
+        .length = -1,
+        .stmt.type = (StmtType)
+        {
+            .identifier      = identifier     ,
+            .argv            = argv           ,
+            .constructors    = constructors    ,
+            .argc            = argc           ,
+            .constructor_num = constructor_num,
+        }
+    };
+
+    return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }

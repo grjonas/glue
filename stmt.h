@@ -6,18 +6,20 @@
 #include "expr.h"
 #include "decl.h"
 
-typedef struct Stmt         Stmt        ;
+typedef struct Stmt                Stmt               ;
 
-typedef enum   StmtKind     StmtKind    ;
-typedef struct StmtBlock    StmtBlock   ;
-typedef struct StmtLet      StmtLet     ;
-typedef struct StmtIf       StmtIf      ;
-typedef struct StmtElif     StmtElif    ;
-typedef struct StmtWhile    StmtWhile   ;
-typedef struct StmtFnArg    StmtFnArg   ;
-typedef struct StmtFn       StmtFn      ;
-typedef struct StmtReturn   StmtReturn  ;
-typedef struct StmtAlias    StmtAlias   ;
+typedef enum   StmtKind            StmtKind           ;
+typedef struct StmtBlock           StmtBlock          ;
+typedef struct StmtLet             StmtLet            ;
+typedef struct StmtIf              StmtIf             ;
+typedef struct StmtElif            StmtElif           ;
+typedef struct StmtWhile           StmtWhile          ;
+typedef struct StmtFnArg           StmtFnArg          ;
+typedef struct StmtFn              StmtFn             ;
+typedef struct StmtReturn          StmtReturn         ;
+typedef struct StmtAlias           StmtAlias          ;
+typedef struct StmtType            StmtType           ;
+typedef struct StmtTypeConstructor StmtTypeConstructor;
 
 // Stmt
 enum StmtKind
@@ -32,6 +34,7 @@ enum StmtKind
     STMT_FN               ,
     STMT_RETURN           ,
     STMT_ALIAS            ,
+    STMT_TYPE             ,
 };
 
 struct StmtBlock
@@ -92,6 +95,22 @@ struct StmtAlias
     TypeExpr* type      ;
 };
 
+struct StmtTypeConstructor
+{
+    char* identifier;
+    TypeExpr** types;
+    int type_num;
+};
+
+struct StmtType
+{
+    char               *  identifier     ;
+    char               ** argv           ;
+    StmtTypeConstructor** constructors   ;
+    int                   argc           ;
+    int                   constructor_num;
+};
+
 // Tagged Union
 struct Stmt
 {
@@ -111,26 +130,29 @@ struct Stmt
         StmtFn     fn     ;
         StmtReturn returnn;
         StmtAlias  alias  ;
+        StmtType   type   ;
         void*      none   ; // For statements that are just singular tokens such as 'break' or 'continue'.
     }
     stmt;
 };
 
 // Stmt
-Stmt     * parser_parse_stmts        (Parser* parser);
+Stmt               * parser_parse_stmts                (Parser* parser);
 
-Stmt     * parser_parse_stmt         (Parser* parser);
+Stmt               * parser_parse_stmt                 (Parser* parser);
 
-Stmt     * parser_parse_stmt_block   (Parser* parser);
-Stmt     * parser_parse_stmt_let     (Parser* parser);
-Stmt     * parser_parse_stmt_if      (Parser* parser);
-Stmt     * parser_parse_stmt_while   (Parser* parser);
-Stmt     * parser_parse_stmt_fn      (Parser* parser);
-StmtFnArg* parser_parse_stmt_fn_arg  (Parser* parser);
-Stmt     * parser_parse_stmt_expr    (Parser* parser);
-Stmt     * parser_parse_stmt_break   (Parser* parser);
-Stmt     * parser_parse_stmt_continue(Parser* parser);
-Stmt     * parser_parse_stmt_return  (Parser* parser);
-Stmt     * parser_parse_stmt_alias   (Parser* parser);
+Stmt               * parser_parse_stmt_block           (Parser* parser);
+Stmt               * parser_parse_stmt_let             (Parser* parser);
+Stmt               * parser_parse_stmt_if              (Parser* parser, TokenType type);
+Stmt               * parser_parse_stmt_while           (Parser* parser);
+Stmt               * parser_parse_stmt_fn              (Parser* parser);
+StmtFnArg          * parser_parse_stmt_fn_arg          (Parser* parser);
+Stmt               * parser_parse_stmt_expr            (Parser* parser);
+Stmt               * parser_parse_stmt_break           (Parser* parser);
+Stmt               * parser_parse_stmt_continue        (Parser* parser);
+Stmt               * parser_parse_stmt_return          (Parser* parser);
+Stmt               * parser_parse_stmt_alias           (Parser* parser);
+StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser);
+Stmt               * parser_parse_stmt_type            (Parser* parser);
 
 #endif

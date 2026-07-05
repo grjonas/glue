@@ -54,7 +54,109 @@ void    inferer_free(Inferer* inferer  )
     };
 }
 
-void inferer_infer_expr(Inferer* infer, Expr** expr_ptr)
-{
-    assert(expr_ptr != NULL);
-}
+// Type* inferer_infer_expr(Inferer* infer, TypeEnv* env, Expr* expr)
+// {
+//     assert(expr != NULL);
+// 
+//     Type* type = NULL;
+// 
+//     switch (expr->kind)
+//     {
+//         case EXPR_PRIMARY:
+//             return inferer_infer_expr_primary(inferer, env, expr->expr.primary);
+//             break;
+// 
+//         case EXPR_UNARY  :
+//             break;
+// 
+//         case EXPR_BINARY :
+//             break;
+// 
+//         case EXPR_FN     :
+//             break;
+//     };
+// }
+// 
+// Type* inferer_infer_expr_primary(Inferer* inferer, TypeEnv* env, ExprPrimary primary)
+// {
+//     Type*   type   = NULL;
+//     Scheme* scheme = NULL;
+// 
+//     TypeStructField*  type_field  = NULL;
+//     TypeStructField** type_struct = NULL;
+// 
+//     switch (primary.kind)
+//     {
+//         case EXPR_PRIMARY_UNKNOWN   :
+//             fprintf(stderr, "[%s:%d] Type inference: Detected unknown primary expression during inference.\n", __FILE__, __LINE__);
+//             exit(1);
+// 
+//         case EXPR_PRIMARY_NIL       :
+//             type = inferer_get_type_nil(inferer);
+//             break;
+// 
+//         case EXPR_PRIMARY_BOOLEAN   :
+//             type = inferer_get_type_bool(inferer);
+//             break;
+// 
+//         case EXPR_PRIMARY_STRING    :
+//             type = inferer_get_type_string(inferer);
+//             break;
+// 
+//         case EXPR_PRIMARY_NATURAL   :
+//             type = inferer_get_type_natural(inferer);
+//             break;
+// 
+//         case EXPR_PRIMARY_INTEGER   :
+//             type = inferer_get_type_integer(inferer);
+//             break;
+// 
+//         case EXPR_PRIMARY_REAL      :
+//             type = inferer_get_type_real(inferer);
+//             break;
+// 
+//         case EXPR_PRIMARY_STRUCT    :
+//             // for (int i = 0; i < primary.primary.structt.argc; ++i)
+//             // {
+//             //     ExprPrimaryStructField* field = primary.primary.structt.argv[i];
+//             //     if (field.value != NULL)
+//             //     {
+//             //         type = inferer_infer_expr(inferer, env, field.value);
+//             //     }
+//             // }
+//             fprintf(stderr, "[%s:%d] Type inference: Not implemented.\n", __FILE__, __LINE__);
+//             exit(1);
+// 
+//         case EXPR_PRIMARY_FN        :
+//             fprintf(stderr, "[%s:%d] Type inference: Not implemented.\n", __FILE__, __LINE__);
+//             exit(1);
+// 
+//         case EXPR_PRIMARY_IDENTIFIER:
+//             fprintf(stderr, "[%s:%d] Type inference: Somehow found identifier expression.\n", __FILE__, __LINE__);
+//             exit(1);
+// 
+//         case EXPR_PRIMARY_DECL      :
+//             scheme = inferer_type_env_lookup(inferer, env, primary.primary.decl);
+//             if (scheme == NULL)
+//             {
+//                 assert("Error! Replace Later with throw error." == NULL);
+//                 return NULL;
+//             }
+//             type = inferer_scheme_instantiate(inferer, scheme);
+//             break;
+//     }
+// 
+//     return type;
+// }
+// 
+// Subst* inferer_unify(Inferer* inferer, Type* left, Type* right)
+// {
+//     assert(left  != NULL);
+//     assert(right != NULL);
+// 
+//     Subst* subst = NULL;
+// 
+//     switch (left->kind)
+//     {
+//     }
+// }

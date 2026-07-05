@@ -7,7 +7,8 @@ struct Type
 {
 };
 
-
+// typedef struct Type Type;
+// 
 // typedef struct Type            Type           ;
 // typedef enum   TypeKind        TypeKind       ;
 // 
@@ -69,11 +70,6 @@ struct Type
 //     Type* right;
 // };
 // 
-// // struct TypeAlias
-// // {
-// //     Type* type;
-// // };
-// 
 // struct TypeAbstraction
 // {
 //     int    parameter_num  ;
@@ -99,12 +95,15 @@ struct Type
 //         TypeList        list       ;
 //         TypeStruct      structt    ;
 //         TypeFn          fn         ;
-//         // TypeAlias       alias      ;
 //         TypeAbstraction abstraction;
 //         TypeApplication application;
 //     }
 //     type;
 // };
 // 
+// struct Scheme
+// {
+//     int argc;
+// };
 
 #endif

@@ -16,8 +16,9 @@ typedef enum   ExprPrimaryKind ExprPrimaryKind;
 typedef enum   ExprUnaryKind   ExprUnaryKind  ;
 typedef enum   ExprBinaryKind  ExprBinaryKind ;
 
+typedef struct ExprPrimaryList        ExprPrimaryList       ;
 typedef struct ExprPrimaryStructField ExprPrimaryStructField;
-typedef struct ExprPrimaryStruct      ExprPrimaryStruct;
+typedef struct ExprPrimaryStruct      ExprPrimaryStruct     ;
 // typedef enum   ExprFnKind      ExprFnKind     ;
 enum ExprKind
 {
@@ -36,6 +37,7 @@ enum ExprPrimaryKind
     EXPR_PRIMARY_NATURAL   ,
     EXPR_PRIMARY_INTEGER   ,
     EXPR_PRIMARY_REAL      ,
+    EXPR_PRIMARY_LIST      ,
     EXPR_PRIMARY_STRUCT    ,
     EXPR_PRIMARY_FN        ,
     EXPR_PRIMARY_IDENTIFIER,
@@ -84,6 +86,12 @@ struct ExprPrimaryStructField
     Expr    * value;
 };
 
+struct ExprPrimaryList
+{
+    int    length;
+    Expr** list;
+};
+
 struct ExprPrimaryStruct
 {
     int argc;
@@ -103,9 +111,10 @@ struct ExprPrimary
         char* natural            ; // These will have to be changed later i think.
         char* integer            ; // These will have to be changed later i think.
         char* real               ; // These will have to be changed later i think.
+        ExprPrimaryList   list   ;
         ExprPrimaryStruct structt;
         char* obj                ; // Some kind of other object.
-        Decl* decl;
+        Decl* decl               ;
     }
     primary;
 };
@@ -161,6 +170,7 @@ Expr* parser_parse_expr_parens (Parser* parser);
 Expr* parser_parse_expr_prefix (Parser* parser);
 Expr* parser_parse_expr_index  (Parser* parser);
 Expr* parser_parse_expr_fn     (Parser* parser);
+Expr* parser_parse_expr_list   (Parser* parser);
 Expr* parser_parse_expr_struct (Parser* parser);
 
 ExprUnaryKind  get_prefix_operator(TokenType type, int* right_bp               );

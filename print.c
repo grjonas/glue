@@ -23,6 +23,7 @@ const char* stmt_kind_name(StmtKind kind)
         case STMT_FN:                return "fn";
         case STMT_RETURN:            return "return";
         case STMT_ALIAS:             return "alias";
+        case STMT_TYPE:              return "type";
     }
 
     return "UNKNOWN";
@@ -45,9 +46,15 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
     TypeExpr* type_expr  = NULL;
     Decl    * decl       = NULL;
     Stmt    * stmt       = NULL;
+    Stmt    * next       = NULL;
     int       block_size = 0   ;
     Stmt   ** block      = NULL;
     StmtFn    stmt_fn;
+
+    char   ** argv       = NULL;
+    int       argc       = 0   ;
+    StmtTypeConstructor** constructors = NULL;
+    int constructor_num                = 0   ;
 
     stmt_print_indent(file, indent * depth);
     fprintf(file, "%s", stmt_kind_name(show_stmt->kind));
@@ -95,11 +102,16 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
         case STMT_IF      :
             expr = show_stmt->stmt.iff.condition;
             stmt = show_stmt->stmt.iff.body;
+            next = show_stmt->stmt.iff.next;
 
             fprintf(file, " ");
             expr_print     (file, expr     );
             fprintf(file, "\n");
             stmt_print_inner(file, stmt, depth + 1);
+            if (next != NULL)
+            {
+                stmt_print_inner(file, next, depth);
+            }
             break;
 
         case STMT_WHILE   :
@@ -165,6 +177,26 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
 
             fprintf(file, " %s ", identifier);
             type_expr_print(file, type_expr);
+            fprintf(file, "\n");
+            break;
+
+        case STMT_TYPE:
+            identifier      = show_stmt->stmt.type.identifier     ;
+            argv            = show_stmt->stmt.type.argv           ;
+            constructors    = show_stmt->stmt.type.constructors   ;
+            argc            = show_stmt->stmt.type.argc           ;
+            constructor_num = show_stmt->stmt.type.constructor_num;
+
+            fprintf(file, "type %s(", identifier);
+            for (int i = 0; i < argc; ++i)
+            {
+                fprintf(file, "%s", argv[i]);
+                if (i + 1 < argc)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, ")\n");
             break;
     }
 }
@@ -185,6 +217,7 @@ const char* expr_primary_kind_name(ExprPrimaryKind primary)
         case EXPR_PRIMARY_NATURAL   : return "EP_NATURAL";
         case EXPR_PRIMARY_INTEGER   : return "EP_INTEGER";
         case EXPR_PRIMARY_REAL      : return "EP_REAL";
+        case EXPR_PRIMARY_LIST      : return "EP_LIST";
         case EXPR_PRIMARY_STRUCT    : return "EP_STRUCT";
         case EXPR_PRIMARY_FN        : return "EP_FN";
         case EXPR_PRIMARY_IDENTIFIER: return "EP_IDENTIFIER";
@@ -264,6 +297,21 @@ void expr_primary_print(FILE* file, ExprPrimary primary)
 
         case EXPR_PRIMARY_REAL      :
             fprintf(file, "%s", primary.primary.real);
+            return;
+
+        case EXPR_PRIMARY_LIST      :
+            fprintf(file, "[ ");
+            for (int i = 0; i < primary.primary.list.length; ++i)
+            {
+                Expr* e = primary.primary.list.list[i];
+
+                expr_print(file, e);
+                if (i + 1 < primary.primary.list.length)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, " ]");
             return;
 
         case EXPR_PRIMARY_STRUCT    :

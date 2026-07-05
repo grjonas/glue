@@ -57,6 +57,7 @@ void resolver_push_decl_to_context(Resolver* resolver, Decl* decl);
 
 Decl* resolver_declare_variable(Resolver* resolver, char* identifier);
 Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier);
+Decl* resolver_declare_alias(Resolver* resolver, char* identifier);
 Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier);
 
 void resolver_throw_compiler_error(Resolver* resolver, CompileError err);

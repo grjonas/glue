@@ -324,27 +324,18 @@ Expr* parser_parse_expr_primary(Parser* parser)
             break;
 
         case TOKEN_LEFT_PAREN:
-            expr_ptr = parser_parse_expr_parens(parser);
-            if (expr_ptr == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Expression parsing: Could not parse expression inside parentheses.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            return expr_ptr;
+            return parser_parse_expr_parens(parser);
 
         case TOKEN_LEFT_BRACE:
-            expr_ptr = parser_parse_expr_struct(parser);
-            if (expr_ptr == NULL)
-            {
-                fprintf(stderr, "[%s:%d] Expression parsing: Could not parse struct.\n", __FILE__, __LINE__);
-                exit(1);
-            }
-            return expr_ptr;
+            return parser_parse_expr_struct(parser);
+
+        case TOKEN_LEFT_SQUARE:
+            return parser_parse_expr_list(parser);
 
         default:
-            // fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
-            // exit(1);
-            return NULL;
+            fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
+            exit(1);
+            // return NULL;
     }
 
     expr = (Expr)
@@ -358,6 +349,79 @@ Expr* parser_parse_expr_primary(Parser* parser)
 
     expr_ptr = arena_push(&parser->arena, &expr, sizeof(Expr));
     return expr_ptr;
+}
+
+Expr* parser_parse_expr_list(Parser* parser)
+{
+    Expr expr;
+
+    int length     = 0   ;
+    Expr** list    = NULL;
+    Expr*  element = NULL;
+
+    Token token;
+
+    if (!parser_expect_token(parser, TOKEN_LEFT_SQUARE))
+        return NULL;
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_RIGHT_SQUARE)
+    {
+        parser_next(parser);
+    }
+    else
+    {
+        while (true)
+        {
+            element = parser_parse_expr(parser);
+            if (element == NULL)
+            {
+                return NULL;
+            }
+
+            arrput(list, element);
+            token = parser_next(parser);
+            if (token.type == TOKEN_RIGHT_SQUARE)
+            {
+                break;
+            }
+            else if (token.type == TOKEN_COMMA)
+            {
+                continue;
+            }
+            else
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Expression parsing: Unexpected token encountered.",
+                });
+                return NULL;
+            }
+        }
+        length = arrlen(list);
+        Expr** tmp_ptr = list;
+        list = (Expr**) arena_push(&parser->arena, list, length * sizeof(Expr*));
+        arrfree(tmp_ptr);
+    }
+
+    expr = (Expr)
+    {
+        .kind   = EXPR_PRIMARY,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+        .expr.primary.primary.list = (ExprPrimaryList)
+        {
+            .length = length,
+            .list   = list  ,
+        }
+    };
+
+    return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
 }
 
 Expr* parser_parse_expr_struct(Parser* parser)

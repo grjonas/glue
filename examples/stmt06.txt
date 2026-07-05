@@ -4,3 +4,14 @@ do
 end
 
 let hyllo : y -> x
+
+alias Joe { x : Int, y: Int }
+
+let joe : Joe -> a
+
+if joe > 5
+	let x
+elif joe > 2
+	let x
+else
+	let x
