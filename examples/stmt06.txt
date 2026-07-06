@@ -24,3 +24,5 @@ end
 let a = 2
 
 let ls : [Int -> Joe] = [2, 3, 4]
+
+let hello = left(2)

@@ -427,34 +427,17 @@ bool resolver_resolve_stmt_type(Resolver* resolver)
     decl = resolver_declare_new_type(resolver, identifier);
     resolver_push_decl_to_context(resolver, decl);
 
-    snapshot = resolver_get_context_snapshot(resolver);
-    for (int i = 0; i < argc; ++i)
-    {
-        Decl* type_var = resolver_declare_type_variable(resolver, argv[i]);
-        resolver_push_decl_to_context(resolver, type_var);
-
-        arrput(type_vars,  type_var);
-    }
-
-    Decl** tmp_vars = type_vars;
-    type_vars = (Decl**) arena_push(&resolver->arena, type_vars, argc * sizeof(Decl*));
-    arrfree(tmp_vars);
-
+    // Declaration of type constructors - it is important that they are declared
+    // before taking the snapshot -
+    // otherwise they will only be valid withing scope of type declaration.
+    // Actual resolution of them is done later - after declaring variables
     for (int i = 0; i < constructor_num; ++i)
     {
         StmtTypeConstructor* stmt_type_constructor = constructors[i];
         Decl* type_constructor =
             resolver_declare_new_type_constructor
                 (resolver, stmt_type_constructor->identifier);
-
-
-        for (int j = 0; j < stmt_type_constructor->type_num; ++j)
-        {
-            if (!resolver_resolve_type_expr(resolver, stmt_type_constructor->types[j]))
-            {
-                return false;
-            }
-        }
+        resolver_push_decl_to_context(resolver, type_constructor);
 
         type_constructor->decl.constructor = (DeclTypeConstructor)
         {
@@ -468,6 +451,35 @@ bool resolver_resolve_stmt_type(Resolver* resolver)
     Decl** tmp_cons = type_constructors;
     type_constructors = (Decl**) arena_push(&resolver->arena, type_constructors, constructor_num * sizeof(Decl*));
     arrfree(tmp_cons);
+
+    snapshot = resolver_get_context_snapshot(resolver);
+
+    // Variable declaration - done after taking the snapshot,
+    // such that they are not valid outside the scope of the type statement.
+    for (int i = 0; i < argc; ++i)
+    {
+        Decl* type_var = resolver_declare_type_variable(resolver, argv[i]);
+        resolver_push_decl_to_context(resolver, type_var);
+
+        arrput(type_vars,  type_var);
+    }
+
+    Decl** tmp_vars = type_vars;
+    type_vars = (Decl**) arena_push(&resolver->arena, type_vars, argc * sizeof(Decl*));
+    arrfree(tmp_vars);
+
+    // Type constructor resolution
+    for (int i = 0; i < constructor_num; ++i)
+    {
+        StmtTypeConstructor* stmt_type_constructor = constructors[i];
+        for (int j = 0; j < stmt_type_constructor->type_num; ++j)
+        {
+            if (!resolver_resolve_type_expr(resolver, stmt_type_constructor->types[j]))
+            {
+                return false;
+            }
+        }
+    }
 
     resolver_restore_context_snapshot(resolver, snapshot);
 
@@ -538,7 +550,7 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
             {
                 return false;
             }
-            else if (decl->kind != DECL_VAR)
+            else if (decl->kind != DECL_VAR && decl->kind != DECL_TYPE_CONSTRUCTOR)
             {
                 resolver_throw_compiler_error(resolver, (CompileError)
                 {
