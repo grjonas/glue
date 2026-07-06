@@ -29,6 +29,32 @@ const char* stmt_kind_name(StmtKind kind)
     return "UNKNOWN";
 }
 
+void stmt_type_constructor_print(FILE* file, StmtTypeConstructor* constructor)
+{
+    assert(constructor != NULL);
+
+    char    *  identifier = NULL;
+    TypeExpr** types      = NULL;
+    int        type_num   = 0   ;
+
+    identifier = constructor->identifier;
+    types      = constructor->types     ;
+    type_num   = constructor->type_num  ;
+
+    fprintf(file, "| %s(", identifier);
+    for (int i = 0; i < type_num; ++i)
+    {
+        TypeExpr* te = types[i];
+
+        type_expr_print(file, te);
+        if (i + 1 < type_num)
+        {
+            fprintf(file, ", ");
+        }
+    }
+    fprintf(file, ")\n");
+}
+
 void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
 {
     assert(depth >= 0);
@@ -174,8 +200,11 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
         case STMT_ALIAS   :
             identifier = show_stmt->stmt.alias.identifier;
             type_expr  = show_stmt->stmt.alias.type      ;
+            decl       = show_stmt->stmt.alias.decl      ;
 
-            fprintf(file, " %s ", identifier);
+            fprintf(file, " %s", identifier);
+            decl_print(file, decl);
+            fprintf(file, " ");
             type_expr_print(file, type_expr);
             fprintf(file, "\n");
             break;
@@ -186,8 +215,9 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
             constructors    = show_stmt->stmt.type.constructors   ;
             argc            = show_stmt->stmt.type.argc           ;
             constructor_num = show_stmt->stmt.type.constructor_num;
+            decl            = show_stmt->stmt.type.decl           ;
 
-            fprintf(file, "type %s(", identifier);
+            fprintf(file, " %s(", identifier);
             for (int i = 0; i < argc; ++i)
             {
                 fprintf(file, "%s", argv[i]);
@@ -196,7 +226,16 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
                     fprintf(file, ", ");
                 }
             }
-            fprintf(file, ")\n");
+            fprintf(file, ")");
+            decl_print(file, decl);
+            fprintf(file, "\n");
+            for (int i = 0; i < constructor_num; ++i)
+            {
+                stmt_print_indent(file, indent * depth);
+                stmt_type_constructor_print(file, constructors[i]);
+            }
+            stmt_print_indent(file, indent * depth);
+            fprintf(file, "end\n");
             break;
     }
 }
@@ -557,6 +596,19 @@ void type_print(FILE* file, Type* type)
 
 void decl_print(FILE* file, Decl* decl)
 {
+    // Alias
+    TypeExpr*  type_expr       = NULL;
+
+    // Type
+    Decl**     type_vars       = NULL;
+    Decl**     constructors    = NULL;
+    int        type_var_num    = 0   ;
+    int        constructor_num = 0   ;
+
+    // Type constructor
+    TypeExpr** types           = NULL;
+    int        type_num        = 0   ;
+
     fprintf(file, "<");
 
     if (decl == NULL)
@@ -567,35 +619,72 @@ void decl_print(FILE* file, Decl* decl)
     {
         switch (decl->kind)
         {
-            case DECL_LET             :
+            case DECL_VAR             :
                 fprintf(file, "let");
+                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
                 break;
 
-            case DECL_TYPE_VARIABLE   :
+            case DECL_TYPE_VAR   :
                 fprintf(file, "type_var");
+                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
                 break;
 
             case DECL_ALIAS           :
+                type_expr = decl->decl.alias.type_expr;
+
                 fprintf(file, "alias");
+                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                fprintf(file, " : ");
+                type_expr_print(file, type_expr);
                 break;
 
             case DECL_TYPE            :
+                type_vars       = decl->decl.type.type_vars      ;
+                constructors    = decl->decl.type.constructors   ;
+                type_var_num    = decl->decl.type.type_var_num   ;
+                constructor_num = decl->decl.type.constructor_num;
+
                 fprintf(file, "type");
+                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                fprintf(file, "; vars - ");
+                for (int i = 0; i < type_var_num; ++i)
+                {
+                    decl_print(file, type_vars[i]);
+                    if (i + 1 < type_var_num)
+                    {
+                        fprintf(file, ", ");
+                    }
+                }
+                fprintf(file, "; cons - ");
+                for (int i = 0; i < constructor_num; ++i)
+                {
+                    decl_print(file, constructors[i]);
+                    if (i + 1 < constructor_num)
+                    {
+                        fprintf(file, ", ");
+                    }
+                }
                 break;
 
             case DECL_TYPE_CONSTRUCTOR:
+                types           = decl->decl.constructor.types   ;
+                type_num        = decl->decl.constructor.type_num;
+
                 fprintf(file, "constructor");
+                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                fprintf(file, " : ");
+                for (int i = 0; i < type_num; ++i)
+                {
+                    type_expr_print(file, types[i]);
+                    if (i + 1 < type_num)
+                    {
+                        fprintf(file, ", ");
+                    }
+                }
                 break;
 
             default:
                 fprintf(file, "[DECL]");
-        }
-
-        fprintf(file, ": %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
-        if (decl->type != NULL)
-        {
-            fprintf(file, " : ");
-            type_print(file, decl->type);
         }
     }
 

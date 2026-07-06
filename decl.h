@@ -2,32 +2,67 @@
 #define DECL_H
 
 #include "dependencies.h"
-#include "type.h"
+#include "decl_definition.h"
+#include "type_expr.h"
 
-typedef struct Decl                Decl               ;
 typedef enum   DeclKind            DeclKind           ;
 
 typedef struct DeclVar             DeclVar            ;
-typedef struct DeclTypeVariable    DeclTypeVariable   ;
+typedef struct DeclTypeVar         DeclTypeVar        ;
 typedef struct DeclAlias           DeclAlias          ;
 typedef struct DeclTypeConstructor DeclTypeConstructor;
 typedef struct DeclType            DeclType           ;
 
 enum DeclKind
 {
-    DECL_LET             ,
-    DECL_TYPE_VARIABLE   ,
+    DECL_VAR             ,
+    DECL_TYPE_VAR        ,
     DECL_ALIAS           ,
     DECL_TYPE            ,
     DECL_TYPE_CONSTRUCTOR,
 };
 
+struct DeclVar
+{
+};
+
+struct DeclTypeVar
+{
+};
+
+struct DeclAlias
+{
+    TypeExpr* type_expr;
+};
+
+struct DeclType
+{
+    Decl** type_vars;
+    Decl** constructors;
+    int type_var_num;
+    int constructor_num;
+};
+
+struct DeclTypeConstructor
+{
+    TypeExpr** types;
+    int type_num;
+};
+
 struct Decl
 {
     DeclKind kind;
-    char* identifier;
-    Type* type      ;
     int   id        ;
+    char* identifier;
+    union
+    {
+        DeclVar             var        ;
+        DeclTypeVar         type_var   ;
+        DeclAlias           alias      ;
+        DeclType            type       ;
+        DeclTypeConstructor constructor;
+    }
+    decl;
 };
 
 bool decl_is_type_variable(Decl decl);

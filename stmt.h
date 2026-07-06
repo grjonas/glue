@@ -4,7 +4,7 @@
 #include "scanner.h"
 #include "parser.h"
 #include "expr.h"
-#include "decl.h"
+#include "decl_definition.h"
 
 typedef struct Stmt                Stmt               ;
 
@@ -93,6 +93,7 @@ struct StmtAlias
 {
     char    * identifier;
     TypeExpr* type      ;
+    Decl    * decl      ;
 };
 
 struct StmtTypeConstructor
@@ -109,6 +110,7 @@ struct StmtType
     StmtTypeConstructor** constructors   ;
     int                   argc           ;
     int                   constructor_num;
+    Decl*                 decl           ;
 };
 
 // Tagged Union

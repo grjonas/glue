@@ -2,7 +2,7 @@
 
 bool decl_is_type_variable(Decl decl)
 {
-    return decl.kind == DECL_TYPE_VARIABLE;
+    return decl.kind == DECL_TYPE_VAR;
 }
 
 bool decl_is_alias(Decl decl)

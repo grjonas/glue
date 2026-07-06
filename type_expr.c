@@ -150,6 +150,8 @@ TypeExpr* parser_parse_type_expr_list(Parser* parser)
         }
     };
 
+    parser_expect_token(parser, TOKEN_RIGHT_SQUARE);
+
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
 

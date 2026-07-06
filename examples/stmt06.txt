@@ -15,3 +15,12 @@ elif joe > 2
 	let x
 else
 	let x
+
+type Either(a, b)
+| left(a)
+| right(b)
+end
+
+let a = 2
+
+let ls : [Int -> Joe] = [2, 3, 4]

@@ -100,6 +100,9 @@ Stmt* parser_parse_stmt(Parser* parser)
         case TOKEN_ALIAS:
             return parser_parse_stmt_alias(parser);
 
+        case TOKEN_TYPE:
+            return parser_parse_stmt_type(parser);
+
         default:
             return parser_parse_stmt_expr(parser);
     }
@@ -874,6 +877,7 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
         {
             .identifier = identifier,
             .type       = type      ,
+            .decl       = NULL      ,
         }
     };
 
@@ -892,7 +896,7 @@ StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
 
     Token token;
 
-    if (!parser_expect_token(parser, TOKEN_TYPE))
+    if (!parser_expect_token(parser, TOKEN_PIPE))
         return NULL;
 
     identifier = parser_parse_identifier(parser);
@@ -1026,6 +1030,8 @@ Stmt* parser_parse_stmt_type(Parser* parser)
     // parse contructors
     do
     {
+        parser_skip(parser, is_newline);
+
         token = parser_peek(parser);
 
         if (token.type == TOKEN_PIPE)
@@ -1050,7 +1056,7 @@ Stmt* parser_parse_stmt_type(Parser* parser)
                 .line   = token.line  ,
                 .column = token.column,
                 .length = token.line  ,
-                .msg    = "Statement parsing: Failed to parse type in 'alias' statement.",
+                .msg    = "Statement parsing: Failed to type constructor in 'type' statement.",
             });
             return NULL;
         }
@@ -1073,9 +1079,10 @@ Stmt* parser_parse_stmt_type(Parser* parser)
         {
             .identifier      = identifier     ,
             .argv            = argv           ,
-            .constructors    = constructors    ,
+            .constructors    = constructors   ,
             .argc            = argc           ,
             .constructor_num = constructor_num,
+            .decl            = NULL           ,
         }
     };
 

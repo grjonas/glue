@@ -335,7 +335,6 @@ Expr* parser_parse_expr_primary(Parser* parser)
         default:
             fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
             exit(1);
-            // return NULL;
     }
 
     expr = (Expr)
@@ -414,10 +413,14 @@ Expr* parser_parse_expr_list(Parser* parser)
         .line   = token.line  ,
         .column = token.column,
         .length = token.length,
-        .expr.primary.primary.list = (ExprPrimaryList)
+        .expr.primary = (ExprPrimary)
         {
-            .length = length,
-            .list   = list  ,
+            .kind    = EXPR_PRIMARY_LIST,
+            .primary.list = (ExprPrimaryList)
+            {
+                .length = length,
+                .list   = list  ,
+            }
         }
     };
 

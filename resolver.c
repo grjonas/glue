@@ -382,6 +382,8 @@ bool resolver_resolve_stmt_alias(Resolver* resolver)
     decl = resolver_declare_alias(resolver, identifier);
     resolver_push_decl_to_context(resolver, decl);
 
+    decl->decl.alias.type_expr = type_expr;
+
     snapshot = resolver_get_context_snapshot(resolver);
 
     if (!resolver_resolve_type_expr(resolver, type_expr))
@@ -390,6 +392,93 @@ bool resolver_resolve_stmt_alias(Resolver* resolver)
     }
 
     resolver_restore_context_snapshot(resolver, snapshot);
+
+    curr_stmt->stmt.alias.decl = decl;
+
+    return true;
+}
+
+bool resolver_resolve_stmt_type(Resolver* resolver)
+{
+    Stmt* curr_stmt  = resolver->stmts;
+
+    char               *  identifier      = NULL;
+    char               ** argv            = NULL;
+    StmtTypeConstructor** constructors    = NULL;
+    int                   argc            = 0   ;
+    int                   constructor_num = 0   ;
+
+    Decl               *  decl            = NULL;
+
+    Decl** type_vars         = NULL;
+    Decl** type_constructors = NULL;
+
+    Snapshot snapshot;
+
+    assert(curr_stmt != NULL);
+    assert(curr_stmt->kind == STMT_TYPE);
+
+    identifier      = curr_stmt->stmt.type.identifier     ;
+    argv            = curr_stmt->stmt.type.argv           ;
+    constructors    = curr_stmt->stmt.type.constructors   ;
+    argc            = curr_stmt->stmt.type.argc           ;
+    constructor_num = curr_stmt->stmt.type.constructor_num;
+
+    decl = resolver_declare_new_type(resolver, identifier);
+    resolver_push_decl_to_context(resolver, decl);
+
+    snapshot = resolver_get_context_snapshot(resolver);
+    for (int i = 0; i < argc; ++i)
+    {
+        Decl* type_var = resolver_declare_type_variable(resolver, argv[i]);
+        resolver_push_decl_to_context(resolver, type_var);
+
+        arrput(type_vars,  type_var);
+    }
+
+    Decl** tmp_vars = type_vars;
+    type_vars = (Decl**) arena_push(&resolver->arena, type_vars, argc * sizeof(Decl*));
+    arrfree(tmp_vars);
+
+    for (int i = 0; i < constructor_num; ++i)
+    {
+        StmtTypeConstructor* stmt_type_constructor = constructors[i];
+        Decl* type_constructor =
+            resolver_declare_new_type_constructor
+                (resolver, stmt_type_constructor->identifier);
+
+
+        for (int j = 0; j < stmt_type_constructor->type_num; ++j)
+        {
+            if (!resolver_resolve_type_expr(resolver, stmt_type_constructor->types[j]))
+            {
+                return false;
+            }
+        }
+
+        type_constructor->decl.constructor = (DeclTypeConstructor)
+        {
+            .types    = stmt_type_constructor->types   ,
+            .type_num = stmt_type_constructor->type_num,
+        };
+
+        arrput(type_constructors, type_constructor);
+    }
+
+    Decl** tmp_cons = type_constructors;
+    type_constructors = (Decl**) arena_push(&resolver->arena, type_constructors, constructor_num * sizeof(Decl*));
+    arrfree(tmp_cons);
+
+    resolver_restore_context_snapshot(resolver, snapshot);
+
+    decl->decl.type = (DeclType)
+    {
+        .type_vars       = type_vars        ,
+        .constructors    = type_constructors,
+        .type_var_num    = argc             ,
+        .constructor_num = constructor_num  ,
+    };
+    curr_stmt->stmt.type.decl = decl;
 
     return true;
 }
@@ -419,10 +508,12 @@ bool resolver_resolve_stmt(Resolver* resolver)
         case STMT_FN      : result = resolver_resolve_stmt_fn      (resolver); break;
         case STMT_RETURN  : result = resolver_resolve_stmt_return  (resolver); break;
         case STMT_ALIAS   : result = resolver_resolve_stmt_alias   (resolver); break;
+        case STMT_TYPE    : result = resolver_resolve_stmt_type    (resolver); break;
+        //case STMT_TYPE    : break;
 
-        // default:
-            // fprintf(stderr, "[%s:%d] Variable resolution: Found statement of unknown kind.\n", __FILE__, __LINE__);
-            // exit(1);
+        default:
+            fprintf(stderr, "[%s:%d] Variable resolution: Found statement of unknown kind.\n", __FILE__, __LINE__);
+            exit(1);
     }
 
     resolver->stmts = curr_stmt;
@@ -447,7 +538,7 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
             {
                 return false;
             }
-            else if (decl->kind != DECL_LET)
+            else if (decl->kind != DECL_VAR)
             {
                 resolver_throw_compiler_error(resolver, (CompileError)
                 {
@@ -539,9 +630,9 @@ bool resolver_resolve_expr(Resolver* resolver, Expr* expr)
             }
             break;
 
-        // default:
-            // fprintf(stderr, "[%s:%d] Variable resolution: Found expression of unknown kind.\n", __FILE__, __LINE__);
-            // exit(1);
+        default:
+            fprintf(stderr, "[%s:%d] Variable resolution: Found expression of unknown kind.\n", __FILE__, __LINE__);
+            exit(1);
     }
 
     return true;
@@ -761,11 +852,6 @@ char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
     return new_id;
 }
 
-void decl_set_type(Decl* decl, Type* type)
-{
-    decl->type = type;
-}
-
 Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
 {
     int id_len = strlen(identifier);
@@ -779,11 +865,11 @@ Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
         id   = NULL;
         switch (decl->kind)
         {
-            case DECL_LET:
+            case DECL_VAR:
                 id = decl->identifier;
                 break;
 
-            case DECL_TYPE_VARIABLE:
+            case DECL_TYPE_VAR:
                 id = decl->identifier;
                 break;
 
@@ -817,9 +903,8 @@ Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
 
     decl = (Decl)
     {
-        .kind       = DECL_LET           ,
+        .kind       = DECL_VAR           ,
         .identifier = existing_identifier,
-        .type       = NULL               ,
         .id         = resolver->decl_id++,
     };
 
@@ -837,9 +922,8 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
 
     decl = (Decl)
     {
-        .kind       = DECL_TYPE_VARIABLE ,
+        .kind       = DECL_TYPE_VAR      ,
         .identifier = existing_identifier,
-        .type       = NULL               ,
         .id         = resolver->decl_id++,
     };
 
@@ -859,8 +943,45 @@ Decl* resolver_declare_alias(Resolver* resolver, char* identifier)
     {
         .kind       = DECL_ALIAS         ,
         .identifier = existing_identifier,
-        .type       = NULL               ,
         .id         = resolver->decl_id++,
+    };
+
+    decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+    arrput(resolver->declarations, decl_ptr);
+
+    return decl_ptr;
+}
+
+Decl* resolver_declare_new_type(Resolver* resolver, char* identifier)
+{
+    Decl decl;
+    Decl* decl_ptr;
+    char* existing_identifier = resolver_get_existing_identifier(resolver, identifier);
+
+    decl = (Decl)
+    {
+        .kind       = DECL_TYPE          ,
+        .identifier = existing_identifier,
+        .id         = resolver->decl_id++,
+    };
+
+    decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
+    arrput(resolver->declarations, decl_ptr);
+
+    return decl_ptr;
+}
+
+Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier)
+{
+    Decl  decl;
+    Decl* decl_ptr;
+    char* existing_identifier = resolver_get_existing_identifier(resolver, identifier);
+
+    decl = (Decl)
+    {
+        .kind       = DECL_TYPE_CONSTRUCTOR,
+        .identifier = existing_identifier  ,
+        .id         = resolver->decl_id++  ,
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));

@@ -2,7 +2,7 @@
 #define TYPE_EXPR_H
 
 #include "parser.h"
-#include "decl.h"
+#include "decl_definition.h"
 
 // 'type expression' - the type as written in a function signature, and contains positional, and other relevant information,
 // 'type proper' - contains the actual type information.
