@@ -5,6 +5,7 @@
 #include "type.h"
 
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
+// TODO: Think about rewriting substitution to use hashmaps instead of lists.
 typedef struct Inferer       Inferer      ;
 
 typedef struct Scheme        Scheme       ;
@@ -17,21 +18,19 @@ typedef struct TypeAlloc     TypeAlloc    ;
 // A type, and
 struct Scheme
 {
-    Decl** decls;
     Type*  type ;
-    int decl_num;
+    int bounded_var_num; // Number of bounded variables
 };
 
 struct TypeEnvTerm
 {
-    Scheme scheme ;
-    int    term_id;
+    Scheme value;
+    int    key  ;
 };
 
 struct TypeEnv
 {
-    TypeEnvTerm** terms;
-    int term_num;
+    TypeEnvTerm* terms;
 };
 
 enum TypeAllocKind
@@ -44,7 +43,7 @@ enum TypeAllocKind
 
 struct SubstObj
 {
-    int   key  ;
+    int   key  ; // free var id
     Type* value;
 };
 
