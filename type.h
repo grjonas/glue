@@ -14,7 +14,7 @@ typedef struct TypeFn          TypeFn         ;
 // typedef struct TypeAbstraction TypeAbstraction;
 // typedef struct TypeApplication TypeApplication;
 
-struct TypeKind
+enum TypeKind
 {
     // Primitive types
     TYPE_NIL        ,
@@ -79,7 +79,8 @@ struct Type
         TypeList       list       ;
         TypeStruct     structt    ;
         TypeFn         fn         ;
-    };
+    }
+    type;
 };
 
 // struct TypeAbstraction

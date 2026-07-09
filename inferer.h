@@ -15,22 +15,17 @@ typedef struct SubstObj      SubstObj     ;
 typedef struct Subst         Subst        ;
 typedef struct TypeAlloc     TypeAlloc    ;
 
-// A type, and
+// A bonded type and it's associated variable ids.
 struct Scheme
 {
     Type* type;
-    int*  bounded_vars   ;
+    int*  bound_var_ids;
 };
 
 struct TypeEnvTerm
 {
-    Scheme value;
     int    key  ;
-};
-
-struct TypeEnv
-{
-    TypeEnvTerm* terms;
+    Scheme value;
 };
 
 enum TypeAllocKind
@@ -41,15 +36,10 @@ enum TypeAllocKind
     TYPE_ALLOC_TYPE_ENV,
 };
 
-struct SubstObj
-{
-    int   key  ; // free var id
-    Type* value;
-};
-
 struct Subst
 {
-    SubstObj* substs; // Allocated using stb
+    int   key  ; // var id
+    Type* value;
 };
 
 // A single object
@@ -71,7 +61,8 @@ struct Inferer
     char** identifiers;
 
     // Memory-management
-    Arena  arena;
+    Arena arena;
+    Arena type_arena;
 
     // Misc. state
 
@@ -83,5 +74,20 @@ struct Inferer
 
 Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
+
+void type_get_free_type_vars(Type type, int** free_type_vars);
+void scheme_get_free_type_vars(Scheme scheme, int** free_type_vars);
+void type_env_get_free_type_vars(TypeEnvTerm* env, int** free_type_vars);
+Type* type_deepcopy(Arena* arena, Type* type);
+void substitute_var_free_with_bounded(Type* type, int free_var, int bounded_var);
+void inferer_type_apply_substitution(Inferer* inferer, Subst* subst_hashmap, Type** type_ref);
+void generalize_type(TypeEnvTerm* env, Type* type, Scheme* scheme);
+bool instantiate_scheme(Scheme scheme, Type* type_ref);
+bool inferer_throw_failed_to_unify_error(Inferer* inferer);
+Subst* compose_substitutions(Subst* subst_hashmap_a, Subst* subst_hashmap_b);
+bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Subst** subst);
+bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right, Subst** subst_hashmap);
+
+void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 
 #endif

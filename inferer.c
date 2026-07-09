@@ -54,113 +54,6 @@ void    inferer_free(Inferer* inferer  )
     };
 }
 
-// Type* inferer_infer_expr(Inferer* infer, TypeEnv* env, Expr* expr)
-// {
-//     assert(expr != NULL);
-// 
-//     Type* type = NULL;
-// 
-//     switch (expr->kind)
-//     {
-//         case EXPR_PRIMARY:
-//             return inferer_infer_expr_primary(inferer, env, expr->expr.primary);
-//             break;
-// 
-//         case EXPR_UNARY  :
-//             break;
-// 
-//         case EXPR_BINARY :
-//             break;
-// 
-//         case EXPR_FN     :
-//             break;
-//     };
-// }
-// 
-// Type* inferer_infer_expr_primary(Inferer* inferer, TypeEnv* env, ExprPrimary primary)
-// {
-//     Type*   type   = NULL;
-//     Scheme* scheme = NULL;
-// 
-//     TypeStructField*  type_field  = NULL;
-//     TypeStructField** type_struct = NULL;
-// 
-//     switch (primary.kind)
-//     {
-//         case EXPR_PRIMARY_UNKNOWN   :
-//             fprintf(stderr, "[%s:%d] Type inference: Detected unknown primary expression during inference.\n", __FILE__, __LINE__);
-//             exit(1);
-// 
-//         case EXPR_PRIMARY_NIL       :
-//             type = inferer_get_type_nil(inferer);
-//             break;
-// 
-//         case EXPR_PRIMARY_BOOLEAN   :
-//             type = inferer_get_type_bool(inferer);
-//             break;
-// 
-//         case EXPR_PRIMARY_STRING    :
-//             type = inferer_get_type_string(inferer);
-//             break;
-// 
-//         case EXPR_PRIMARY_NATURAL   :
-//             type = inferer_get_type_natural(inferer);
-//             break;
-// 
-//         case EXPR_PRIMARY_INTEGER   :
-//             type = inferer_get_type_integer(inferer);
-//             break;
-// 
-//         case EXPR_PRIMARY_REAL      :
-//             type = inferer_get_type_real(inferer);
-//             break;
-// 
-//         case EXPR_PRIMARY_STRUCT    :
-//             // for (int i = 0; i < primary.primary.structt.argc; ++i)
-//             // {
-//             //     ExprPrimaryStructField* field = primary.primary.structt.argv[i];
-//             //     if (field.value != NULL)
-//             //     {
-//             //         type = inferer_infer_expr(inferer, env, field.value);
-//             //     }
-//             // }
-//             fprintf(stderr, "[%s:%d] Type inference: Not implemented.\n", __FILE__, __LINE__);
-//             exit(1);
-// 
-//         case EXPR_PRIMARY_FN        :
-//             fprintf(stderr, "[%s:%d] Type inference: Not implemented.\n", __FILE__, __LINE__);
-//             exit(1);
-// 
-//         case EXPR_PRIMARY_IDENTIFIER:
-//             fprintf(stderr, "[%s:%d] Type inference: Somehow found identifier expression.\n", __FILE__, __LINE__);
-//             exit(1);
-// 
-//         case EXPR_PRIMARY_DECL      :
-//             scheme = inferer_type_env_lookup(inferer, env, primary.primary.decl);
-//             if (scheme == NULL)
-//             {
-//                 assert("Error! Replace Later with throw error." == NULL);
-//                 return NULL;
-//             }
-//             type = inferer_scheme_instantiate(inferer, scheme);
-//             break;
-//     }
-// 
-//     return type;
-// }
-// 
-// Subst* inferer_unify(Inferer* inferer, Type* left, Type* right)
-// {
-//     assert(left  != NULL);
-//     assert(right != NULL);
-// 
-//     Subst* subst = NULL;
-// 
-//     switch (left->kind)
-//     {
-//     }
-// }
-
 // get_all_free_type_variables : a -> int** free_var_id;
 // apply_substition : Subst -> a -> a -- only replaces free type variables
 // remove : TypeEnv -> int term_id -> TypeEnv
@@ -179,7 +72,7 @@ void type_get_free_type_vars(Type type, int** free_type_vars)
     int* free_type_vars_left  = NULL;
     int* free_type_vars_right = NULL;
 
-    switch (type->kind)
+    switch (type.kind)
     {
         case TYPE_NIL        : return;
         case TYPE_BOOL       : return;
@@ -189,7 +82,7 @@ void type_get_free_type_vars(Type type, int** free_type_vars)
 
         case TYPE_LIST       :
             type_get_free_type_vars
-                (inferer, type.type.list.type, free_type_vars);
+                (*type.type.list.type, free_type_vars);
             return;
 
         case TYPE_STRUCT     :
@@ -197,21 +90,21 @@ void type_get_free_type_vars(Type type, int** free_type_vars)
 
         case TYPE_FN         :
             type_get_free_type_vars
-                (inferer, type.type.fn.left , &free_type_vars_a);
+                (*type.type.fn.left , &free_type_vars_left );
             type_get_free_type_vars
-                (inferer, type.type.fn.right, &free_type_vars_b);
+                (*type.type.fn.right, &free_type_vars_right);
 
-            for (int i = 0; i < arrlen(free_type_vars_b); ++i)
+            for (int i = 0; i < arrlen(free_type_vars_left); ++i)
             {
-                arrput(free_type_vars_a, free_type_vars_b[i]);
+                arrput(free_type_vars_left, free_type_vars_right[i]);
             }
-            arrfree(free_type_vars_b);
+            arrfree(free_type_vars_right);
 
-            *free_type_vars = free_type_vars_a;
+            *free_type_vars = free_type_vars_left;
             return;
 
         case TYPE_FREE_VAR   :
-            arrput(*free_type_var, type.type.free_type.free_var_id);
+            arrput(*free_type_vars, type.type.free_var.free_var_id);
             return;
 
         case TYPE_BOUNDED_VAR:
@@ -231,27 +124,74 @@ void scheme_get_free_type_vars(Scheme scheme, int** free_type_vars)
     assert(*free_type_vars == NULL);
 
     type_get_free_type_vars
-        (scheme.type, free_type_vars);
+        (*scheme.type, free_type_vars);
 }
 
-void type_env_get_free_type_vars(TypeEnv env, int** free_type_vars)
+void type_env_get_free_type_vars(TypeEnvTerm* env, int** free_type_vars)
 {
     assert(free_type_vars != NULL);
     assert(*free_type_vars == NULL);
 
-    TypeEnvTerm* terms = env->terms;
-
-    for (int i = 0; i < hmlen(terms); ++i)
+    for (int i = 0; i < arrlen(env); ++i)
     {
-        TypeEnvTerm t = terms[i];
+        TypeEnvTerm t = env[i];
         scheme_get_free_type_vars
-            (t.scheme, free_type_vars);
+            (t.value, free_type_vars);
     }
 }
 
-Type type_deepcopy(Type* type)
+Type* type_deepcopy(Arena* arena, Type* type)
 {
+    assert(arena != NULL);
+
+    Type type_mem;
+
+    if (type == NULL)
+    {
+        assert(false); // Idk if this is actaully a good idea
+        return NULL;
+    }
+
     assert(false);
+    switch (type->kind)
+    {
+        case TYPE_NIL        : return (Type*) arena_push(arena, type, sizeof(Type));
+        case TYPE_BOOL       : return (Type*) arena_push(arena, type, sizeof(Type));
+        case TYPE_INT        : return (Type*) arena_push(arena, type, sizeof(Type));
+        case TYPE_REAL       : return (Type*) arena_push(arena, type, sizeof(Type));
+        case TYPE_STRING     : return (Type*) arena_push(arena, type, sizeof(Type));
+
+        case TYPE_LIST       :
+            type_mem = (Type)
+            {
+                .kind = TYPE_LIST,
+                .type.list.type = type_deepcopy(arena, type->type.list.type), 
+            };
+            return (Type*) arena_push(arena, &type_mem, sizeof(Type));
+
+        case TYPE_STRUCT     :
+            assert(false);
+            break;
+
+        case TYPE_FN         :
+            type_mem = (Type)
+            {
+                .kind = TYPE_FN,
+                .type.fn = (TypeFn)
+                {
+                    .left  = type_deepcopy(arena, type->type.fn.left ),
+                    .right = type_deepcopy(arena, type->type.fn.right),
+                }
+            };
+            return (Type*) arena_push(arena, &type_mem, sizeof(Type));
+
+        case TYPE_FREE_VAR   : return (Type*) arena_push(arena, type, sizeof(Type));
+        case TYPE_BOUNDED_VAR: return (Type*) arena_push(arena, type, sizeof(Type));
+
+        default:
+            fprintf(stderr, "[%s:%d] Type inference: Couldn't recognize type kind while while copying type.\n", __FILE__, __LINE__);
+            exit(1);
+    }
 }
 
 void substitute_var_free_with_bounded(Type* type, int free_var, int bounded_var)
@@ -303,8 +243,14 @@ void substitute_var_free_with_bounded(Type* type, int free_var, int bounded_var)
     }
 }
 
-void type_apply_substitution(Subst subst, Type* type)
+void inferer_type_apply_substitution(Inferer* inferer, Subst* subst_arr, Type** type_ref)
 {
+    assert(subst_arr != NULL);
+    assert(type_ref != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+
     switch (type->kind)
     {
         case TYPE_NIL        : return;
@@ -314,27 +260,27 @@ void type_apply_substitution(Subst subst, Type* type)
         case TYPE_STRING     : return;
 
         case TYPE_LIST       :
-            type_apply_substitution
-                (inferer, subst, type->type.list.type);
+            inferer_type_apply_substitution
+                (inferer, subst_arr, &type->type.list.type);
             return;
 
         case TYPE_STRUCT     :
             assert(false);
 
         case TYPE_FN         :
-            type_apply_substitution
-                (inferer, subst, type->type.fn.left);
-            type_apply_substitution
-                (inferer, subst, type->type.fn.right);
+            inferer_type_apply_substitution
+                (inferer, subst_arr, &type->type.fn.left);
+            inferer_type_apply_substitution
+                (inferer, subst_arr, &type->type.fn.right);
             return;
 
         case TYPE_FREE_VAR   :
-            for (int i = 0; i < arrlen(subst.substs); ++i)
+            for (int i = 0; i < arrlen(subst_arr); ++i)
             {
-                SubstObj s = subst.substs[i];
-                if (s.key == type->type.free_type.free_var_id)
+                Subst s = subst_arr[i];
+                if (s.key == type->type.free_var.free_var_id)
                 {
-                    *type = type_deepcopy(s.value);
+                    *type_ref = type_deepcopy(&inferer->type_arena, s.value);
                     break;
                 }
             }
@@ -350,33 +296,8 @@ void type_apply_substitution(Subst subst, Type* type)
     }
 }
 
-void type_env_add_term(TypeEnv* env, int key, Scheme value)
-{
-    assert(env != NULL);
-    hmput(env->terms, key, value);
-}
-
-bool type_env_remove_term(TypeEnv* env, int key)
-{
-    assert(env != NULL);
-    if (hmdel(env->terms, key))
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-void type_env_free(TypeEnv* env)
-{
-    assert(env != NULL);
-    hmfree(env->terms);
-}
-
 // Type* is replaced.
-void generalize_type(TypeEnv env, Type* type, Scheme* subst_ref)
+void generalize_type(TypeEnvTerm* env, Type* type, Scheme* scheme)
 {
     assert(type   != NULL);
     assert(scheme != NULL);
@@ -415,13 +336,14 @@ void generalize_type(TypeEnv env, Type* type, Scheme* subst_ref)
 
     *scheme = (Scheme)
     {
-        .type         = type        ,
-        .bounded_vars = bounded_vars,
+        .type          = type        ,
+        .bound_var_ids = bounded_vars,
     };
 }
 
 bool instantiate_scheme(Scheme scheme, Type* type_ref)
 {
+    assert(false);
 }
 
 // always returns false
@@ -438,25 +360,23 @@ bool inferer_throw_failed_to_unify_error(Inferer* inferer)
     return false;
 }
 
-void subst_add_var(Subst* subst, int key, Type* value)
-{
-    assert(subst != NULL);
-
-    hmput(subst->substs, key, value);
-}
-
-void subst_remove_var(Subst* subst, int key)
-{
-    assert(subst != NULL);
-
-    hmdel(subst->substs, key);
-}
-
 // Allocates return type memory using stb.
-Subst* compose_substitutions(Subst* subst_a, Subst* subst_b)
+Subst* compose_substitutions(Subst* subst_arr_a, Subst* subst_arr_b)
 {
-    // Apply subst_a to subst_b
-    // Then unify the two substitutions and return it.
+    Subst* subst_arr_new = NULL;
+
+    for (int i = 0; i < arrlen(subst_arr_a); ++i)
+    {
+        Subst sa = subst_arr_a[i];
+        arrput(subst_arr_new, sa);
+    }
+    for (int i = 0; i < arrlen(subst_arr_b); ++i)
+    {
+        Subst sb = subst_arr_b[i];
+        arrput(subst_arr_new, sb);
+    }
+
+    return subst_arr_new;
 }
 
 bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Subst** subst)
@@ -467,17 +387,17 @@ bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Sub
 
     bool var_id_in_type = false;
     int* free_type_vars = NULL ;
+    Subst subst_mem;
 
-    if (type->kind == TYPE_FREE_VAR)
+    // type ~ TVar var_id
+    if (type->kind == TYPE_FREE_VAR && var_id == type->type.free_var.free_var_id)
     {
         return true;
     }
 
-    if (!type_get_free_type_vars(inferer, type, &free_type_vars))
-    {
-        return false;
-    }
-    for (int i = 0; i < arrlen(free_vars); ++i)
+    // Establish whether var_id 'part of' (ftv type)
+    type_get_free_type_vars(*type, &free_type_vars);
+    for (int i = 0; i < arrlen(free_type_vars); ++i)
     {
         int free_type_var = free_type_vars[i];
         if (free_type_var == var_id)
@@ -488,6 +408,7 @@ bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Sub
     }
     arrfree(free_type_vars);
 
+    // If is part of, throw error.
     if (var_id_in_type)
     {
         inferer_throw_compiler_error(inferer, (CompileError)
@@ -501,22 +422,30 @@ bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Sub
         return false;
     }
 
-    *subst = inferer_create_subst_singleton(inferer, var_id, type);
+    // otherwise
+    // *subst = inferer_create_subst_singleton(inferer, var_id, type);
+    subst_mem = (Subst)
+    {
+        .key   = var_id,
+        .value = type  ,
+    };
+    arrput(*subst, subst_mem);
     return false;
 }
 
 // Probably the most central function to the inferer.
-bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right, Subst** subst)
+bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right, Subst** subst_arr)
 {
     assert(left  != NULL);
     assert(right != NULL);
-    assert(subst != NULL);
+    assert(subst_arr != NULL);
+    assert(*subst_arr == NULL);
 
-    *subst = NULL;
+    *subst_arr = NULL;
 
     if (right->kind == TYPE_FREE_VAR)
         return inferer_bind_variable_to_type
-            (inferer, right->type.free_var.free_var_id, left, subst);
+            (inferer, right->type.free_var.free_var_id, left, subst_arr);
 
     switch (left->kind)
     {
@@ -529,7 +458,7 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
         case TYPE_LIST       :
             if (right->kind == TYPE_LIST)
                 return inferer_get_most_general_unifier
-                    (inferer, left->type.list.type, right->type.list.type, subst);
+                    (inferer, left->type.list.type, right->type.list.type, subst_arr);
 
         case TYPE_STRUCT     :
             assert(false);
@@ -551,24 +480,24 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
                     return false;
                 }
 
-                type_apply_substitution(inferer, subst_a,  left->type.fn.right);
-                type_apply_substitution(inferer, subst_b, right->type.fn.right);
+                inferer_type_apply_substitution(inferer, subst_a, & left->type.fn.right);
+                inferer_type_apply_substitution(inferer, subst_a, &right->type.fn.right);
                 result = inferer_get_most_general_unifier
                     (inferer, left->type.fn.right, right->type.fn.right, &subst_b);
                 if (!result)
                 {
                     return false;
                 }
-                *subst = compose_substitutions(inferer, subst_a, subst_b);
-                hmfree(subst_a);
-                hmfree(subst_b);
+                *subst_arr = compose_substitutions(subst_a, subst_b);
+                arrfree(subst_a);
+                arrfree(subst_b);
                 return true;
             }
             break;
 
         case TYPE_FREE_VAR   :
             return inferer_bind_variable_to_type
-                (inferer, left->type.free_var.free_var_id, right, subst);
+                (inferer, left->type.free_var.free_var_id, right, subst_arr);
             break;
 
         case TYPE_BOUNDED_VAR:
@@ -582,4 +511,11 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
     }
 
     return inferer_throw_failed_to_unify_error(inferer);
+}
+
+void inferer_throw_compiler_error(Inferer* inferer, CompileError err)
+{
+    CompileError* err_ptr = NULL;
+    err_ptr = (CompileError*) arena_push(&inferer->arena, &err, sizeof(CompileError));
+    arrput(inferer->errs, err_ptr);
 }
