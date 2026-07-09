@@ -18,8 +18,8 @@ typedef struct TypeAlloc     TypeAlloc    ;
 // A type, and
 struct Scheme
 {
-    Type*  type ;
-    int bounded_var_num; // Number of bounded variables
+    Type* type;
+    int*  bounded_vars   ;
 };
 
 struct TypeEnvTerm
