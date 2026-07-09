@@ -28,24 +28,10 @@ struct TypeEnvTerm
     Scheme value;
 };
 
-enum TypeAllocKind
-{
-    TYPE_ALLOC_TYPE    ,
-    TYPE_ALLOC_SCHEME  ,
-    TYPE_ALLOC_SUBST   ,
-    TYPE_ALLOC_TYPE_ENV,
-};
-
 struct Subst
 {
     int   key  ; // var id
     Type* value;
-};
-
-// A single object
-struct TypeAlloc
-{
-    int reference_num; // How many objects hold reference to an object of this type.
 };
 
 // There are a couple of things that should be known about the inferer:

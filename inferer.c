@@ -513,6 +513,233 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
     return inferer_throw_failed_to_unify_error(inferer);
 }
 
+bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type_ref)
+{
+    assert(inferer   != NULL);
+    assert(expr      != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+    Type  type_mem;
+
+    switch (expr->expr.primary.kind)
+    {
+        case EXPR_PRIMARY_UNKNOWN   :
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize primary expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+
+        case EXPR_PRIMARY_NIL       :
+            type_mem = (Type) { .kind = TYPE_NIL };
+            *type_ref = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+            return true;
+
+        case EXPR_PRIMARY_BOOLEAN   :
+            type_mem = (Type) { .kind = TYPE_NIL };
+            *type_ref = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+            return true;
+
+        case EXPR_PRIMARY_STRING    :
+            type_mem = (Type) { .kind = TYPE_NIL };
+            *type_ref = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+            return true;
+
+        case EXPR_PRIMARY_NATURAL   :
+            type_mem = (Type) { .kind = TYPE_NIL };
+            *type_ref = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+            return true;
+
+        case EXPR_PRIMARY_INTEGER   :
+            type_mem = (Type) { .kind = TYPE_NIL };
+            *type_ref = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+            return true;
+
+        case EXPR_PRIMARY_REAL      :
+            type_mem = (Type) { .kind = TYPE_NIL };
+            *type_ref = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+            return true;
+
+        case EXPR_PRIMARY_LIST      :
+            assert(false);
+            break;
+
+        case EXPR_PRIMARY_STRUCT    :
+            assert(false);
+            break;
+
+        case EXPR_PRIMARY_FN        :
+            assert(false);
+            break;
+
+        case EXPR_PRIMARY_IDENTIFIER:
+            assert(false);
+            break;
+
+        case EXPR_PRIMARY_DECL      :
+            assert(false);
+            break;
+
+        default:
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize primary expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+}
+
+bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type_ref)
+{
+    assert(inferer   != NULL);
+    assert(expr      != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+    Type  type_mem;
+
+    switch (expr->expr.unary.kind)
+    {
+        case EXPR_UNARY_UNKNOWN:
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize unary expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+
+        case EXPR_UNARY_NOT    :
+            assert(false);
+            break;
+
+        case EXPR_UNARY_NEGATE :
+            assert(false);
+            break;
+
+        default:
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize unary expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+}
+
+bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type_ref)
+{
+    assert(inferer   != NULL);
+    assert(expr      != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+    Type  type_mem;
+
+    switch (expr->expr.binary.kind)
+    {
+        case EXPR_BINARY_UNKNOWN      :
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize binary expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+
+        case EXPR_BINARY_ADD          :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_SUBTRACT     :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_MULTIPLY     :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_DIVIDE       :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_MODULO       :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_AND          :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_OR           :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_EQUAL        :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_NOT_EQUAL    :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_LESS_EQUAL   :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_LESS         :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_GREATER_EQUAL:
+            assert(false);
+            break;
+
+        case EXPR_BINARY_GREATER      :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_CHAIN        :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_ACCESS       :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_ASSIGN       :
+            assert(false);
+            break;
+
+        case EXPR_BINARY_INDEX        :
+            assert(false);
+            break;
+
+        default:
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize binary expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+}
+
+bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type_ref)
+{
+    assert(inferer   != NULL);
+    assert(expr      != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+    Type  type_mem;
+
+    fprintf(stderr, "[%s:%d] Type inference: Failed to infer expression of type fn.\n", __FILE__, __LINE__);
+    exit(1);
+}
+
+bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type_ref)
+{
+    assert(inferer   != NULL);
+    assert(expr      != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+
+    switch(expr->kind)
+    {
+        case EXPR_PRIMARY: return inferer_infer_expr_primary (inferer, expr, type_ref);
+        case EXPR_UNARY  : return inferer_infer_expr_unary   (inferer, expr, type_ref);
+        case EXPR_BINARY : return inferer_infer_expr_binary  (inferer, expr, type_ref);
+        case EXPR_FN     : return inferer_infer_expr_fn      (inferer, expr, type_ref);
+        default:
+            fprintf(stderr, "[%s:%d] Type inference: Failed to recognize expr kind.\n", __FILE__, __LINE__);
+            exit(1);
+    }
+}
+
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err)
 {
     CompileError* err_ptr = NULL;
