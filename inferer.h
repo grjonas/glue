@@ -73,6 +73,7 @@ bool inferer_throw_failed_to_unify_error(Inferer* inferer);
 Subst* compose_substitutions(Subst* subst_hashmap_a, Subst* subst_hashmap_b);
 bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Subst** subst);
 bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right, Subst** subst_hashmap);
+bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref);
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 

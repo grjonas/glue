@@ -1,5 +1,12 @@
 #include "inferer.h"
 
+Type builtin_nil    = (Type) { .kind = TYPE_NIL    };
+Type builtin_bool   = (Type) { .kind = TYPE_BOOL   };
+Type builtin_int    = (Type) { .kind = TYPE_INT    };
+// Type builtin_nat    = (Type) { .kind = TYPE_NAT    };
+Type builtin_real   = (Type) { .kind = TYPE_REAL   };
+Type builtin_string = (Type) { .kind = TYPE_STRING };
+
 Inferer inferer_init(Resolver* resolver)
 {
     arrfree(resolver->context     );
@@ -433,6 +440,11 @@ bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Sub
     return false;
 }
 
+Type* inferer_new_type_variable(Inferer* inferer)
+{
+    assert(false);
+}
+
 // Probably the most central function to the inferer.
 bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right, Subst** subst_arr)
 {
@@ -459,6 +471,7 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
             if (right->kind == TYPE_LIST)
                 return inferer_get_most_general_unifier
                     (inferer, left->type.list.type, right->type.list.type, subst_arr);
+            break;
 
         case TYPE_STRUCT     :
             assert(false);
@@ -480,6 +493,7 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
                     return false;
                 }
 
+                // TODO: Rethink this at a later date - should this modify the existing data types?
                 inferer_type_apply_substitution(inferer, subst_a, & left->type.fn.right);
                 inferer_type_apply_substitution(inferer, subst_a, &right->type.fn.right);
                 result = inferer_get_most_general_unifier
@@ -513,7 +527,12 @@ bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right,
     return inferer_throw_failed_to_unify_error(inferer);
 }
 
-bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type_ref)
+Type* inferer_get_decl_type(Inferer* inferer, Decl* decl)
+{
+    assert(false);
+}
+
+bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref)
 {
     assert(inferer   != NULL);
     assert(expr      != NULL);
@@ -572,12 +591,14 @@ bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type_ref)
             break;
 
         case EXPR_PRIMARY_IDENTIFIER:
-            assert(false);
-            break;
+            fprintf(stderr, "[%s:%d] Type inference: Found unresolved identifier in type inference stage of compilation.\n", __FILE__, __LINE__);
+            exit(1);
 
         case EXPR_PRIMARY_DECL      :
-            assert(false);
-            break;
+            type = inferer_get_decl_type(inferer, expr->expr.primary.primary.decl);
+            assert(type != NULL);
+            *type_ref = type_deepcopy(&inferer->type_arena, type);
+            return true;
 
         default:
             fprintf(stderr, "[%s:%d] Type inference: Failed to recognize primary expr kind.\n", __FILE__, __LINE__);
@@ -585,15 +606,49 @@ bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type_ref)
     }
 }
 
-bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type_ref)
+bool inferer_infer_expr_unary_operator(Inferer* inferer, Expr* operand, Type* builtin_type, Type** type_ref, Subst** subst_ref)
+{
+    assert(inferer   != NULL);
+    assert(operand   != NULL);
+    assert(builtin_type != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+    assert(subst_ref != NULL);
+    assert(*subst_ref != NULL);
+
+    Type* unary_type = NULL;
+
+    Subst* subst_a = NULL;
+    Subst* subst_b = NULL;
+    Subst* unified_subst = NULL;
+
+    inferer_infer_expr(inferer, operand, &unary_type, &subst_a);
+
+    inferer_type_apply_substitution(inferer, subst_a, &unary_type);
+
+    if (!inferer_get_most_general_unifier(inferer, unary_type, builtin_type, &subst_b))
+    {
+        return false;
+    }
+
+    unified_subst = compose_substitutions(subst_b, subst_a);
+
+    inferer_type_apply_substitution(inferer, unified_subst, &unary_type);
+    arrfree(subst_a);
+    arrfree(subst_b);
+
+    *type_ref  = unary_type   ;
+    *subst_ref = unifier_subst;
+
+    return true;
+}
+
+bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref)
 {
     assert(inferer   != NULL);
     assert(expr      != NULL);
     assert(type_ref  != NULL);
     assert(*type_ref != NULL);
-
-    Type* type = *type_ref;
-    Type  type_mem;
 
     switch (expr->expr.unary.kind)
     {
@@ -602,12 +657,12 @@ bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type_ref)
             exit(1);
 
         case EXPR_UNARY_NOT    :
-            assert(false);
-            break;
+            return inferer_infer_expr_unary_operator
+                (inferer, expr->expr.unary.unary, &builtin_bool, type_ref, subst_ref)
 
         case EXPR_UNARY_NEGATE :
-            assert(false);
-            break;
+            return inferer_infer_expr_unary_operator
+                (inferer, expr->expr.unary.unary, &builtin_int , type_ref, subst_ref)
 
         default:
             fprintf(stderr, "[%s:%d] Type inference: Failed to recognize unary expr kind.\n", __FILE__, __LINE__);
@@ -615,7 +670,49 @@ bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type_ref)
     }
 }
 
-bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type_ref)
+bool inferer_infer_expr_binary_operator(Inferer* inferer, Expr* left, Expr* right, Type* left_builtin_type, Type* right_builtin_type, Type** type_ref, Subst** subst_ref)
+{
+    assert(inferer   != NULL);
+    assert(left      != NULL);
+    assert(right     != NULL);
+    assert(left_builtin_type  != NULL);
+    assert(right_builtin_type != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+    assert(subst_ref != NULL);
+    assert(*subst_ref != NULL);
+
+    Type* type_var   = NULL;
+    Type* left_type  = NULL;
+    Type* right_type = NULL;
+
+    Subst* subst_left  = NULL;
+    Subst* subst_right = NULL;
+
+    type_var = inferer_new_type_variable(inferer);
+
+    inferer_infer_expr(inferer, left, &left_type, &subst_left);
+
+    inferer_type_env_apply_substitution(inferer, subst_left);
+
+    inferer_infer_expr(inferer, right, &right_type, &subst_right);
+
+    inferer_type_apply_substitution(inferer, subst_left , &right_type);
+
+    // *type_ref = create_function(right_type, type_var)
+    // mgu( w)
+
+    *subst_ref = compose_substitutions(
+    inferer_infer_expr(inferer, right, &right_type, &subst_right);
+
+    *subst_ref = compose_substitutions(subst_right, subst_left);
+
+    inferer_type_apply_substitution(inferer, *subst_ref, &right_type);
+
+    return true;
+}
+
+bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref)
 {
     assert(inferer   != NULL);
     assert(expr      != NULL);
@@ -705,7 +802,7 @@ bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type_ref)
     }
 }
 
-bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type_ref)
+bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref)
 {
     assert(inferer   != NULL);
     assert(expr      != NULL);
@@ -719,7 +816,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type_ref)
     exit(1);
 }
 
-bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type_ref)
+bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref)
 {
     assert(inferer   != NULL);
     assert(expr      != NULL);
@@ -730,10 +827,10 @@ bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type_ref)
 
     switch(expr->kind)
     {
-        case EXPR_PRIMARY: return inferer_infer_expr_primary (inferer, expr, type_ref);
-        case EXPR_UNARY  : return inferer_infer_expr_unary   (inferer, expr, type_ref);
-        case EXPR_BINARY : return inferer_infer_expr_binary  (inferer, expr, type_ref);
-        case EXPR_FN     : return inferer_infer_expr_fn      (inferer, expr, type_ref);
+        case EXPR_PRIMARY: return inferer_infer_expr_primary (inferer, expr, type_ref, subst_ref);
+        case EXPR_UNARY  : return inferer_infer_expr_unary   (inferer, expr, type_ref, subst_ref);
+        case EXPR_BINARY : return inferer_infer_expr_binary  (inferer, expr, type_ref, subst_ref);
+        case EXPR_FN     : return inferer_infer_expr_fn      (inferer, expr, type_ref, subst_ref);
         default:
             fprintf(stderr, "[%s:%d] Type inference: Failed to recognize expr kind.\n", __FILE__, __LINE__);
             exit(1);
