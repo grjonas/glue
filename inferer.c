@@ -686,28 +686,37 @@ bool inferer_infer_expr_binary_operator(Inferer* inferer, Expr* left, Expr* righ
     Type* left_type  = NULL;
     Type* right_type = NULL;
 
-    Subst* subst_left  = NULL;
-    Subst* subst_right = NULL;
+    Subst* left_subst  = NULL;
+    Subst* right_subst = NULL;
 
-    type_var = inferer_new_type_variable(inferer);
 
-    inferer_infer_expr(inferer, left, &left_type, &subst_left);
+    // ================================================================================
 
-    inferer_type_env_apply_substitution(inferer, subst_left);
 
-    inferer_infer_expr(inferer, right, &right_type, &subst_right);
+    // Infer left hand side of binary expression.
+    inferer_infer_expr(inferer, left, &left_type, &left_subst);
 
-    inferer_type_apply_substitution(inferer, subst_left , &right_type);
+    // Substitute all type variables in type environment with types.
+    inferer_type_env_apply_substitution(inferer, left_subst);
 
-    // *type_ref = create_function(right_type, type_var)
-    // mgu( w)
+    inferer_get_most_general_unifier(inferer, left_type, left_builtin_type, &left_subst);
 
-    *subst_ref = compose_substitutions(
-    inferer_infer_expr(inferer, right, &right_type, &subst_right);
+    inferer_type_env_apply_substitution(inferer, left_subst);
 
-    *subst_ref = compose_substitutions(subst_right, subst_left);
+    // ================================================================================
 
-    inferer_type_apply_substitution(inferer, *subst_ref, &right_type);
+
+    // Infer right hand side of binary expression.
+    infer_inferer_expr(inferer, right, &right_type, &right_subst);
+
+    // Substitute all type variables in type environment with types.
+    inferer_type_env_apply_substitution(inferer, right_subst);
+
+    inferer_get_most_general_unifier(inferer, right_type, right_builtin_type, &right_subst);
+
+    inferer_type_env_apply_substitution(inferer, right_subst);
+
+    // ================================================================================
 
     return true;
 }
