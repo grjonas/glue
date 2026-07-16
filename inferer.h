@@ -4,34 +4,21 @@
 #include "resolver.h"
 #include "type.h"
 
+#define BUILTIN_TYPE_NIL    NULL
+#define BUILTIN_TYPE_BOOL   NULL
+#define BUILTIN_TYPE_STRING NULL
+#define BUILTIN_TYPE_NAT    NULL
+#define BUILTIN_TYPE_INT    NULL
+#define BUILTIN_TYPE_REAL   NULL
+
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
-// TODO: Think about rewriting substitution to use hashmaps instead of lists.
-typedef struct Inferer       Inferer      ;
+typedef struct Inferer    Inferer   ;
+typedef struct TypeScheme TypeScheme;
 
-typedef struct Scheme        Scheme       ;
-typedef struct TypeEnvTerm   TypeEnvTerm  ;
-typedef enum   TypeAllocKind TypeAllocKind;
-typedef struct SubstObj      SubstObj     ;
-typedef struct Subst         Subst        ;
-typedef struct TypeAlloc     TypeAlloc    ;
-
-// A bonded type and it's associated variable ids.
-struct Scheme
+struct TypeScheme
 {
+    int quantified_count;
     Type* type;
-    int*  bound_var_ids;
-};
-
-struct TypeEnvTerm
-{
-    int    key  ;
-    Scheme value;
-};
-
-struct Subst
-{
-    int   key  ; // var id
-    Type* value;
 };
 
 // There are a couple of things that should be known about the inferer:
@@ -51,6 +38,7 @@ struct Inferer
     Arena type_arena;
 
     // Misc. state
+    Type** type_variables;
 
     // Outputs
 
@@ -61,19 +49,13 @@ struct Inferer
 Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
 
-void type_get_free_type_vars(Type type, int** free_type_vars);
-void scheme_get_free_type_vars(Scheme scheme, int** free_type_vars);
-void type_env_get_free_type_vars(TypeEnvTerm* env, int** free_type_vars);
-Type* type_deepcopy(Arena* arena, Type* type);
-void substitute_var_free_with_bounded(Type* type, int free_var, int bounded_var);
-void inferer_type_apply_substitution(Inferer* inferer, Subst* subst_hashmap, Type** type_ref);
-void generalize_type(TypeEnvTerm* env, Type* type, Scheme* scheme);
-bool instantiate_scheme(Scheme scheme, Type* type_ref);
-bool inferer_throw_failed_to_unify_error(Inferer* inferer);
-Subst* compose_substitutions(Subst* subst_hashmap_a, Subst* subst_hashmap_b);
-bool inferer_bind_variable_to_type(Inferer* inferer, int var_id, Type* type, Subst** subst);
-bool inferer_get_most_general_unifier(Inferer* inferer, Type* left, Type* right, Subst** subst_hashmap);
-bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type_ref, Subst** subst_ref);
+bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type);
+
+// Unifies the two types
+void  inferer_unify     (Inferer* inferer, Type** left, Type** right);
+
+// Follows free type variables until until we find a concrete type.
+Type* inferer_resolve_type_variable(Inferer* inferer, Type* type_var);
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 

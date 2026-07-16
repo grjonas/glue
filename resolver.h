@@ -61,6 +61,7 @@ Decl* resolver_declare_alias               (Resolver* resolver, char* identifier
 Decl* resolver_declare_new_type            (Resolver* resolver, char* identifier);
 Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier);
 
+char* resolver_get_existing_identifier(Resolver* resolver, char* identifier);
 Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier);
 
 void resolver_throw_compiler_error(Resolver* resolver, CompileError err);

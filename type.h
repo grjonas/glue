@@ -38,12 +38,12 @@ enum TypeKind
 
 struct TypeFreeVar
 {
-    int free_var_id;
+    Type* type;
 };
 
 struct TypeBoundedVar
 {
-    int bounded_var_id;
+    int id;
 };
 
 struct TypeList

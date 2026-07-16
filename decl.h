@@ -4,6 +4,7 @@
 #include "dependencies.h"
 #include "decl_definition.h"
 #include "type_expr.h"
+#include "type.h"
 
 typedef enum   DeclKind            DeclKind           ;
 
@@ -54,6 +55,7 @@ struct Decl
     DeclKind kind;
     int   id        ;
     char* identifier;
+    Type* type      ;
     union
     {
         DeclVar             var        ;

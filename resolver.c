@@ -585,6 +585,54 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
     return true;
 }
 
+bool resolver_resolve_expr_binary_access_operator(Resolver* resolver, Expr* expr)
+{
+    assert(expr != NULL);
+
+    // if   expression is an identifier, then return true
+    // elif
+    //     expression is a binary operator
+    //     , and  the operator type is access
+    //     , and  the left hand-side is an identifier
+    //     , then recursively call function on the right-hand side
+    // else return false
+
+    // Beautiful code :)))
+    if (expr->kind == EXPR_PRIMARY && expr->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER)
+    {
+        char** identifier = &expr->expr.primary.primary.identifier;
+        *identifier =
+            resolver_get_existing_identifier(resolver, *identifier);
+        return true;
+    }
+    // Also beautiful code :DDDDDDDD
+    else if
+        (
+               expr->kind == EXPR_BINARY
+            && expr->expr.binary.kind == EXPR_BINARY_ACCESS
+            && expr->expr.binary.left->kind == EXPR_PRIMARY
+            && expr->expr.binary.left->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER
+        )
+    {
+        char** identifier = &expr->expr.binary.left->expr.primary.primary.identifier;
+        *identifier =
+            resolver_get_existing_identifier(resolver, *identifier);
+        return resolver_resolve_expr_binary_access_operator(resolver, expr->expr.binary.right);
+    }
+    else
+    {
+        resolver_throw_compiler_error(resolver, (CompileError)
+        {
+            .kind   = ERROR_ERROR      ,
+            .line   = expr->line  ,
+            .column = expr->column,
+            .length = expr->length,
+            .msg    = "Type resolution: Could not resolve struct access operator - does not match pattern.",
+        });
+        return false;
+    }
+}
+
 // 1) If type != NULL, then we bind then the type of the expression is equal to type.
 // 2) Set variable to the most recent instance of identifier.
 // TODO: Once we begin implementing inference, update this code.
@@ -618,10 +666,22 @@ bool resolver_resolve_expr(Resolver* resolver, Expr* expr)
             {
                 return false;
             }
-            result = resolver_resolve_expr(resolver, expr->expr.binary.right);
-            if (!result)
+
+            if (expr->expr.binary.kind == EXPR_BINARY_ACCESS)
             {
-                return false;
+                result = resolver_resolve_expr_binary_access_operator(resolver, expr->expr.binary.right);
+                if (!result)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                result = resolver_resolve_expr(resolver, expr->expr.binary.right);
+                if (!result)
+                {
+                    return false;
+                }
             }
             break;
 
@@ -954,8 +1014,9 @@ Decl* resolver_declare_alias(Resolver* resolver, char* identifier)
     decl = (Decl)
     {
         .kind       = DECL_ALIAS         ,
-        .identifier = existing_identifier,
         .id         = resolver->decl_id++,
+        .identifier = existing_identifier,
+        .type       = NULL               ,
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
