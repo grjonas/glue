@@ -19,6 +19,7 @@ enum TypeKind
     // Primitive types
     TYPE_NIL        ,
     TYPE_BOOL       ,
+    TYPE_NUMERIC    , // Abstract, represents the other numeric types.
     TYPE_INT        ,
     TYPE_REAL       ,
     TYPE_STRING     ,

@@ -12,8 +12,16 @@
 #define BUILTIN_TYPE_REAL   NULL
 
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
-typedef struct Inferer    Inferer   ;
-typedef struct TypeScheme TypeScheme;
+typedef enum   InfererReturn InfererReturn;
+typedef struct Inferer       Inferer      ;
+typedef struct TypeScheme    TypeScheme   ;
+
+enum InfererReturn
+{
+    INFERER_RETURN_ERROR       ,
+    INFERER_RETURN_SUCCESS     ,
+    INFERER_RETURN_UNIFY_FAILED,
+};
 
 struct TypeScheme
 {
@@ -50,12 +58,14 @@ Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
 
 bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type);
-
-// Unifies the two types
-void  inferer_unify     (Inferer* inferer, Type** left, Type** right);
+bool inferer_resolve(Inferer* inferer, Type* type, Type** resolved_type); // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
+bool inferer_unify     (Inferer* inferer, Type** left, Type** right);     // Unifies the two types
+bool inferer_infer_and_unify_with_type_of_type_kind(Inferer* inferer, Expr* expr, TypeKind expr_type, Type** type);
 
 // Follows free type variables until until we find a concrete type.
 Type* inferer_resolve_type_variable(Inferer* inferer, Type* type_var);
+
+void assert_generic_operator_type_is_valid(TypeKind type);
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 
