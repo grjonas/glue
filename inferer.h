@@ -66,6 +66,8 @@ Type* inferer_resolve_type_variable(Inferer* inferer, Type* type_var);
 
 void assert_generic_operator_type_is_valid(TypeKind type);
 
+Type* inferer_create_free_type_var(Inferer* inferer);
+
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 
 #endif

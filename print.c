@@ -533,65 +533,75 @@ void type_print(FILE* file, Type* type)
 
     fprintf(file, "[TYPE]");
 
-//     switch (type->kind)
-//     {
-//         case TYPE_NIL        :
-//             fprintf(file, "Nil");
-//             return;
-// 
-//         case TYPE_BOOL       :
-//             fprintf(file, "Bool");
-//             return;
-// 
-//         case TYPE_INT        :
-//             fprintf(file, "Int");
-//             return;
-// 
-//         case TYPE_REAL       :
-//             fprintf(file, "Real");
-//             return;
-// 
-//         case TYPE_STRING     :
-//             fprintf(file, "String");
-//             return;
-// 
-//         case TYPE_LIST       :
-//             fprintf(file, "[");
-//             type_print(file, type->type.list.type);
-//             fprintf(file, "]");
-//             return;
-// 
-//         case TYPE_STRUCT     :
-//             fprintf(file, "[TYPE_STRUCT]");
-//             return;
-// 
-//         case TYPE_FN         :
-//             TypeFn type_fn = type->type.fn;
-//             if (type_fn.left->kind == TYPE_FN) fprintf(file, "(");
-//             type_print(file, type_fn.left);
-//             if (type_fn.left->kind == TYPE_FN) fprintf(file, ")");
-//             fprintf(file, " -> ");
-//             type_print(file, type_fn.right);
-//             return;
-// 
-//         case TYPE_VARIABLE   :
-//             fprintf(file, "@%d", type->type.variable.id);
-//             return;
-// 
-//         case TYPE_ALIAS      :
-//             fprintf(file, "[TYPE_ALIAS]");
-//             return;
-// 
-//         case TYPE_ABSTRACTION:
-//             fprintf(file, "[TYPE_ABSTRACTION]");
-//             return;
-// 
-//         case TYPE_APPLICATION:
-//             fprintf(file, "[TYPE_APPLICATION]");
-//             return;
-//     }
-// 
-//     fprintf(file, "[TYPE]");
+    switch (type->kind)
+    {
+        case TYPE_NIL        :
+            fprintf(file, "Nil");
+            return;
+
+        case TYPE_BOOL       :
+            fprintf(file, "Bool");
+            return;
+
+        case TYPE_NUMERIC    :
+            fprintf(file, "[NUMERIC]");
+            return;
+
+        case TYPE_NAT        :
+            fprintf(file, "Nat");
+            return;
+
+        case TYPE_INT        :
+            fprintf(file, "Int");
+            return;
+
+        case TYPE_REAL       :
+            fprintf(file, "Real");
+            return;
+
+        case TYPE_STRING     :
+            fprintf(file, "String");
+            return;
+
+        case TYPE_LIST       :
+            fprintf(file, "[");
+            type_print(file, type->type.list.type);
+            fprintf(file, "]");
+            return;
+
+        case TYPE_STRUCT     :
+            fprintf(file, "[TYPE_STRUCT]");
+            return;
+
+        case TYPE_FN         :
+            TypeFn type_fn = type->type.fn;
+            if (type_fn.left->kind == TYPE_FN) fprintf(file, "(");
+            type_print(file, type_fn.left);
+            if (type_fn.left->kind == TYPE_FN) fprintf(file, ")");
+            fprintf(file, " -> ");
+            type_print(file, type_fn.right);
+            return;
+
+        case TYPE_FREE_VAR   :
+            fprintf(file, "@%p", type->type.free_var.type);
+            return;
+
+        case TYPE_BOUNDED_VAR:
+            fprintf(file, "@%d", type->type.bounded_var.id);
+            return;
+    }
+
+    fprintf(file, "[TYPE]");
+}
+
+void decl_print_top_level(FILE* file, Decl* decl)
+{
+    fprintf
+    (
+        file, " - %s@%d : ",
+        decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id
+    );
+    type_print(file, decl->type);
 }
 
 void decl_print(FILE* file, Decl* decl)
@@ -621,19 +631,19 @@ void decl_print(FILE* file, Decl* decl)
         {
             case DECL_VAR             :
                 fprintf(file, "let");
-                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                decl_print_top_level(file, decl);
                 break;
 
             case DECL_TYPE_VAR   :
                 fprintf(file, "type_var");
-                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                decl_print_top_level(file, decl);
                 break;
 
             case DECL_ALIAS           :
                 type_expr = decl->decl.alias.type_expr;
 
                 fprintf(file, "alias");
-                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                decl_print_top_level(file, decl);
                 fprintf(file, " : ");
                 type_expr_print(file, type_expr);
                 break;
@@ -645,7 +655,7 @@ void decl_print(FILE* file, Decl* decl)
                 constructor_num = decl->decl.type.constructor_num;
 
                 fprintf(file, "type");
-                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                decl_print_top_level(file, decl);
                 fprintf(file, "; vars - ");
                 for (int i = 0; i < type_var_num; ++i)
                 {
@@ -671,7 +681,7 @@ void decl_print(FILE* file, Decl* decl)
                 type_num        = decl->decl.constructor.type_num;
 
                 fprintf(file, "constructor");
-                fprintf(file, " - %s@%d", decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id);
+                decl_print_top_level(file, decl);
                 fprintf(file, " : ");
                 for (int i = 0; i < type_num; ++i)
                 {

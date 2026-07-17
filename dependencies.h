@@ -54,6 +54,8 @@ The following functions are defined:
     }\
     while(0)
 
+#define DYNAMIC_ARRAY
+
 #include "arena.h"
 
 #endif
