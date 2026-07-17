@@ -4,29 +4,27 @@
 #include "resolver.h"
 #include "type.h"
 
-#define BUILTIN_TYPE_NIL    NULL
-#define BUILTIN_TYPE_BOOL   NULL
-#define BUILTIN_TYPE_STRING NULL
-#define BUILTIN_TYPE_NAT    NULL
-#define BUILTIN_TYPE_INT    NULL
-#define BUILTIN_TYPE_REAL   NULL
-
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
-typedef enum   InfererReturn InfererReturn;
-typedef struct Inferer       Inferer      ;
-typedef struct TypeScheme    TypeScheme   ;
-
-enum InfererReturn
-{
-    INFERER_RETURN_ERROR       ,
-    INFERER_RETURN_SUCCESS     ,
-    INFERER_RETURN_UNIFY_FAILED,
-};
+typedef struct Inferer        Inferer       ;
+typedef struct TypeScheme     TypeScheme    ;
+typedef enum   TypeConstraint TypeConstraint;
 
 struct TypeScheme
 {
     int quantified_count;
     Type* type;
+};
+
+enum TypeConstraint
+{
+    TYPE_CONSTRAINT_NIL        ,
+    TYPE_CONSTRAINT_BOOL       ,
+    TYPE_CONSTRAINT_NUMERIC    ,
+    TYPE_CONSTRAINT_NAT        ,
+    TYPE_CONSTRAINT_INT        ,
+    TYPE_CONSTRAINT_REAL       ,
+    TYPE_CONSTRAINT_STRING     ,
+    TYPE_CONSTRAINT_EQUALITY   ,
 };
 
 // There are a couple of things that should be known about the inferer:
@@ -60,9 +58,10 @@ void    inferer_free(Inferer* inferer  );
 bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type);
 bool inferer_resolve(Inferer* inferer, Type* type, Type** resolved_type); // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
 bool inferer_unify     (Inferer* inferer, Type** left, Type** right);     // Unifies the two types
-bool inferer_infer_and_unify_with_type_of_type_kind(Inferer* inferer, Expr* expr, TypeKind expr_type, Type** type);
 
 // Follows free type variables until until we find a concrete type.
+bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
+
 Type* inferer_resolve_type_variable(Inferer* inferer, Type* type_var);
 
 void assert_generic_operator_type_is_valid(TypeKind type);

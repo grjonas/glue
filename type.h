@@ -20,6 +20,7 @@ enum TypeKind
     TYPE_NIL        ,
     TYPE_BOOL       ,
     TYPE_NUMERIC    , // Abstract, represents the other numeric types.
+    TYPE_NAT        ,
     TYPE_INT        ,
     TYPE_REAL       ,
     TYPE_STRING     ,
