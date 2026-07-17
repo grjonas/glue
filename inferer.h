@@ -34,22 +34,22 @@ struct Inferer
 {
     // Inputs
     const char* txt;
-    Token* tokens;
+    DYNAMIC_ARRAY Token* tokens;
     Stmt*  stmts;
-    Decl** declarations; // Holds ALL scanned declarations
-    char** identifiers;
+    DYNAMIC_ARRAY Decl** declarations; // Holds ALL scanned declarations
+    DYNAMIC_ARRAY char** identifiers;
 
     // Memory-management
     Arena arena;
     Arena type_arena;
 
     // Misc. state
-    Type** type_variables;
+    DYNAMIC_ARRAY Type** type_variables;
 
     // Outputs
 
     // Errs
-    CompileError** errs;
+    DYNAMIC_ARRAY CompileError** errs;
 };
 
 Inferer inferer_init(Resolver* resolver);

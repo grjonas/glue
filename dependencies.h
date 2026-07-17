@@ -45,7 +45,7 @@ The following functions are defined:
     arrsetcap - sets the internal capacity. it is not possible to shrink the capacity (currently) 
 */
 
-#define append_list_to_list(ls_a, ls_b) \
+#define append_list_to_list(DYNAMIC_ARRAY ls_a, DYNAMIC_ARRAY ls_b) \
     do\
     {\
         size_t rhs_len = arrlen(ls_b);\

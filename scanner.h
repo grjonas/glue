@@ -65,7 +65,7 @@ typedef struct
     char* init;
     const char* start;
     const char* current;
-    Token* token_list;
+    DYNAMIC_ARRAY Token* token_list;
 
     int32_t line;
     int32_t column;
