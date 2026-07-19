@@ -6,6 +6,7 @@
 #include "type.h"
 #include "expr.h"
 #include "resolver.h"
+#include "inferer.h"
 #include "print.h"
 
 // Returns a null-terminated string that has the file's contents.
@@ -101,7 +102,9 @@ int main(int argc, char** argv)
     }
     stmt_print(file, resolver.stmts);
 
-    resolver_free(&resolver);
+    Inferer inferer = inferer_init(&resolver);
+
+    inferer_free(&inferer);
 
     return 0;
 }

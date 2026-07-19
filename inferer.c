@@ -14,19 +14,162 @@ static Type* builtin_type_int    = &private_builtin_type_int   ;
 static Type* builtin_type_real   = &private_builtin_type_real  ;
 static Type* builtin_type_string = &private_builtin_type_string;
 
+Inferer inferer_init(Resolver* resolver)
+{
+    assert(resolver != NULL);
+
+    Inferer inferer = (Inferer)
+    {
+        .txt            = resolver->txt   ,
+        .tokens         = resolver->tokens,
+        .stmts          = resolver->stmts ,
+        .declarations   = resolver->declarations,
+        .identifiers    = resolver->identifiers ,
+        .arena          = resolver->arena,
+        .type_arena     = NULL,
+        .type_variables = NULL,
+        .errs           = NULL,
+    };
+
+    for (int i = 0; i < arrlen(resolver->errs); ++i)
+    {
+        arrfree(resolver->errs[i]);
+    }
+    arrfree(resolver->errs);
+    arrfree(resolver->context);
+
+    *resolver = (Resolver)
+    {
+        .txt              = NULL ,
+        .tokens           = NULL ,
+        .stmts            = NULL ,
+        .arena            = NULL ,
+        .decl_id          = 0    ,
+        .type_variable_id = 0    ,
+        .loop_depth       = 0    ,
+        .inside_function  = false,
+        .context          = NULL ,
+        .declarations     = NULL ,
+        .identifiers      = NULL ,
+        .errs             = NULL ,
+    };
+
+    return inferer;
+}
+
+void inferer_free(Inferer* inferer)
+{
+    assert(inferer != NULL);
+
+    free((char*)inferer->txt);
+    arrfree(inferer->tokens);
+    arena_free(&inferer->arena);
+    arena_free(&inferer->type_arena);
+
+    arrfree(inferer->declarations);
+    for (int i = 0; i < arrlen(inferer->identifiers); ++i)
+    {
+        free(inferer->identifiers[i]);
+    }
+    arrfree(inferer->identifiers );
+
+    for (int i = 0; i < arrlen(inferer->errs); ++i)
+    {
+        arrfree(inferer->errs[i]);
+    }
+    arrfree(inferer->errs        );
+
+    for (int i = 0; i < arrlen(inferer->type_variables); ++i)
+    {
+        arrfree(inferer->type_variables[i]);
+    }
+    arrfree(inferer->type_variables);
+
+    *inferer = (Inferer)
+    {
+        .txt            = NULL,
+        .tokens         = NULL,
+        .stmts          = NULL,
+        .declarations   = NULL,
+        .identifiers    = NULL,
+        .arena          = NULL,
+        .type_arena     = NULL,
+        .type_variables = NULL,
+        .errs           = NULL,
+    };
+}
+
 // Attempts to unify two types
 // Returns:
 //     * 'true'  on successful unification,
 //     makes changes to both the left and right types.
 //     * 'false' on failure to unify,
 //     does not modify the types on either the left or right
-bool inferer_unify(Inferer* inferer, Type** left, Type** right)
+bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
 {
-    assert(inferer != NULL);
-    assert(left    != NULL);
-    assert(right   != NULL);
+    assert(inferer   != NULL);
+    assert(left_ref  != NULL);
+    assert(right_ref != NULL);
 
-    assert(false);
+    bool is_sucessful = false;
+    Type* left  = *left_ref ;
+    Type* right = *right_ref;
+
+    if (right->kind == TYPE_FREE_VAR)
+    {
+        inferer_bind_variable_to_type(inferer, left, &right);
+        goto inferer_unify_end;
+    }
+
+    switch (left->kind)
+    {
+        case TYPE_NIL        : is_sucessful = right->kind == TYPE_NIL        ; break;
+        case TYPE_BOOL       : is_sucessful = right->kind == TYPE_BOOL       ; break;
+        case TYPE_NAT        : is_sucessful = right->kind == TYPE_NAT        ; break;
+        case TYPE_INT        : is_sucessful = right->kind == TYPE_INT        ; break;
+        case TYPE_REAL       : is_sucessful = right->kind == TYPE_REAL       ; break;
+        case TYPE_STRING     : is_sucessful = right->kind == TYPE_STRING     ; break;
+
+        case TYPE_LIST       : assert(false);
+        case TYPE_STRUCT     : assert(false);
+        case TYPE_FN         :
+            if (right->kind == TYPE_FN)
+            {
+                is_sucessful = inferer_unify(inferer, &left->type.fn.left, &right->type.fn.left);
+                if (!is_sucessful)
+                {
+                    break;
+                }
+
+                inferer_unify(inferer, &left->type.fn.right, &right->type.fn.right);
+                if (!is_sucessful)
+                {
+                    break;
+                }
+            }
+            break;
+
+        case TYPE_FREE_VAR   : inferer_bind_variable_to_type(inferer, left, &right); break;
+        case TYPE_BOUNDED_VAR: assert(false);
+
+        case TYPE_NUMERIC    : assert(false);
+    }
+
+    inferer_unify_end:
+
+    if (!is_sucessful)
+    {
+        inferer_throw_compiler_error(inferer, (CompileError)
+        {
+            .kind   = ERROR_ERROR,
+            .line   = -1         ,
+            .column = -1         ,
+            .length = -1         ,
+            .msg    = "Type inference: Failed to unify types.",
+        });
+    }
+
+    return is_sucessful;
 }
 
 bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Type** type)
@@ -187,11 +330,11 @@ bool inferer_infer_expr_primary(Inferer* inferer, ExprPrimary primary, Type** ty
         // there are uses where identifier doesn't get resolved (for example, in struct access).
         case EXPR_PRIMARY_IDENTIFIER: assert(false);
         case EXPR_PRIMARY_DECL      :
-            *type = primary.primary.decl->type;
+            *type = inferer_get_decl_type(inferer, primary.primary.decl);
             if (*type == NULL)
             {
                 *type = inferer_create_free_type_var(inferer);
-                primary.primary.decl->type = *type;
+                inferer_set_decl_type(inferer, primary.primary.decl, *type);
             }
             return true;
 
@@ -404,13 +547,41 @@ bool inferer_infer_expr_fn(Inferer* inferer, ExprFn fn, Type** type)
     assert(type    != NULL);
     assert(*type   == NULL);
 
-    // struct ExprFn
-    // {
-    //     int    argc  ;
-    //     Expr*  caller;
-    //     Expr** argv  ;
-    // };
+    bool is_sucessful   = false;
+    Type* caller_type   = NULL ;
+    Type* fn_type       = NULL ;
+    Type* curr_fn_ptr   = NULL ;
+    Type* curr_arg_type = NULL ;
+
     assert(false);
+
+    is_sucessful = inferer_infer_expr(inferer, fn.caller, &caller_type);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    fn_type = inferer_create_free_function_type(inferer, fn.argc);
+    curr_fn_ptr = fn_type;
+
+    for (int i = 0; i < fn.argc; ++i)
+    {
+        is_sucessful = inferer_infer_expr(inferer, fn.argv[i], &curr_arg_type);
+        if (!is_sucessful)
+        {
+            return false;
+        }
+
+        is_sucessful = inferer_unify(inferer, &curr_fn_ptr->type.fn.left, &curr_arg_type);
+        if (!is_sucessful)
+        {
+            return false;
+        }
+
+        curr_fn_ptr = fn_type->type.fn.right;
+    }
+
+    return true;
 }
 
 bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
@@ -425,19 +596,102 @@ bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
         case EXPR_PRIMARY: return inferer_infer_expr_primary(inferer, expr->expr.primary, type);
         case EXPR_UNARY  : return inferer_infer_expr_unary  (inferer, expr->expr.unary  , type);
         case EXPR_BINARY : return inferer_infer_expr_binary (inferer, expr->expr.binary , type);
-        case EXPR_FN     : assert(false);
-        // case EXPR_FN     : return inferer_infer_expr_fn     (inferer, expr->expr.fn     , type);
+        case EXPR_FN     : return inferer_infer_expr_fn     (inferer, expr->expr.fn     , type);
         default:
             fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
             exit(1);
     }
-
 }
 
 Type* inferer_create_free_type_var(Inferer* inferer)
 {
     assert(inferer != NULL);
-    assert(false);
+
+    Type type_mem;
+    Type* type = NULL;
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_FREE_VAR,
+        .type.free_var.type = NULL,
+    };
+
+    type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    arrput(inferer->type_variables, type);
+
+    return type;
+}
+
+Type* inferer_create_free_function_type(Inferer* inferer, int arity)
+{
+    assert(inferer != NULL);
+
+    Type type_mem;
+    Type* type      = NULL;
+    Type* curr_type = NULL;
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_FN,
+        .type.fn = (TypeFn)
+        {
+            .left  = arity == 0 ? NULL : inferer_create_free_type_var(inferer),
+            .right = inferer_create_free_type_var(inferer),
+        }
+    };
+
+    type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    curr_type = type;
+
+    for (int i = 1; i < arity; ++i)
+    {
+        type_mem = (Type)
+        {
+            .kind = TYPE_FN,
+            .type.fn = (TypeFn)
+            {
+                .left  = inferer_create_free_type_var(inferer),
+                .right = curr_type->type.fn.right,
+            }
+        };
+
+        curr_type->type.fn.right = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    }
+
+    return type;
+}
+
+Type* inferer_get_decl_type(Inferer* inferer, Decl* decl)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+
+    return decl->type;
+}
+
+void inferer_set_decl_type(Inferer* inferer, Decl* decl, Type* type)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    // type can be NULL ?
+
+    decl->type = type;
+}
+
+void inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type** type)
+{
+    assert(inferer   != NULL         );
+    assert(var       != NULL         );
+    assert(type      != NULL         );
+    assert(var->kind == TYPE_FREE_VAR);
+
+    if (var->type.free_var.type != NULL)
+    {
+        fprintf(stderr, "[%s:%d] Type inference: Cannot bind type to variable that already has a type bound to it.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    var->type.free_var.type = *type;
 }
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err)

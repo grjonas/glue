@@ -1,5 +1,6 @@
 #include "resolver.h"
 
+// TODO: Fix init and free for the resolver, because it doesn't really free everything (the errors mainly).
 Resolver resolver_init(Parser* parser, Stmt* stmts)
 {
     // Parser cleanup
