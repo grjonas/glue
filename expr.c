@@ -810,6 +810,34 @@ bool is_postfix(TokenType type, int* left_bp)
     }
 }
 
+Expr* construct_assign_expr(Arena* arena, char* identifier, Expr* expr)
+{
+    assert(identifier != NULL);
+    assert(expr       != NULL);
+
+    Expr identifier_expr = (Expr)
+    {
+        .kind = EXPR_PRIMARY,
+        .expr.primary = (ExprPrimary)
+        {
+            .kind = EXPR_PRIMARY_IDENTIFIER,
+            .primary.identifier = identifier,
+        }
+    };
+
+    Expr assign_expr = (Expr)
+    {
+        .kind = EXPR_BINARY,
+        .expr.binary = (ExprBinary)
+        {
+            .kind  = EXPR_BINARY_ASSIGN,
+            .left  = (Expr*) arena_push(arena, &identifier_expr, sizeof(Expr)),
+            .right = expr,
+        }
+    };
+
+    return (Expr*) arena_push(arena, &assign_expr, sizeof(Expr));
+}
 
 Expr** create_new_argument_list(Arena* arena, int old_argc, Expr** expr, Expr* lhs)
 {

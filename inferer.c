@@ -153,6 +153,8 @@ bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
         case TYPE_BOUNDED_VAR: assert(false);
 
         case TYPE_NUMERIC    : assert(false);
+
+        case TYPE_SCHEME     : assert(false);
     }
 
     inferer_unify_end:
@@ -755,43 +757,6 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     assert(inferer != NULL);
 
     bool is_sucessful = false;
-    Type* expr_type = NULL;
-    Type* type      = NULL;
-    Type* scheme    = NULL;
-
-    is_sucessful = inferer_infer_expr(inferer, let.expr, &expr_type);
-    if (!is_sucessful)
-    {
-        return false;
-    }
-
-    if (let.type != NULL)
-    {
-        is_sucessful = inferer_infer_type_expr(inferer, let.type, &type);
-        if (!is_sucessful)
-        {
-            return false;
-        }
-
-        inferer_set_decl_var_type(inferer, let.decl, type);
-    }
-
-    is_sucessful = inferer_generalize(inferer, inferer_get_decl_var_type(inferer, let.decl), &scheme);
-    if (!is_sucessful)
-    {
-        return false;
-    }
-
-    assert(scheme->kind == TYPE_SCHEME);
-    inferer_set_decl_var_type(inferer, let.decl, scheme);
-    return true;
-}
-
-bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
-{
-    assert(inferer != NULL);
-
-    bool is_sucessful = false;
 
     Type* expr_type       = NULL;
     Type* annotation_type = NULL;
@@ -812,7 +777,7 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
             return false;
         }
 
-        is_sucessful = inferer_unify(inferer, expr_type, annotation_type);
+        is_sucessful = inferer_unify(inferer, &expr_type, &annotation_type);
         if (!is_sucessful)
         {
             return false;
@@ -837,6 +802,13 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     inferer_set_decl_var_type(inferer, let.decl, scheme);
 
     return true;
+}
+
+bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
+{
+    assert(inferer != NULL);
+
+    assert(false);
 }
 
 // bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)

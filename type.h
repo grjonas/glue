@@ -10,6 +10,7 @@ typedef struct TypeList        TypeList       ;
 typedef struct TypeStruct      TypeStruct     ;
 typedef struct TypeStructField TypeStructField;
 typedef struct TypeFn          TypeFn         ;
+typedef struct TypeScheme      TypeScheme     ;
 // typedef struct TypeAlias       TypeAlias      ;
 // typedef struct TypeAbstraction TypeAbstraction;
 // typedef struct TypeApplication TypeApplication;

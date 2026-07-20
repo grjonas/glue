@@ -6,15 +6,8 @@
 
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
 typedef struct Inferer         Inferer        ;
-typedef struct TypeScheme      TypeScheme     ;
 typedef enum   TypeConstraint  TypeConstraint ;
 // typedef struct InfererSnapshot InfererSnapshot;
-
-struct TypeScheme
-{
-    int quantified_count;
-    Type* type;
-};
 
 enum TypeConstraint
 {
@@ -46,7 +39,6 @@ struct Inferer
 
     // Misc. state
     DYNAMIC_ARRAY Type  ** type_variables;
-    DYNAMIC_ARRAY Scheme**        schemes;
 
     // Outputs
 

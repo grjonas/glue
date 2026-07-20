@@ -295,7 +295,7 @@ Stmt* parser_parse_stmt_let(Parser* parser)
         }
         // This is to make is that the expresseion attached isn't just the expression,
         // but also assigns the result to the variable that is declared.
-        expr = construct_assign_expr(identifier, expr);
+        expr = construct_assign_expr(&parser->arena, identifier, expr);
         stmt.stmt.let.expr = expr;
     }
 

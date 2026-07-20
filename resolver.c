@@ -830,6 +830,7 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
 
         case TYPE_EXPR_NIL       : return true;
         case TYPE_EXPR_BOOL      : return true;
+        case TYPE_EXPR_NAT       : return true;
         case TYPE_EXPR_INT       : return true;
         case TYPE_EXPR_REAL      : return true;
         case TYPE_EXPR_STRING    : return true;

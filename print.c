@@ -471,6 +471,10 @@ void type_expr_print(FILE* file, TypeExpr* type_expr)
             fprintf(file, "Bool");
             return;
 
+        case TYPE_EXPR_NAT:
+            fprintf(file, "Nat");
+            return;
+
         case TYPE_EXPR_INT       :
             fprintf(file, "Int");
             return;
@@ -588,6 +592,10 @@ void type_print(FILE* file, Type* type)
 
         case TYPE_BOUNDED_VAR:
             fprintf(file, "@%d", type->type.bounded_var.id);
+            return;
+
+        case TYPE_SCHEME     :
+            fprintf(file, "[T_SCHEME]");
             return;
     }
 
