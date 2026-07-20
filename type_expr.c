@@ -370,6 +370,10 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
             type_expr.kind = TYPE_EXPR_BOOL;
             break;
 
+        case TOKEN_NAT  :
+            type_expr.kind = TYPE_EXPR_NAT;
+            break;
+
         case TOKEN_INT  :
             type_expr.kind = TYPE_EXPR_INT;
             break;

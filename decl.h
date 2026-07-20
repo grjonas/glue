@@ -25,6 +25,7 @@ enum DeclKind
 
 struct DeclVar
 {
+    Type* type      ;
 };
 
 struct DeclTypeVar
@@ -33,6 +34,7 @@ struct DeclTypeVar
 
 struct DeclAlias
 {
+    Type* type      ;
     TypeExpr* type_expr;
 };
 
@@ -55,7 +57,6 @@ struct Decl
     DeclKind kind;
     int   id        ;
     char* identifier;
-    Type* type      ;
     union
     {
         DeclVar             var        ;

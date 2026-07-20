@@ -5,9 +5,10 @@
 #include "type.h"
 
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
-typedef struct Inferer        Inferer       ;
-typedef struct TypeScheme     TypeScheme    ;
-typedef enum   TypeConstraint TypeConstraint;
+typedef struct Inferer         Inferer        ;
+typedef struct TypeScheme      TypeScheme     ;
+typedef enum   TypeConstraint  TypeConstraint ;
+// typedef struct InfererSnapshot InfererSnapshot;
 
 struct TypeScheme
 {
@@ -44,7 +45,8 @@ struct Inferer
     Arena type_arena;
 
     // Misc. state
-    DYNAMIC_ARRAY Type** type_variables;
+    DYNAMIC_ARRAY Type  ** type_variables;
+    DYNAMIC_ARRAY Scheme**        schemes;
 
     // Outputs
 
@@ -52,12 +54,19 @@ struct Inferer
     DYNAMIC_ARRAY CompileError** errs;
 };
 
+// struct InfererSnapshot
+// {
+//     int context_length;
+// };
+
 Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
 
+bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt);
 bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type);
 bool inferer_resolve   (Inferer* inferer, Type* type, Type** resolved_type) ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
 bool inferer_unify     (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
+bool inferer_generalize(Inferer* inferer, Type* type, Type** scheme);
 
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
@@ -68,9 +77,12 @@ void assert_generic_operator_type_is_valid(TypeKind type);
 
 Type* inferer_create_free_type_var(Inferer* inferer);
 Type* inferer_create_free_function_type(Inferer* inferer, int arity);
-Type* inferer_get_decl_type(Inferer* inferer, Decl* decl);
-void inferer_set_decl_type(Inferer* inferer, Decl* decl, Type* type);
-void inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type** type);
+Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl);
+void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type);
+void  inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type** type);
+
+// InfererSnapshot inferer_get_context_snapshot    (Inferer* inferer);
+// void            inferer_restore_context_snapshot(Inferer* inferer, InfererSnapshot snapshot);
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 

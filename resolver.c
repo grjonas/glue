@@ -69,7 +69,7 @@ bool resolver_resolve_stmt_block(Resolver* resolver)
 
     int    size = 0   ;
     Stmt** body = NULL;
-    Snapshot snapshot ;
+    ResolverSnapshot snapshot ;
 
     size = curr_stmt->stmt.block.size;
     body = curr_stmt->stmt.block.body;
@@ -99,7 +99,7 @@ bool resolver_resolve_stmt_let(Resolver* resolver)
     TypeExpr* type_expr  = NULL;
     Expr    * expr       = NULL;
     Decl    * decl       = NULL;
-    Snapshot snapshot;
+    ResolverSnapshot snapshot;
 
     identifier = curr_stmt->stmt.let.identifier;
     type_expr  = curr_stmt->stmt.let.type      ;
@@ -155,7 +155,7 @@ bool resolver_resolve_stmt_if(Resolver* resolver)
     Expr* expr = NULL;
     Stmt* stmt = NULL;
     Stmt* next = NULL;
-    Snapshot snapshot;
+    ResolverSnapshot snapshot;
 
     expr = curr_stmt->stmt.iff.condition;
     stmt = curr_stmt->stmt.iff.body     ;
@@ -197,7 +197,7 @@ bool resolver_resolve_stmt_while(Resolver* resolver)
 
     Expr* expr = NULL;
     Stmt* stmt = NULL;
-    Snapshot snapshot;
+    ResolverSnapshot snapshot;
 
     expr = curr_stmt->stmt.whilee.condition;
     stmt = curr_stmt->stmt.whilee.body     ;
@@ -294,7 +294,7 @@ bool resolver_resolve_stmt_fn(Resolver* resolver)
     StmtFn fn;
     Stmt*  stmt = NULL;
     Decl*  decl = NULL;
-    Snapshot snapshot;
+    ResolverSnapshot snapshot;
 
     fn   = curr_stmt->stmt.fn;
     stmt = fn.body;
@@ -372,7 +372,7 @@ bool resolver_resolve_stmt_alias(Resolver* resolver)
     char    * identifier = NULL;
     TypeExpr* type_expr  = NULL;
 
-    Snapshot snapshot;
+    ResolverSnapshot snapshot;
 
     assert(curr_stmt != NULL);
     assert(curr_stmt->kind == STMT_ALIAS);
@@ -414,7 +414,7 @@ bool resolver_resolve_stmt_type(Resolver* resolver)
     Decl** type_vars         = NULL;
     Decl** type_constructors = NULL;
 
-    Snapshot snapshot;
+    ResolverSnapshot snapshot;
 
     assert(curr_stmt != NULL);
     assert(curr_stmt->kind == STMT_TYPE);
@@ -865,9 +865,9 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
     exit(1);
 }
 
-Snapshot resolver_get_context_snapshot(Resolver* resolver)
+ResolverSnapshot resolver_get_context_snapshot(Resolver* resolver)
 {
-    return (Snapshot)
+    return (ResolverSnapshot)
     {
         .context_length   = arrlen(resolver->context) ,
         // .decl_id          = resolver->decl_id         ,
@@ -875,11 +875,11 @@ Snapshot resolver_get_context_snapshot(Resolver* resolver)
     };
 }
 
-void resolver_restore_context_snapshot(Resolver* resolver, Snapshot snapshot)
+void resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot)
 {
-    Snapshot curr_snapshot  = (Snapshot)
+    ResolverSnapshot curr_snapshot  = (ResolverSnapshot)
     {
-        .context_length   = arrlen(resolver->context) ,
+        .context_length      = arrlen(resolver->context) ,
         // .decl_id          = resolver->decl_id         ,
         // .type_variable_id = resolver->type_variable_id,
     };
@@ -1017,7 +1017,6 @@ Decl* resolver_declare_alias(Resolver* resolver, char* identifier)
         .kind       = DECL_ALIAS         ,
         .id         = resolver->decl_id++,
         .identifier = existing_identifier,
-        .type       = NULL               ,
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));

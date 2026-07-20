@@ -66,6 +66,7 @@ const char* token_type_name(TokenType type)
         case TOKEN_NIL_T:           return "TOKEN_NIL_T";
         case TOKEN_BOOL:            return "TOKEN_BOOL";
         case TOKEN_INT:             return "TOKEN_INT";
+        case TOKEN_NAT:             return "TOKEN_NAT";
         case TOKEN_REAL:            return "TOKEN_REAL";
         case TOKEN_LET:             return "TOKEN_LET";
         case TOKEN_ALIAS:           return "TOKEN_ALIAS";
@@ -324,6 +325,8 @@ Token scanner_scan_token(Scanner* scanner)
                     case 'N': // Nil
                         if (scanner_match_string(scanner, "il", 1))
                             rt = scanner_make_token(scanner, TOKEN_NIL_T, 0, 2);
+                        else if (scanner_match_string(scanner, "at", 1))
+                            rt = scanner_make_token(scanner, TOKEN_NAT, 0, 2);
                         else
                             rt = scanner_scan_identifier(scanner);
                         break;

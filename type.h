@@ -31,8 +31,9 @@ enum TypeKind
     TYPE_FN         ,
 
     // Special types
-    TYPE_FREE_VAR,
+    TYPE_FREE_VAR   ,
     TYPE_BOUNDED_VAR,
+    TYPE_SCHEME     ,
     // TYPE_ALIAS      , // a type representing an alias to an existing type.
     // TYPE_ABSTRACTION, // a type representing a newly defined type.
     // TYPE_APPLICATION, // application of abstraction
@@ -71,6 +72,12 @@ struct TypeFn
     Type* right;
 };
 
+struct TypeScheme
+{
+    int quantified_count;
+    Type* type;
+};
+
 struct Type
 {
     TypeKind kind;
@@ -81,6 +88,7 @@ struct Type
         TypeList       list       ;
         TypeStruct     structt    ;
         TypeFn         fn         ;
+        TypeScheme     scheme     ;
     }
     type;
 };

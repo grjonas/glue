@@ -48,7 +48,7 @@ struct StmtLet
     char     * identifier;
     Decl     * decl      ;
     TypeExpr * type      ;
-    Expr*      expr      ;
+    Expr     * expr      ;
 };
 
 // I'm thinking that if the condition is NULL, then it's an 'else' statement.
@@ -71,10 +71,10 @@ struct StmtFn
 {
     char      * identifier ;
     Decl      * decl       ;
-    int         argc       ;
-    StmtFnArg** argv       ;
     TypeExpr  * return_type;
     Stmt      * body       ;
+    StmtFnArg** argv       ;
+    int         argc       ;
 };
 
 struct StmtFnArg

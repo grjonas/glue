@@ -598,10 +598,10 @@ void decl_print_top_level(FILE* file, Decl* decl)
 {
     fprintf
     (
-        file, " - %s@%d : ",
+        file, " %s@%d : ",
         decl->identifier == NULL? "[NULL]" : decl->identifier, decl->id
     );
-    type_print(file, decl->type);
+    // type_print(file, decl->type);
 }
 
 void decl_print(FILE* file, Decl* decl)
@@ -632,6 +632,9 @@ void decl_print(FILE* file, Decl* decl)
             case DECL_VAR             :
                 fprintf(file, "let");
                 decl_print_top_level(file, decl);
+                fprintf(file, " type: ");
+                type_print(file, decl->decl.var.type);
+                fprintf(file, " : ");
                 break;
 
             case DECL_TYPE_VAR   :

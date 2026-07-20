@@ -172,6 +172,18 @@ bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
     return is_sucessful;
 }
 
+// The function 'generalize' abstracts a type over all type variables
+// which are free in the type but not free in the given type environment.
+bool inferer_generalize(Inferer* inferer, Type* type, Type** scheme)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(scheme  != NULL);
+    assert(*scheme == NULL);
+
+    assert(false);
+}
+
 bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Type** type)
 {
     assert(inferer    != NULL);
@@ -330,11 +342,11 @@ bool inferer_infer_expr_primary(Inferer* inferer, ExprPrimary primary, Type** ty
         // there are uses where identifier doesn't get resolved (for example, in struct access).
         case EXPR_PRIMARY_IDENTIFIER: assert(false);
         case EXPR_PRIMARY_DECL      :
-            *type = inferer_get_decl_type(inferer, primary.primary.decl);
+            *type = inferer_get_decl_var_type(inferer, primary.primary.decl);
             if (*type == NULL)
             {
                 *type = inferer_create_free_type_var(inferer);
-                inferer_set_decl_type(inferer, primary.primary.decl, *type);
+                inferer_set_decl_var_type(inferer, primary.primary.decl, *type);
             }
             return true;
 
@@ -598,9 +610,313 @@ bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
         case EXPR_BINARY : return inferer_infer_expr_binary (inferer, expr->expr.binary , type);
         case EXPR_FN     : return inferer_infer_expr_fn     (inferer, expr->expr.fn     , type);
         default:
-            fprintf(stderr, "[%s:%d] Statement parsing: Logical error while parsing statements.\n", __FILE__, __LINE__);
+            fprintf(stderr, "[%s:%d] Type inference: Logical error while parsing expression.\n", __FILE__, __LINE__);
             exit(1);
     }
+}
+
+bool inferer_infer_type_expr_variable(Inferer* inferer, TypeExprVariable variable, Type** type)
+{
+    assert(inferer   != NULL);
+    assert(type      != NULL);
+    assert(*type     == NULL);
+
+    assert(false);
+
+    // TypeExprVariable works sort of like either a function if the arity is above 0,
+    // OR variable, if the arity is 0.
+    assert(false);
+    if (variable.argc > 0)
+    {
+        return true;
+    }
+    else
+    {
+        return true;
+    }
+}
+
+bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
+{
+    assert(inferer   != NULL);
+    assert(type_expr != NULL);
+    assert(type      != NULL);
+    assert(*type     == NULL);
+
+    switch(type_expr->kind)
+    {
+        /*
+            fn map(fun : a -> b, ls_a : List(a))
+            do
+                # The 'b' in 'List(b)' should be the same as the one in 'a -> b'.
+                let ls_b : List(b) = fun(ls_a)
+                return ls_b
+            end
+         */
+        case TYPE_EXPR_VARIABLE  : return inferer_infer_type_expr_variable(inferer, type_expr->type_expr.variable, type);
+        case TYPE_EXPR_IDENTIFIER: assert(false); // Shouldn't be encountered at this stage.
+
+        case TYPE_EXPR_NIL       : return builtin_type_nil   ; 
+        case TYPE_EXPR_BOOL      : return builtin_type_bool  ; 
+        case TYPE_EXPR_NAT       : return builtin_type_nat   ; 
+        case TYPE_EXPR_INT       : return builtin_type_int   ; 
+        case TYPE_EXPR_REAL      : return builtin_type_real  ; 
+        case TYPE_EXPR_STRING    : return builtin_type_string; 
+
+        case TYPE_EXPR_LIST      : assert(false); 
+        case TYPE_EXPR_STRUCT    : assert(false); 
+        case TYPE_EXPR_FN        : assert(false);
+
+        case TYPE_EXPR_INSTANCE  : assert(false);
+    }
+
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while parsing type expression.\n", __FILE__, __LINE__);
+    exit(1);
+}
+
+bool inferer_infer_stmt_block(Inferer* inferer, StmtBlock block)
+{
+    assert(inferer    != NULL);
+    assert(block.body != NULL);
+
+    for (int i = 0; i < block.size; ++i)
+    {
+        Stmt* inner_stmt = block.body[i];
+        bool is_sucessful = inferer_infer_stmt(inferer, inner_stmt);
+        if (!is_sucessful)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool inferer_infer_stmt_while(Inferer* inferer, StmtWhile whilee)
+{
+    assert(inferer    != NULL);
+
+    bool is_sucessful = false;
+    Type* type = NULL;
+
+    is_sucessful = inferer_infer_expr(inferer, whilee.condition, &type);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    is_sucessful = inferer_infer_stmt(inferer, whilee.body);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool inferer_infer_stmt_if(Inferer* inferer, StmtIf iff)
+{
+    assert(inferer    != NULL);
+
+    bool is_sucessful = false;
+    Type* type = NULL;
+
+    is_sucessful = inferer_infer_expr(inferer, iff.condition, &type);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    is_sucessful = inferer_infer_stmt(inferer, iff.body);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
+{
+    assert(inferer    != NULL);
+
+    Type* type = NULL;
+
+    if (returnn.expr != NULL && !inferer_infer_expr(inferer, returnn.expr, &type))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
+{
+    assert(inferer != NULL);
+
+    bool is_sucessful = false;
+    Type* expr_type = NULL;
+    Type* type      = NULL;
+    Type* scheme    = NULL;
+
+    is_sucessful = inferer_infer_expr(inferer, let.expr, &expr_type);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    if (let.type != NULL)
+    {
+        is_sucessful = inferer_infer_type_expr(inferer, let.type, &type);
+        if (!is_sucessful)
+        {
+            return false;
+        }
+
+        inferer_set_decl_var_type(inferer, let.decl, type);
+    }
+
+    is_sucessful = inferer_generalize(inferer, inferer_get_decl_var_type(inferer, let.decl), &scheme);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    assert(scheme->kind == TYPE_SCHEME);
+    inferer_set_decl_var_type(inferer, let.decl, scheme);
+    return true;
+}
+
+bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
+{
+    assert(inferer != NULL);
+
+    bool is_sucessful = false;
+
+    Type* expr_type       = NULL;
+    Type* annotation_type = NULL;
+    Type* final_type      = NULL;
+    Type* scheme          = NULL;
+
+    is_sucessful = inferer_infer_expr(inferer, let.expr, &expr_type);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    if (let.type != NULL)
+    {
+        is_sucessful = inferer_infer_type_expr(inferer, let.type, &annotation_type);
+        if (!is_sucessful)
+        {
+            return false;
+        }
+
+        is_sucessful = inferer_unify(inferer, expr_type, annotation_type);
+        if (!is_sucessful)
+        {
+            return false;
+        }
+
+        final_type = annotation_type;
+    }
+    else
+    {
+        final_type = expr_type;
+    }
+
+    is_sucessful = inferer_generalize(inferer, final_type, &scheme);
+    if (!is_sucessful)
+    {
+        return false;
+    }
+
+    assert(scheme != NULL);
+    assert(scheme->kind == TYPE_SCHEME);
+
+    inferer_set_decl_var_type(inferer, let.decl, scheme);
+
+    return true;
+}
+
+// bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
+// {
+//     assert(inferer != NULL);
+// 
+//     bool  is_successful = false;
+//     Type* return_type   = NULL;
+//     Type* function_type = NULL;
+//     Type* scheme        = NULL;
+// 
+//     if (fn.return_type != NULL)
+//     {
+//         is_successful = inferer_infer_type_expr(inferer, fn.return_type, &return_type);
+//         if (!is_successful)
+//         {
+//             return false;
+//         }
+//     }
+// 
+//     is_successful = inferer_infer_stmt(inferer, fn.body);
+//     if (!is_successful)
+//     {
+//         return false;
+//     }
+// 
+//     function_type = inferer_get_decl_var_type(inferer, fn.decl);
+// 
+//     if (return_type != NULL)
+//     {
+//         Type* body_return_type = inferer_get_function_return_type(function_type);
+// 
+//         is_successful = inferer_get_most_general_unifier(inferer, body_return_type, return_type);
+//         if (!is_successful)
+//         {
+//             return false;
+//         }
+//     }
+// 
+//     is_successful = inferer_generalize(inferer, function_type, &scheme);
+//     if (!is_successful)
+//     {
+//         return false;
+//     }
+// 
+//     assert(scheme != NULL);
+//     assert(scheme->kind == TYPE_SCHEME);
+// 
+//     inferer_set_decl_var_type(inferer, fn.decl, scheme);
+// 
+//     return true;
+// }
+
+bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
+{
+    assert(inferer != NULL);
+    assert(stmt    != NULL);
+    // assert(type    != NULL);
+    // assert(*type   == NULL);
+
+    Type* type = NULL;
+
+    switch (stmt->kind)
+    {
+
+        case STMT_BLOCK   : return inferer_infer_stmt_block (inferer, stmt->stmt.block  );
+        case STMT_LET     : return inferer_infer_stmt_let   (inferer, stmt->stmt.let    ); 
+        case STMT_EXPR    : return inferer_infer_expr       (inferer, stmt->stmt.expr, &type);
+        case STMT_IF      : return inferer_infer_stmt_if    (inferer, stmt->stmt.iff    );
+        case STMT_WHILE   : return inferer_infer_stmt_while (inferer, stmt->stmt.whilee );
+        case STMT_BREAK   : return true; 
+        case STMT_CONTINUE: return true;
+        case STMT_FN      : return inferer_infer_stmt_fn    (inferer, stmt->stmt.fn     );
+        case STMT_RETURN  : return inferer_infer_stmt_return(inferer, stmt->stmt.returnn);
+        case STMT_ALIAS   : assert(false);
+        case STMT_TYPE    : assert(false);
+    }
+
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while parsing statement.\n", __FILE__, __LINE__);
+    exit(1);
 }
 
 Type* inferer_create_free_type_var(Inferer* inferer)
@@ -661,21 +977,23 @@ Type* inferer_create_free_function_type(Inferer* inferer, int arity)
     return type;
 }
 
-Type* inferer_get_decl_type(Inferer* inferer, Decl* decl)
+Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
+    assert(decl->kind == DECL_VAR);
 
-    return decl->type;
+    return decl->decl.var.type;
 }
 
-void inferer_set_decl_type(Inferer* inferer, Decl* decl, Type* type)
+void inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
+    assert(decl->kind == DECL_VAR);
     // type can be NULL ?
 
-    decl->type = type;
+    decl->decl.var.type = type;
 }
 
 void inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type** type)

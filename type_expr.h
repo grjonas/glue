@@ -28,6 +28,7 @@ enum TypeExprKind
     TYPE_EXPR_IDENTIFIER,
     TYPE_EXPR_NIL       ,
     TYPE_EXPR_BOOL      ,
+    TYPE_EXPR_NAT       ,
     TYPE_EXPR_INT       ,
     TYPE_EXPR_REAL      ,
     TYPE_EXPR_STRING    ,

@@ -7,7 +7,7 @@
 #include "decl.h"
 
 typedef struct Resolver Resolver;
-typedef struct Snapshot Snapshot;
+typedef struct ResolverSnapshot ResolverSnapshot;
 
 struct Resolver
 {
@@ -35,7 +35,7 @@ struct Resolver
     DYNAMIC_ARRAY CompileError** errs;
 };
 
-struct Snapshot
+struct ResolverSnapshot
 {
     int context_length  ;
     // int type_variable_id;
@@ -50,8 +50,8 @@ bool resolver_resolve_stmt     (Resolver* resolver);
 bool resolver_resolve_expr     (Resolver* resolver, Expr* expr);
 bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
 
-Snapshot resolver_get_context_snapshot    (Resolver* resolver);
-void     resolver_restore_context_snapshot(Resolver* resolver, Snapshot snapshot);
+ResolverSnapshot resolver_get_context_snapshot    (Resolver* resolver);
+void     resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot);
 
 void resolver_push_decl_to_context(Resolver* resolver, Decl* decl);
 
