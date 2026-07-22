@@ -58,4 +58,6 @@ The following functions are defined:
 
 #define DYNAMIC_ARRAY
 
+char* find_string_in_string_list(DYNAMIC_ARRAY char** strs, char* str);
+
 #endif

@@ -36,3 +36,20 @@ The following functions are defined:
     arrcap - returns the internal capacity, the maximum length the array can be without reallocating it
     arrsetcap - sets the internal capacity. it is not possible to shrink the capacity (currently) 
 */
+
+char* find_string_in_string_list(DYNAMIC_ARRAY char** strs, char* str)
+{
+    assert(strs != NULL);
+    assert(str  != NULL);
+
+    int length = arrlen(strs);
+    for (int i = 0; i < length; ++i)
+    {
+        if (strcmp(strs[i], str) == 0)
+        {
+            return str;
+        }
+    }
+
+    return NULL;
+}

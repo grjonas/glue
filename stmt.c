@@ -544,6 +544,7 @@ Stmt* parser_parse_stmt_return(Parser* parser)
         .stmt.returnn = (StmtReturn)
         {
             .expr = expr,
+            .fn   = NULL,
         }
     };
 
@@ -712,6 +713,13 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
             return NULL;
         }
     }
+    // This is not something that should be done,
+    // since there's not telling the return type of a function
+    // if it's type expression is ommited.
+    // else
+    // {
+    //     return_type = construct_primitive_type_expr(&parser->arena, TYPE_EXPR_NIL);
+    // }
 
     body = parser_parse_stmt(parser);
     if (body == NULL)

@@ -433,6 +433,7 @@ Expr* parser_parse_expr_struct(Parser* parser)
 
     int argc = 0;
     ExprPrimaryStructField** argv = NULL;
+    DYNAMIC_ARRAY char** parsed_keys = NULL;
 
     Token token;
 
@@ -513,7 +514,22 @@ Expr* parser_parse_expr_struct(Parser* parser)
             });
             return NULL;
         }
+
+        if (find_string_in_string_list(parsed_keys, identifier) != NULL)
+        {
+            parser_throw_compiler_error(parser, (CompileError)
+            {
+                .kind   = ERROR_ERROR ,
+                .line   = token.line  ,
+                .column = token.column,
+                .length = token.line  ,
+                .msg    = "Expression parsing: Found duplicate identifier while parsing struct.",
+            });
+            return NULL;
+        }
+        arrput(parsed_keys, identifier);
     }
+    arrfree(parsed_keys);
 
     argc = arrlen(argv);
     ExprPrimaryStructField** tmp_ptr = argv;

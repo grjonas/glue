@@ -23,7 +23,7 @@ struct Resolver
     int decl_id;
     int type_variable_id;
     int loop_depth;
-    bool inside_function;
+    Decl* curr_fn; // NULL means not inside any function
     DYNAMIC_ARRAY Decl** context; // Works similiar to a stack - when we recursively try to resolve a statement,
                     // we use this as context - on return, we restore the stack to it's previous state.
 

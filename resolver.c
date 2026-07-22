@@ -26,7 +26,8 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
         .type_variable_id = 0             ,
         .decl_id          = 0             ,
         .loop_depth       = 0             ,
-        .inside_function  = false         ,
+        // .inside_function  = false         ,
+        .curr_fn          = NULL          ,
         .context          = NULL          ,
         .declarations     = NULL          ,
         .identifiers      = NULL          ,
@@ -55,7 +56,8 @@ void resolver_free(Resolver* resolver)
         .type_variable_id = 0              ,
         .decl_id          = 0              ,
         .loop_depth       = 0              ,
-        .inside_function  = false          ,
+        // .inside_function  = false          ,
+        .curr_fn          = NULL           ,
         .context          = NULL           ,
         .declarations     = NULL           ,
         .identifiers      = NULL           ,
@@ -311,9 +313,9 @@ bool resolver_resolve_stmt_fn(Resolver* resolver)
         return false;
     }
 
-    bool inside_function = resolver->inside_function;
+    Decl* curr_fn = resolver->curr_fn;
     resolver->stmts = stmt;
-    resolver->inside_function = true;
+    resolver->curr_fn = decl;
 
     // Assigning types to argument.
     if (!resolver_resolve_stmt(resolver))
@@ -322,7 +324,7 @@ bool resolver_resolve_stmt_fn(Resolver* resolver)
     }
 
     resolver->stmts = curr_stmt;
-    resolver->inside_function = inside_function;
+    resolver->curr_fn = curr_fn;
 
     resolver_restore_context_snapshot(resolver, snapshot);
 
@@ -339,7 +341,7 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
     assert(curr_stmt->kind == STMT_RETURN);
 
     // TODO: Somehow bind this to it's respective function declaration.
-    if (!resolver->inside_function)
+    if (resolver->curr_fn == NULL)
     {
         resolver_throw_compiler_error(resolver, (CompileError)
         {
@@ -360,6 +362,7 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
             return false;
         }
     }
+    curr_stmt->stmt.returnn.fn = resolver->curr_fn;
 
     return true;
 }

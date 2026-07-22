@@ -1,6 +1,8 @@
 #ifndef TYPE_H
 #define TYPE_H
 
+#include "dependencies.h"
+
 typedef struct Type            Type           ;
 typedef enum   TypeKind        TypeKind       ;
 
@@ -108,5 +110,8 @@ struct Type
 //     int    argc;
 //     Type** argv;
 // };
+
+TypeStructField* type_struct_find_key(TypeStruct structt, char* key);
+bool type_kind_is_numeric(TypeKind kind);
 
 #endif

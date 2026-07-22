@@ -174,6 +174,7 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
         char    * identifier = NULL;
         TypeExpr* field_type = NULL;
         TypeExprStructField field;
+        DYNAMIC_ARRAY char   ** parsed_keys = NULL;
 
         // If it's not, then we parse an argument.
         // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
@@ -228,7 +229,22 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
                 });
                 return NULL;
             }
+
+            if (find_string_in_string_list(parsed_keys, identifier) != NULL)
+            {
+                parser_throw_compiler_error(parser, (CompileError)
+                {
+                    .kind   = ERROR_ERROR ,
+                    .line   = token.line  ,
+                    .column = token.column,
+                    .length = token.line  ,
+                    .msg    = "Expression parsing: Found duplicate identifier while parsing struct.",
+                });
+                return NULL;
+            }
+            arrput(parsed_keys, identifier);
         }
+        arrfree(parsed_keys);
 
         tmp_ptr = argv;
         argc = arrlen(tmp_ptr);
@@ -406,6 +422,30 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
     parser_next(parser);
 
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
+}
+
+TypeExpr* construct_primitive_type_expr(Arena* arena, TypeExprKind kind)
+{
+    switch (kind)
+    {
+        case TYPE_EXPR_NIL       : break;
+        case TYPE_EXPR_BOOL      : break;
+        case TYPE_EXPR_NAT       : break;
+        case TYPE_EXPR_INT       : break;
+        case TYPE_EXPR_REAL      : break;
+        case TYPE_EXPR_STRING    : break;
+        default:
+            fprintf(stderr, "Type expression contruction: Given type kind is not primitive.\n");
+            exit(1);
+    }
+
+    TypeExpr type_expr = (TypeExpr)
+    {
+        .kind           = kind,
+        .type_expr.none = NULL,
+    };
+
+    return (TypeExpr*) arena_push(arena, &type_expr, sizeof(TypeExpr));
 }
 
 // Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr)
