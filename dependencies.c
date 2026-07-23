@@ -37,7 +37,7 @@ The following functions are defined:
     arrsetcap - sets the internal capacity. it is not possible to shrink the capacity (currently) 
 */
 
-char* find_string_in_string_list(DYNAMIC_ARRAY char** strs, char* str)
+char* find_string_in_string_list(DYNAMIC_ARRAY(char** strs), char* str)
 {
     assert(strs != NULL);
     assert(str  != NULL);

@@ -433,7 +433,7 @@ Expr* parser_parse_expr_struct(Parser* parser)
 
     int argc = 0;
     ExprPrimaryStructField** argv = NULL;
-    DYNAMIC_ARRAY char** parsed_keys = NULL;
+    DYNAMIC_ARRAY(char** parsed_keys) = NULL;
 
     Token token;
 

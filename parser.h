@@ -20,7 +20,7 @@ struct Parser
 {
     // Input
     const char* txt   ;
-    DYNAMIC_ARRAY Token* tokens;
+    DYNAMIC_ARRAY(Token* tokens);
 
     // State
     ParserState state ;
@@ -30,7 +30,7 @@ struct Parser
 
     // Output
     Arena arena;
-    DYNAMIC_ARRAY CompileError** errs;
+    DYNAMIC_ARRAY(CompileError** errs);
 };
 
 Parser init_parser(Scanner scanner);

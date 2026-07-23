@@ -13,7 +13,7 @@ struct Resolver
 {
     // Inputs
     const char* txt;
-    DYNAMIC_ARRAY Token* tokens;
+    DYNAMIC_ARRAY(Token* tokens);
     Stmt*  stmts;
 
     // Memory-management
@@ -24,15 +24,15 @@ struct Resolver
     int type_variable_id;
     int loop_depth;
     Decl* curr_fn; // NULL means not inside any function
-    DYNAMIC_ARRAY Decl** context; // Works similiar to a stack - when we recursively try to resolve a statement,
+    DYNAMIC_ARRAY(Decl** context); // Works similiar to a stack - when we recursively try to resolve a statement,
                     // we use this as context - on return, we restore the stack to it's previous state.
 
     // Outputs
-    DYNAMIC_ARRAY Decl** declarations; // Holds ALL scanned declarations
-    DYNAMIC_ARRAY char** identifiers;
+    DYNAMIC_ARRAY(Decl** declarations); // Holds ALL scanned declarations
+    DYNAMIC_ARRAY(char** identifiers );
 
     // Errs
-    DYNAMIC_ARRAY CompileError** errs;
+    DYNAMIC_ARRAY(CompileError** errs);
 };
 
 struct ResolverSnapshot

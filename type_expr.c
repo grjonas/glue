@@ -174,7 +174,7 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
         char    * identifier = NULL;
         TypeExpr* field_type = NULL;
         TypeExprStructField field;
-        DYNAMIC_ARRAY char   ** parsed_keys = NULL;
+        DYNAMIC_ARRAY(char   ** parsed_keys) = NULL;
 
         // If it's not, then we parse an argument.
         // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
