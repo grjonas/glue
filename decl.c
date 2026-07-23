@@ -17,6 +17,8 @@ bool decl_is_new_type(Decl decl)
 
 int  decl_get_new_type_parameter_num(Decl decl)
 {
+    assert(decl.kind == DECL_TYPE);
+
     fprintf(stderr, "[%s:%d] Declarations: Not implemented yet.\n", __FILE__, __LINE__);
     exit(1);
 }

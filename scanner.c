@@ -83,8 +83,9 @@ const char* token_type_name(TokenType type)
         case TOKEN_MATCH   : return "TOKEN_MATCH"   ;
 
         // Special.
-        case TOKEN_ERROR   : return "TOKEN_ERROR"   ;
-        case TOKEN_EOF     : return "TOKEN_EOF"     ;
+        case TOKEN_WHITESPACE: return "TOKEN_WHITESPACE";
+        case TOKEN_ERROR     : return "TOKEN_ERROR"     ;
+        case TOKEN_EOF       : return "TOKEN_EOF"       ;
     }
 
     return "UNKNOWN_TOKEN";

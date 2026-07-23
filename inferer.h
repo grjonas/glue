@@ -19,6 +19,8 @@ enum TypeConstraint
     TYPE_CONSTRAINT_REAL       ,
     TYPE_CONSTRAINT_STRING     ,
     TYPE_CONSTRAINT_EQUALITY   ,
+    TYPE_CONSTRAINT_LIST       ,
+    TYPE_CONSTRAINT_VAR        ,
 };
 
 struct Bind
@@ -67,8 +69,9 @@ bool inferer_generalize      (Inferer* inferer, Type* type, Type** scheme)      
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
 
-Type* inferer_create_free_type_var(Inferer* inferer);
-Type* inferer_create_free_function_type(Inferer* inferer, int arity);
+Type* inferer_create_free_type_var      (Inferer* inferer);
+Type* inferer_create_free_list_type     (Inferer* inferer);
+Type* inferer_create_free_function_type (Inferer* inferer , int arity);
 Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl);
 void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type);
 Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl);

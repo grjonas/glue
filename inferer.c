@@ -163,7 +163,6 @@ bool inferer_attempt_unify_left_type_numeric(Inferer* inferer, Type** left_ref, 
         default:
             assert(false);
     }
-
 }
 
 bool inferer_attempt_unify_left_type_list(Inferer* inferer, TypeList left_list, Type** right_ref)
@@ -201,8 +200,6 @@ bool inferer_attempt_unify_left_type_struct(Inferer* inferer, TypeStruct left_st
     Type* right = *right_ref;
     TypeStruct right_struct;
 
-    assert(false);
-
     if (right->kind != TYPE_STRUCT)
     {
         return false;
@@ -210,7 +207,6 @@ bool inferer_attempt_unify_left_type_struct(Inferer* inferer, TypeStruct left_st
     right_struct = right->type.structt;
 
     // TODO: This (the rest of the function) could be made more efficient.
-    // TODO: Make sure duplicate identifiers are detected during both type_expr and expr struct field parsing.
     for (int i = 0; i < left_struct.field_num; ++i)
     {
         TypeStructField* left_field  = left_struct.fields[i];
@@ -288,7 +284,7 @@ bool inferer_attempt_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
     assert(*left_ref  != NULL);
     assert(*right_ref != NULL);
 
-    bool is_successful = true;
+    bool is_successful = false;
     Type* left  = *left_ref ;
     Type* right = *right_ref;
 
@@ -452,7 +448,7 @@ bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstrai
 
 
     bool is_successful = true;
-
+    Type* new_type = NULL;
 
     inferer_infer_expr(inferer, expr, type);
     switch (*constraint)
@@ -469,9 +465,16 @@ bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstrai
         case TYPE_CONSTRAINT_INT        : is_successful = inferer_unify(inferer, type, &builtin_type_int   ); break;
         case TYPE_CONSTRAINT_REAL       : is_successful = inferer_unify(inferer, type, &builtin_type_real  ); break;
         case TYPE_CONSTRAINT_STRING     : is_successful = inferer_unify(inferer, type, &builtin_type_string); break;
-        // default:
-        //     fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
-        //     exit(1);
+
+        case TYPE_CONSTRAINT_LIST       :
+            new_type = inferer_create_free_list_type(inferer);
+            is_successful = inferer_unify(inferer, type, &new_type);
+            break;
+
+        case TYPE_CONSTRAINT_VAR        :
+            new_type = inferer_create_free_type_var(inferer);
+            is_successful = inferer_unify(inferer, type, &new_type);
+            break;
     }
 
     if (!is_successful)
@@ -488,6 +491,140 @@ bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstrai
     }
 
     return is_successful;
+}
+
+bool inferer_infer_expr_primary_list(Inferer* inferer, ExprPrimaryList list, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+
+    Type*  inferred_type = NULL;
+
+    for (int i = 0; i < list.length; ++i)
+    {
+        Expr* curr_expr = list.list[i];
+        Type* curr_type = NULL;
+
+        if (!inferer_infer_expr(inferer, curr_expr, &curr_type))
+        {
+            return false;
+        }
+
+        if (inferred_type == NULL)
+        {
+            inferred_type = curr_type;
+        }
+        else if (!inferer_unify(inferer, &inferred_type, &curr_type))
+        {
+            return false;
+        }
+    }
+
+    *type = inferred_type;
+    return true;
+}
+
+// TODO: Check if this is fully correct.
+bool inferer_infer_expr_primary_struct(Inferer* inferer, ExprPrimaryStruct structt, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+
+
+    Type type_mem;
+    int field_num = 0;
+    DYNAMIC_ARRAY(TypeStructField** fields) = NULL;
+
+
+    for (int i = 0; structt.argc; ++i)
+    {
+        ExprPrimaryStructField* curr_field = structt.argv[i];
+        TypeStructField  curr_type_field;
+        TypeStructField* pushed_field = NULL;
+        Type* curr_type = NULL;
+
+        curr_type_field.key = curr_field->key;
+        if (!inferer_infer_expr(inferer, curr_field->value, &curr_type))
+        {
+            return false;
+        }
+
+        if (curr_field->type != NULL)
+        {
+            Type* inferred_type = NULL;
+
+            if (!inferer_infer_type_expr(inferer, curr_field->type, &inferred_type))
+            {
+                return false;
+            }
+
+            if (!inferer_unify(inferer, &inferred_type, &curr_type))
+            {
+                return false;
+            }
+        }
+
+        curr_type_field.value = curr_type;
+        pushed_field = (TypeStructField*) arena_push(&inferer->type_arena, &curr_type_field, sizeof(TypeStructField));
+        arrput(fields, pushed_field);
+    }
+
+    TypeStructField** tmp_ptr = fields;
+    field_num = arrlen(tmp_ptr);
+    fields = (TypeStructField**) arena_push(&inferer->type_arena, tmp_ptr, field_num * sizeof(TypeStructField*));
+    arrfree(tmp_ptr);
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_STRUCT,
+        .type.structt = (TypeStruct)
+        {
+            .field_num = field_num,
+            .fields    = fields   ,
+        }
+    };
+
+    *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    return true;
+}
+
+// Lambda functions are not yet implemented in this language.
+bool inferer_infer_expr_primary_lambda(Inferer* inferer, ExprPrimary primary, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+    assert(primary.kind == EXPR_PRIMARY_LAMBDA);
+
+    assert(false);
+}
+
+void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+
+    *type = inferer_get_decl_var_type(inferer, decl);
+    if (*type == NULL)
+    {
+        *type = inferer_create_free_type_var(inferer);
+        inferer_set_decl_var_type(inferer, decl, *type);
+    }
+}
+
+void inferer_infer_expr_primary_identifier(Inferer* inferer, char* identifier, Type** type)
+{
+    assert(inferer    != NULL);
+    assert(type       != NULL);
+    assert(identifier != NULL);
+    assert(*type      == NULL);
+
+    // Not entirely correct - there are uses where identifier doesn't get resolved (for example, in struct access).
+    // Which is why that use case should be handled elsewhere.
+    assert(false);
 }
 
 bool inferer_infer_expr_primary(Inferer* inferer, ExprPrimary primary, Type** type)
@@ -509,28 +646,17 @@ bool inferer_infer_expr_primary(Inferer* inferer, ExprPrimary primary, Type** ty
         case EXPR_PRIMARY_REAL      : *type = builtin_type_real  ; return true;
 
         // Derivative
-        case EXPR_PRIMARY_LIST      : assert(false);
-        case EXPR_PRIMARY_STRUCT    : assert(false);
-        case EXPR_PRIMARY_FN        : assert(false);
+        case EXPR_PRIMARY_LIST      : return inferer_infer_expr_primary_list   (inferer, primary.primary.list   , type);
+        case EXPR_PRIMARY_STRUCT    : return inferer_infer_expr_primary_struct (inferer, primary.primary.structt, type);
+        case EXPR_PRIMARY_LAMBDA    : return inferer_infer_expr_primary_lambda (inferer, primary                , type);
 
         // Special
-
-        // Not entirely correct -
-        // there are uses where identifier doesn't get resolved (for example, in struct access).
-        case EXPR_PRIMARY_IDENTIFIER: assert(false);
-        case EXPR_PRIMARY_DECL      :
-            *type = inferer_get_decl_var_type(inferer, primary.primary.decl);
-            if (*type == NULL)
-            {
-                *type = inferer_create_free_type_var(inferer);
-                inferer_set_decl_var_type(inferer, primary.primary.decl, *type);
-            }
-            return true;
-
-        default:
-            fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
-            exit(1);
+        case EXPR_PRIMARY_DECL      : inferer_infer_expr_primary_decl       (inferer, primary.primary.decl      , type); return true;
+        case EXPR_PRIMARY_IDENTIFIER: inferer_infer_expr_primary_identifier (inferer, primary.primary.identifier, type); return true;
     }
+
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
+    exit(1);
 }
 
 bool inferer_infer_expr_unary_logical_operator(Inferer* inferer, ExprUnary unary, Type** type)
@@ -675,7 +801,6 @@ bool inferer_infer_expr_binary_equality_operator(Inferer* inferer, ExprBinary bi
     TypeConstraint left_constraint  = TYPE_CONSTRAINT_EQUALITY;
     TypeConstraint right_constraint = TYPE_CONSTRAINT_EQUALITY;
 
-    assert(false);
     is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
     if (!is_successful)
         return false;
@@ -685,6 +810,110 @@ bool inferer_infer_expr_binary_equality_operator(Inferer* inferer, ExprBinary bi
         return false;
 
     *type = builtin_type_bool;
+    return true;
+}
+
+bool inferer_infer_expr_binary_access_operator(Inferer* inferer, ExprBinary binary, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+    assert(binary.right->kind == EXPR_PRIMARY);
+    assert(binary.right->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER);
+
+    bool is_successful = false;
+    Type* left_return_type  = NULL;
+    Type* right_return_type = NULL;
+    TypeStructField* right_field = NULL;
+
+    is_successful = inferer_infer_expr(inferer, binary.left, &left_return_type);
+    if (!is_successful)
+    {
+        return false;
+    }
+
+    if (left_return_type->kind != TYPE_STRUCT)
+    {
+        inferer_throw_compiler_error(inferer, (CompileError)
+        {
+            .kind   = ERROR_ERROR,
+            .line   = -1         ,
+            .column = -1         ,
+            .length = -1         ,
+            .msg    = "Type inference: Expected left-hand side to be struct.",
+        });
+        return false;
+    }
+
+    right_field = type_struct_find_key(left_return_type->type.structt, binary.right->expr.primary.primary.identifier); 
+    if (right_field == NULL)
+    {
+        inferer_throw_compiler_error(inferer, (CompileError)
+        {
+            .kind   = ERROR_ERROR,
+            .line   = -1         ,
+            .column = -1         ,
+            .length = -1         ,
+            .msg    = "Type inference: Couldn't find field with type of identifier.",
+        });
+        return false;
+    }
+
+    *type = right_field->value;
+    return true;
+}
+
+bool inferer_infer_expr_binary_assign_operator(Inferer* inferer, ExprBinary binary, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+
+    bool is_successful = false;
+    Type* left_return_type  = NULL;
+    Type* right_return_type = NULL;
+    TypeConstraint left_constraint  = TYPE_CONSTRAINT_VAR;
+    TypeConstraint right_constraint = TYPE_CONSTRAINT_VAR;
+
+    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
+    if (!is_successful)
+        return false;
+
+    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type );
+    if (!is_successful)
+        return false;
+
+    is_successful = inferer_unify(inferer, &left_return_type, &right_return_type);
+    if (!is_successful)
+        return false;
+
+    *type = left_return_type;
+    return true;
+}
+
+bool inferer_infer_expr_binary_index_operator(Inferer* inferer, ExprBinary binary, Type** type)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+
+    assert(false);
+
+    bool is_successful = false;
+    Type* left_return_type  = NULL;
+    Type* right_return_type = NULL;
+    TypeConstraint left_constraint  = TYPE_CONSTRAINT_LIST;
+    TypeConstraint right_constraint = TYPE_CONSTRAINT_NAT ;
+
+    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
+    if (!is_successful)
+        return false;
+
+    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type );
+    if (!is_successful)
+        return false;
+
+    *type = left_return_type;
     return true;
 }
 
@@ -720,9 +949,9 @@ bool inferer_infer_expr_binary(Inferer* inferer, ExprBinary binary, Type** type)
         case EXPR_BINARY_GREATER_EQUAL: return inferer_infer_expr_binary_arithmetic_operator(inferer, binary, type);
         case EXPR_BINARY_GREATER      : return inferer_infer_expr_binary_arithmetic_operator(inferer, binary, type); // TODO: Implement the rest of these binary operators.
         case EXPR_BINARY_CHAIN        : assert(false); // Shouldn't be encountered ideally
-        case EXPR_BINARY_ACCESS       : assert(false);
-        case EXPR_BINARY_ASSIGN       : assert(false);
-        case EXPR_BINARY_INDEX        : assert(false);
+        case EXPR_BINARY_ACCESS       : return inferer_infer_expr_binary_access_operator    (inferer, binary, type);
+        case EXPR_BINARY_ASSIGN       : return inferer_infer_expr_binary_assign_operator    (inferer, binary, type);
+        case EXPR_BINARY_INDEX        : return inferer_infer_expr_binary_index_operator     (inferer, binary, type);
 
         default:
             fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
@@ -813,6 +1042,33 @@ bool inferer_infer_type_expr_variable(Inferer* inferer, TypeExprVariable variabl
     }
 }
 
+bool inferer_infer_type_expr_list(Inferer* inferer, TypeExprList list, Type** type)
+{
+    assert(inferer   != NULL);
+    assert(type      != NULL);
+    assert(*type     == NULL);
+
+    assert(false);
+}
+
+bool inferer_infer_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Type** type)
+{
+    assert(inferer   != NULL);
+    assert(type      != NULL);
+    assert(*type     == NULL);
+
+    assert(false);
+}
+
+bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
+{
+    assert(inferer   != NULL);
+    assert(type      != NULL);
+    assert(*type     == NULL);
+
+    assert(false);
+}
+
 bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
 {
     assert(inferer   != NULL);
@@ -830,19 +1086,19 @@ bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
                 return ls_b
             end
          */
-        case TYPE_EXPR_VARIABLE  : return inferer_infer_type_expr_variable(inferer, type_expr->type_expr.variable, type);
+        case TYPE_EXPR_VARIABLE  : return inferer_infer_type_expr_variable (inferer, type_expr->type_expr.variable, type);
         case TYPE_EXPR_IDENTIFIER: assert(false); // Shouldn't be encountered at this stage.
 
-        case TYPE_EXPR_NIL       : return builtin_type_nil   ; 
-        case TYPE_EXPR_BOOL      : return builtin_type_bool  ; 
-        case TYPE_EXPR_NAT       : return builtin_type_nat   ; 
-        case TYPE_EXPR_INT       : return builtin_type_int   ; 
-        case TYPE_EXPR_REAL      : return builtin_type_real  ; 
-        case TYPE_EXPR_STRING    : return builtin_type_string; 
+        case TYPE_EXPR_NIL       : *type = builtin_type_nil   ; return true;
+        case TYPE_EXPR_BOOL      : *type = builtin_type_bool  ; return true;
+        case TYPE_EXPR_NAT       : *type = builtin_type_nat   ; return true;
+        case TYPE_EXPR_INT       : *type = builtin_type_int   ; return true;
+        case TYPE_EXPR_REAL      : *type = builtin_type_real  ; return true;
+        case TYPE_EXPR_STRING    : *type = builtin_type_string; return true;
 
-        case TYPE_EXPR_LIST      : assert(false); 
-        case TYPE_EXPR_STRUCT    : assert(false); 
-        case TYPE_EXPR_FN        : assert(false);
+        case TYPE_EXPR_LIST      : return inferer_infer_type_expr_list   (inferer, type_expr->type_expr.list   , type);
+        case TYPE_EXPR_STRUCT    : return inferer_infer_type_expr_struct (inferer, type_expr->type_expr.structt, type);
+        case TYPE_EXPR_FN        : return inferer_infer_type_expr_fn     (inferer, type_expr->type_expr.fn     , type);
 
         case TYPE_EXPR_INSTANCE  : assert(false);
     }
@@ -1130,6 +1386,21 @@ Type* inferer_create_free_type_var(Inferer* inferer)
     return type;
 }
 
+Type* inferer_create_free_list_type(Inferer* inferer)
+{
+    assert(inferer != NULL);
+
+    Type type_mem;
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_LIST,
+        .type.list = (TypeList) { .type = inferer_create_free_type_var(inferer) },
+    };
+
+    return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+}
+
 Type* inferer_create_free_function_type(Inferer* inferer, int arity)
 {
     assert(inferer != NULL);
@@ -1339,7 +1610,6 @@ void inferer_unify_apply_binds(Inferer* inferer)
 
     int length = arrlen(inferer->binds);
 
-    assert(false);
     for (int i = 0; i < length; ++i)
     {
         Bind bind = inferer->binds[i];

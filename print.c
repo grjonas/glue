@@ -258,7 +258,7 @@ const char* expr_primary_kind_name(ExprPrimaryKind primary)
         case EXPR_PRIMARY_REAL      : return "EP_REAL";
         case EXPR_PRIMARY_LIST      : return "EP_LIST";
         case EXPR_PRIMARY_STRUCT    : return "EP_STRUCT";
-        case EXPR_PRIMARY_FN        : return "EP_FN";
+        case EXPR_PRIMARY_LAMBDA    : return "EP_FN";
         case EXPR_PRIMARY_IDENTIFIER: return "EP_IDENTIFIER";
         case EXPR_PRIMARY_DECL      : return "EP_DECL";
     }
@@ -380,8 +380,8 @@ void expr_primary_print(FILE* file, ExprPrimary primary)
             fprintf(file, " }");
             return;
 
-        case EXPR_PRIMARY_FN        :
-            fprintf(file, "[EXPR_PRIMARY_FN]");
+        case EXPR_PRIMARY_LAMBDA    :
+            fprintf(file, "[EXPR_PRIMARY_LAMBDA]");
             return;
 
         case EXPR_PRIMARY_IDENTIFIER:

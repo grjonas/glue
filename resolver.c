@@ -665,12 +665,26 @@ bool resolver_resolve_expr(Resolver* resolver, Expr* expr)
             break;
 
         case EXPR_BINARY:
+            // We have to handle assignment properly.
+            if (
+                   expr->expr.binary.kind == EXPR_BINARY_ASSIGN
+                   &&
+                   (
+                       expr->expr.binary.left->kind != EXPR_PRIMARY
+                       || expr->expr.binary.left->expr.primary.kind != EXPR_PRIMARY_IDENTIFIER
+                   )
+               )
+            {
+                return false;
+            }
+
             result = resolver_resolve_expr(resolver, expr->expr.binary.left);
             if (!result)
             {
                 return false;
             }
 
+            // The access operator has to be handled differently than other operators - we want to preserve the identifier on the right-hand side.
             if (expr->expr.binary.kind == EXPR_BINARY_ACCESS)
             {
                 result = resolver_resolve_expr_binary_access_operator(resolver, expr->expr.binary.right);
