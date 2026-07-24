@@ -823,7 +823,6 @@ bool inferer_infer_expr_binary_access_operator(Inferer* inferer, ExprBinary bina
 
     bool is_successful = false;
     Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
     TypeStructField* right_field = NULL;
 
     is_successful = inferer_infer_expr(inferer, binary.left, &left_return_type);
@@ -1048,7 +1047,30 @@ bool inferer_infer_type_expr_list(Inferer* inferer, TypeExprList list, Type** ty
     assert(type      != NULL);
     assert(*type     == NULL);
 
-    assert(false);
+    Type  type_mem;
+    Type* sub_type = NULL;
+
+    if (!inferer_infer_type_expr(inferer, list.type, &sub_type))
+    {
+        inferer_throw_compiler_error(inferer, (CompileError)
+        {
+            .kind   = ERROR_ERROR,
+            .line   = -1         ,
+            .column = -1         ,
+            .length = -1         ,
+            .msg    = "Type expression inference: Failed to infer type expression.",
+        });
+        return false;
+    }
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_LIST,
+        .type.list = (TypeList) { .type = sub_type },
+    };
+    *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+
+    return true;
 }
 
 bool inferer_infer_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Type** type)
@@ -1057,7 +1079,54 @@ bool inferer_infer_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Ty
     assert(type      != NULL);
     assert(*type     == NULL);
 
-    assert(false);
+
+    Type type_mem;
+    int field_num = 0;
+    DYNAMIC_ARRAY(TypeStructField** fields) = NULL;
+
+
+    for (int i = 0; i < structt.argc; ++i)
+    {
+        TypeExprStructField* curr_field = structt.argv[i];
+        TypeStructField  curr_type_field;
+        TypeStructField* pushed_field = NULL;
+
+
+        curr_type_field.key = curr_field->key;
+        if (!inferer_infer_type_expr(inferer, curr_field->value, &curr_type_field.value))
+        {
+            inferer_throw_compiler_error(inferer, (CompileError)
+            {
+                .kind   = ERROR_ERROR,
+                .line   = -1         ,
+                .column = -1         ,
+                .length = -1         ,
+                .msg    = "Type expression inference: Failed to infer type expression of struct field.",
+            });
+            return false;
+        }
+
+        pushed_field = (TypeStructField*) arena_push(&inferer->type_arena, &curr_type_field, sizeof(TypeStructField));
+        arrput(fields, pushed_field);
+    }
+
+    TypeStructField** tmp_ptr = fields;
+    field_num = arrlen(tmp_ptr);
+    fields = (TypeStructField**) arena_push(&inferer->type_arena, tmp_ptr, field_num * sizeof(TypeStructField*));
+    arrfree(tmp_ptr);
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_STRUCT,
+        .type.structt = (TypeStruct)
+        {
+            .field_num = field_num,
+            .fields    = fields   ,
+        }
+    };
+
+    *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    return true;
 }
 
 bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
@@ -1066,7 +1135,50 @@ bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
     assert(type      != NULL);
     assert(*type     == NULL);
 
-    assert(false);
+
+    Type  type_mem;
+    Type* left_type  = NULL;
+    Type* right_type = NULL;
+
+
+    if (!inferer_infer_type_expr(inferer, fn.left , &left_type ))
+    {
+        inferer_throw_compiler_error(inferer, (CompileError)
+        {
+            .kind   = ERROR_ERROR,
+            .line   = -1         ,
+            .column = -1         ,
+            .length = -1         ,
+            .msg    = "Type expression inference: Failed to infer type expression.",
+        });
+        return false;
+    }
+
+    if (!inferer_infer_type_expr(inferer, fn.right, &right_type))
+    {
+        inferer_throw_compiler_error(inferer, (CompileError)
+        {
+            .kind   = ERROR_ERROR,
+            .line   = -1         ,
+            .column = -1         ,
+            .length = -1         ,
+            .msg    = "Type expression inference: Failed to infer type expression.",
+        });
+        return false;
+    }
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_FN,
+        .type.fn = (TypeFn)
+        {
+            .left  =  left_type,
+            .right = right_type,
+        },
+    };
+    *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+
+    return true;
 }
 
 bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
