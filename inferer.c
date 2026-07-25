@@ -311,7 +311,6 @@ bool inferer_attempt_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
 
         case TYPE_FREE_VAR   : is_successful = inferer_bind_variable_to_type(inferer, left, right); break;
         case TYPE_BOUNDED_VAR: assert(false); // Should be instantiated before this point.
-
         case TYPE_SCHEME     : assert(false); // Should be instantiated before this point.
     }
 
@@ -345,7 +344,7 @@ bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
     return true;
 }
 
-// The function 'generalize' abstracts a type over all type variables
+// The function 'inferer_generalize' abstracts a type over all type variables
 // which are free in the type but not free in the given type environment.
 bool inferer_generalize(Inferer* inferer, Type* type, Type** scheme)
 {
@@ -355,6 +354,16 @@ bool inferer_generalize(Inferer* inferer, Type* type, Type** scheme)
     assert(*scheme == NULL);
 
     assert(false);
+
+    /*
+        let a = 3
+        fn fun(fun1, b)
+        do
+            let c = fun(b) + 10
+            let d = c + a
+            return d
+        end
+     */
 }
 
 bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Type** type)
@@ -1026,19 +1035,16 @@ bool inferer_infer_type_expr_variable(Inferer* inferer, TypeExprVariable variabl
     assert(type      != NULL);
     assert(*type     == NULL);
 
-    assert(false);
+    Type* var_type = NULL;
 
-    // TypeExprVariable works sort of like either a function if the arity is above 0,
-    // OR variable, if the arity is 0.
-    assert(false);
-    if (variable.argc > 0)
+    var_type = inferer_get_decl_var_type(inferer, variable.decl);
+    if (var_type == NULL)
     {
-        return true;
+        var_type = inferer_create_free_type_var(inferer);
+        inferer_set_decl_var_type(inferer, variable.decl, var_type);
     }
-    else
-    {
-        return true;
-    }
+
+    return true;
 }
 
 bool inferer_infer_type_expr_list(Inferer* inferer, TypeExprList list, Type** type)
@@ -1181,6 +1187,28 @@ bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
     return true;
 }
 
+bool inferer_infer_type_expr_abstraction(Inferer* inferer, TypeExprAbstraction abstraction, Type** type)
+{
+    assert(inferer   != NULL);
+    assert(type      != NULL);
+    assert(*type     == NULL);
+
+    assert(false);
+
+    // struct DeclType
+    // {
+    //     Decl** type_vars;
+    //     Decl** constructors;
+    //     int type_var_num;
+    //     int constructor_num;
+    // };
+
+    ;
+}
+
+// TODO: This is technically not inferring,
+// so it may be a good idea to rename all the references to inference to conversion,
+// or something similiar.
 bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
 {
     assert(inferer   != NULL);
@@ -1198,21 +1226,24 @@ bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
                 return ls_b
             end
          */
-        case TYPE_EXPR_VARIABLE  : return inferer_infer_type_expr_variable (inferer, type_expr->type_expr.variable, type);
-        case TYPE_EXPR_IDENTIFIER: assert(false); // Shouldn't be encountered at this stage.
+        case TYPE_EXPR_VARIABLE   : return inferer_infer_type_expr_variable (inferer, type_expr->type_expr.variable, type);
+        case TYPE_EXPR_IDENTIFIER : assert(false); // Shouldn't be encountered at this stage.
 
-        case TYPE_EXPR_NIL       : *type = builtin_type_nil   ; return true;
-        case TYPE_EXPR_BOOL      : *type = builtin_type_bool  ; return true;
-        case TYPE_EXPR_NAT       : *type = builtin_type_nat   ; return true;
-        case TYPE_EXPR_INT       : *type = builtin_type_int   ; return true;
-        case TYPE_EXPR_REAL      : *type = builtin_type_real  ; return true;
-        case TYPE_EXPR_STRING    : *type = builtin_type_string; return true;
+        case TYPE_EXPR_NIL        : *type = builtin_type_nil   ; return true;
+        case TYPE_EXPR_BOOL       : *type = builtin_type_bool  ; return true;
+        case TYPE_EXPR_NAT        : *type = builtin_type_nat   ; return true;
+        case TYPE_EXPR_INT        : *type = builtin_type_int   ; return true;
+        case TYPE_EXPR_REAL       : *type = builtin_type_real  ; return true;
+        case TYPE_EXPR_STRING     : *type = builtin_type_string; return true;
 
-        case TYPE_EXPR_LIST      : return inferer_infer_type_expr_list   (inferer, type_expr->type_expr.list   , type);
-        case TYPE_EXPR_STRUCT    : return inferer_infer_type_expr_struct (inferer, type_expr->type_expr.structt, type);
-        case TYPE_EXPR_FN        : return inferer_infer_type_expr_fn     (inferer, type_expr->type_expr.fn     , type);
+        case TYPE_EXPR_LIST       : return inferer_infer_type_expr_list   (inferer, type_expr->type_expr.list   , type);
+        case TYPE_EXPR_STRUCT     : return inferer_infer_type_expr_struct (inferer, type_expr->type_expr.structt, type);
+        case TYPE_EXPR_FN         : return inferer_infer_type_expr_fn     (inferer, type_expr->type_expr.fn     , type);
 
-        case TYPE_EXPR_INSTANCE  : assert(false);
+        case TYPE_EXPR_INSTANCE   : assert(false);
+        case TYPE_EXPR_ABSTRACTION:
+            return inferer_infer_type_expr_abstraction
+                (inferer, type_expr->type_expr.abstraction, type);
     }
 
     fprintf(stderr, "[%s:%d] Type inference: Logical error while parsing type expression.\n", __FILE__, __LINE__);
@@ -1317,6 +1348,9 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     Type* annotation_type = NULL;
     Type* final_type      = NULL;
     Type* scheme          = NULL;
+    TypeEnv type_env;
+
+    type_env = inferer_get_curr_type_env(inferer);
 
     is_successful = inferer_infer_expr(inferer, let.expr, &expr_type);
     if (!is_successful)
@@ -1350,6 +1384,8 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     {
         return false;
     }
+
+    inferer_set_curr_type_env(inferer, type_env);
 
     assert(scheme != NULL);
     assert(scheme->kind == TYPE_SCHEME);
@@ -1423,12 +1459,13 @@ bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
 
     bool is_successful = false;
     Type* fn_type     = NULL;
-
-    assert(false);
+    TypeEnv type_env;
 
     // What we need to do to infer the type of a function
     // We need it go inside, and resolve the individual arguments.
     // We also need to resolve all intances of return type.
+
+    type_env = inferer_get_curr_type_env(inferer);
 
     fn_type = inferer_get_stmt_fn_type(inferer, fn);
     inferer_set_decl_var_type(inferer, fn.decl, fn_type);
@@ -1446,6 +1483,8 @@ bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
         });
         return false;
     }
+
+    inferer_set_curr_type_env(inferer, type_env);
 
     return true;
 }
@@ -1489,7 +1528,10 @@ Type* inferer_create_free_type_var(Inferer* inferer)
     type_mem = (Type)
     {
         .kind = TYPE_FREE_VAR,
-        .type.free_var.type = NULL,
+        .type.free_var = (TypeFreeVar)
+        {
+            .type = NULL,
+        }
     };
 
     type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
@@ -1571,6 +1613,24 @@ void inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type)
     decl->decl.var.type = type;
 }
 
+Type* inferer_get_decl_new_type_type(Inferer* inferer, Decl* decl)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_TYPE);
+
+    assert(false);
+}
+
+void  inferer_set_decl_new_type_type(Inferer* inferer, Decl* decl, Type* type)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_TYPE);
+
+    assert(false);
+}
+
 Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
@@ -1612,13 +1672,19 @@ Type* inferer_resolve_type_variable(Inferer* inferer, Type* var)
     assert(var->kind == TYPE_FREE_VAR);
 
     Type* next = var->type.free_var.type;
+    Type* type_var = NULL;
 
     if (next == NULL || next->kind != TYPE_FREE_VAR)
     {
         return var;
     }
 
-    return inferer_resolve_type_variable(inferer, next);
+    type_var = inferer_resolve_type_variable(inferer, next);
+
+    // Add another type_variable to the stack
+    arrput(inferer->type_variables, type_var);
+
+    return type_var;
 }
 
 bool inferer_occurs_check_struct(Inferer* inferer, Type* var, TypeStruct structt)
@@ -1679,6 +1745,7 @@ bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
     exit(1);
 }
 
+// TODO: Take a look at
 bool inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type* type)
 {
     assert(inferer   != NULL         );
@@ -1736,6 +1803,28 @@ void inferer_unify_free_binds(Inferer* inferer)
 
     arrfree(inferer->binds);
     inferer->binds = NULL  ;
+}
+
+TypeEnv inferer_get_curr_type_env(Inferer* inferer)
+{
+    assert(inferer != NULL);
+
+    return inferer->curr_type_env;
+}
+
+void inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env)
+{
+    assert(inferer != NULL);
+    assert(inferer->curr_type_env.type_variable_length - type_env.type_variable_length >= 0);
+
+    TypeEnv curr_type_env = inferer->curr_type_env;
+
+    for (int i = 0; i < type_env.type_variable_length - curr_type_env.type_variable_length; ++i)
+    {
+        arrpop(inferer->type_variables);
+    }
+
+    inferer->curr_type_env = type_env;
 }
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err)

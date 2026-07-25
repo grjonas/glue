@@ -770,8 +770,6 @@ bool resolver_resolve_type_expr_identifier(Resolver* resolver, TypeExpr* type_ex
 
         type_expr->kind = TYPE_EXPR_VARIABLE;
         type_expr->type_expr.variable.decl = decl;
-        type_expr->type_expr.variable.argv = NULL;
-        type_expr->type_expr.variable.argc = 0   ;
     }
     return true;
 }
@@ -807,10 +805,10 @@ bool resolver_resolve_type_expr_instance(Resolver* resolver, TypeExpr* type_expr
             }
         }
 
-        type_expr->kind = TYPE_EXPR_VARIABLE;
-        type_expr->type_expr.variable.decl = decl;
-        type_expr->type_expr.variable.argv = argv;
-        type_expr->type_expr.variable.argc = argc;
+        type_expr->kind = TYPE_EXPR_ABSTRACTION;
+        type_expr->type_expr.abstraction.decl = decl;
+        type_expr->type_expr.abstraction.argv = argv;
+        type_expr->type_expr.abstraction.argc = argc;
 
         return true;
     }

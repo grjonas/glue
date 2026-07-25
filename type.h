@@ -13,9 +13,11 @@ typedef struct TypeStruct      TypeStruct     ;
 typedef struct TypeStructField TypeStructField;
 typedef struct TypeFn          TypeFn         ;
 typedef struct TypeScheme      TypeScheme     ;
+typedef struct TypeAbstraction TypeAbstraction;
+typedef struct TypeApplication TypeApplication;
+typedef struct TypeConstructor TypeConstructor;
+
 // typedef struct TypeAlias       TypeAlias      ;
-// typedef struct TypeAbstraction TypeAbstraction;
-// typedef struct TypeApplication TypeApplication;
 
 enum TypeKind
 {
@@ -37,14 +39,17 @@ enum TypeKind
     TYPE_FREE_VAR   ,
     TYPE_BOUNDED_VAR,
     TYPE_SCHEME     ,
+
+    TYPE_ABSTRACTION, // a type representing a newly defined type.
+    TYPE_APPLICATION, // instance of abstraction
+    TYPE_CONSTRUCTOR, // basically a function,
+
     // TYPE_ALIAS      , // a type representing an alias to an existing type.
-    // TYPE_ABSTRACTION, // a type representing a newly defined type.
-    // TYPE_APPLICATION, // application of abstraction
 };
 
 struct TypeFreeVar
 {
-    Type* type;
+    Type*  type;
 };
 
 struct TypeBoundedVar
@@ -81,35 +86,41 @@ struct TypeScheme
     Type* type;
 };
 
+struct TypeAbstraction
+{
+    int argc;
+};
+
+struct TypeApplication
+{
+    Type*  abstraction;
+    Type** argv;
+    int    argc; // should be the same as the lenght of abstraction->type.abstraction.argc
+};
+
+struct TypeConstructor
+{
+    Type* left ;
+    Type* right;
+};
+
 struct Type
 {
     TypeKind kind;
     union
     {
-        TypeFreeVar    free_var   ;
-        TypeBoundedVar bounded_var;
-        TypeList       list       ;
-        TypeStruct     structt    ;
-        TypeFn         fn         ;
-        TypeScheme     scheme     ;
+        TypeFreeVar     free_var   ;
+        TypeBoundedVar  bounded_var;
+        TypeList        list       ;
+        TypeStruct      structt    ;
+        TypeFn          fn         ;
+        TypeScheme      scheme     ;
+        TypeAbstraction abstraction;
+        TypeApplication application;
+        TypeConstructor constructor;
     }
     type;
 };
-
-// struct TypeAbstraction
-// {
-//     int    parameter_num  ;
-//     int    constructor_num;
-//     Type** parameters     ; // All of kind TYPE_VARIABLE
-//     Type** constructors   ; // All of kind TYPE_FN, where the rightmost node_ptr is equal of the 'TypeNewType' itself.
-// };
-// 
-// struct TypeApplication
-// {
-//     Type*  abstraction;
-//     int    argc;
-//     Type** argv;
-// };
 
 TypeStructField* type_struct_find_key(TypeStruct structt, char* key);
 bool type_kind_is_numeric(TypeKind kind);

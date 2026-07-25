@@ -8,6 +8,7 @@
 typedef struct Inferer         Inferer        ;
 typedef enum   TypeConstraint  TypeConstraint ;
 typedef struct Bind            Bind           ;
+typedef struct TypeEnv         TypeEnv        ;
 
 enum TypeConstraint
 {
@@ -29,6 +30,11 @@ struct Bind
     Type* type;
 };
 
+struct TypeEnv
+{
+    int type_variable_length;
+};
+
 // There are a couple of things that should be known about the inferer:
 // 1) Unlike some other components, we benefit from not using a arenas as religiously as we did before.
 //     Instead, we should have a 'Subst**', which would allow us to deallocate, and reallocate memory at will.
@@ -46,8 +52,9 @@ struct Inferer
     Arena type_arena;
 
     // Misc. state
-    DYNAMIC_ARRAY(Type** type_variables);
+    DYNAMIC_ARRAY(Type** type_variables); // A stack of type variables
     DYNAMIC_ARRAY(Bind * binds);
+    TypeEnv curr_type_env;
 
     // Outputs
 
@@ -74,6 +81,8 @@ Type* inferer_create_free_list_type     (Inferer* inferer);
 Type* inferer_create_free_function_type (Inferer* inferer , int arity);
 Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl);
 void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type);
+Type* inferer_get_decl_new_type_type(Inferer* inferer, Decl* decl);
+void  inferer_set_decl_new_type_type(Inferer* inferer, Decl* decl, Type* type);
 Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl);
 void  inferer_set_decl_var_return_type(Inferer* inferer, Decl* decl, Type* type);
 Type* inferer_resolve_type_variable(Inferer* inferer, Type* var);
@@ -82,8 +91,8 @@ bool  inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type* type);
 void  inferer_unify_apply_binds(Inferer* inferer);
 void  inferer_unify_free_binds (Inferer* inferer);
 
-// InfererSnapshot inferer_get_context_snapshot    (Inferer* inferer);
-// void            inferer_restore_context_snapshot(Inferer* inferer, InfererSnapshot snapshot);
+TypeEnv inferer_get_curr_type_env(Inferer* inferer);
+void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
 void assert_generic_operator_type_is_valid(TypeKind type);
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);

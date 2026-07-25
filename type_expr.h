@@ -21,28 +21,28 @@ typedef struct TypeExprStructField TypeExprStructField;
 typedef struct TypeExprStruct      TypeExprStruct     ;
 typedef struct TypeExprFn          TypeExprFn         ; // example: map : (a -> b) -> [a] -> [b]
 typedef struct TypeExprInstance    TypeExprInstance   ; // example: Maybe(a), which can be instantiated as such - Maybe(Int), etc.
+typedef struct TypeExprAbstraction TypeExprAbstraction;
 
 enum TypeExprKind
 {
-    TYPE_EXPR_VARIABLE  ,
-    TYPE_EXPR_IDENTIFIER,
-    TYPE_EXPR_NIL       ,
-    TYPE_EXPR_BOOL      ,
-    TYPE_EXPR_NAT       ,
-    TYPE_EXPR_INT       ,
-    TYPE_EXPR_REAL      ,
-    TYPE_EXPR_STRING    ,
-    TYPE_EXPR_LIST      ,
-    TYPE_EXPR_STRUCT    ,
-    TYPE_EXPR_FN        ,
-    TYPE_EXPR_INSTANCE  ,
+    TYPE_EXPR_VARIABLE   ,
+    TYPE_EXPR_IDENTIFIER ,
+    TYPE_EXPR_NIL        ,
+    TYPE_EXPR_BOOL       ,
+    TYPE_EXPR_NAT        ,
+    TYPE_EXPR_INT        ,
+    TYPE_EXPR_REAL       ,
+    TYPE_EXPR_STRING     ,
+    TYPE_EXPR_LIST       ,
+    TYPE_EXPR_STRUCT     ,
+    TYPE_EXPR_FN         ,
+    TYPE_EXPR_INSTANCE   ,
+    TYPE_EXPR_ABSTRACTION,
 };
 
 struct TypeExprVariable
 {
     Decl* decl;
-    TypeExpr** argv  ;
-    int argc;
 };
 
 struct TypeExprIdentifier
@@ -73,9 +73,17 @@ struct TypeExprFn
     TypeExpr* right;
 };
 
+// Shouldn't be encountered after the resolution step.
 struct TypeExprInstance
 {
     char     * caller;
+    TypeExpr** argv  ;
+    int argc;
+};
+
+struct TypeExprAbstraction
+{
+    Decl* decl;
     TypeExpr** argv  ;
     int argc;
 };
@@ -91,13 +99,14 @@ struct TypeExpr
 
     union
     {
-        void             * none      ; // Primitives don't need any data, so they're just NULL void pointers;
-        TypeExprVariable   variable  ;
-        TypeExprIdentifier identifier;
-        TypeExprList       list      ;
-        TypeExprStruct     structt   ;
-        TypeExprFn         fn        ;
-        TypeExprInstance   instance  ;
+        void             *  none       ; // Primitives don't need any data, so they're just NULL void pointers;
+        TypeExprVariable    variable   ;
+        TypeExprIdentifier  identifier ;
+        TypeExprList        list       ;
+        TypeExprStruct      structt    ;
+        TypeExprFn          fn         ;
+        TypeExprInstance    instance   ;
+        TypeExprAbstraction abstraction;
     }
     type_expr;
 };
