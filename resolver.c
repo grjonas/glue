@@ -805,10 +805,10 @@ bool resolver_resolve_type_expr_instance(Resolver* resolver, TypeExpr* type_expr
             }
         }
 
-        type_expr->kind = TYPE_EXPR_ABSTRACTION;
-        type_expr->type_expr.abstraction.decl = decl;
-        type_expr->type_expr.abstraction.argv = argv;
-        type_expr->type_expr.abstraction.argc = argc;
+        type_expr->kind = TYPE_EXPR_APPLICATION;
+        type_expr->type_expr.application.decl = decl;
+        type_expr->type_expr.application.argv = argv;
+        type_expr->type_expr.application.argc = argc;
 
         return true;
     }

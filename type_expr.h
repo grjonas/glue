@@ -21,7 +21,7 @@ typedef struct TypeExprStructField TypeExprStructField;
 typedef struct TypeExprStruct      TypeExprStruct     ;
 typedef struct TypeExprFn          TypeExprFn         ; // example: map : (a -> b) -> [a] -> [b]
 typedef struct TypeExprInstance    TypeExprInstance   ; // example: Maybe(a), which can be instantiated as such - Maybe(Int), etc.
-typedef struct TypeExprAbstraction TypeExprAbstraction;
+typedef struct TypeExprApplication TypeExprApplication;
 
 enum TypeExprKind
 {
@@ -37,7 +37,7 @@ enum TypeExprKind
     TYPE_EXPR_STRUCT     ,
     TYPE_EXPR_FN         ,
     TYPE_EXPR_INSTANCE   ,
-    TYPE_EXPR_ABSTRACTION,
+    TYPE_EXPR_APPLICATION,
 };
 
 struct TypeExprVariable
@@ -81,7 +81,7 @@ struct TypeExprInstance
     int argc;
 };
 
-struct TypeExprAbstraction
+struct TypeExprApplication
 {
     Decl* decl;
     TypeExpr** argv  ;
@@ -106,7 +106,7 @@ struct TypeExpr
         TypeExprStruct      structt    ;
         TypeExprFn          fn         ;
         TypeExprInstance    instance   ;
-        TypeExprAbstraction abstraction;
+        TypeExprApplication application;
     }
     type_expr;
 };

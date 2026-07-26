@@ -40,7 +40,6 @@ enum TypeKind
     TYPE_BOUNDED_VAR,
     TYPE_SCHEME     ,
 
-    TYPE_ABSTRACTION, // a type representing a newly defined type.
     TYPE_APPLICATION, // instance of abstraction
     TYPE_CONSTRUCTOR, // basically a function,
 
@@ -93,7 +92,7 @@ struct TypeAbstraction
 
 struct TypeApplication
 {
-    Type*  abstraction;
+    TypeAbstraction* abstraction;
     Type** argv;
     int    argc; // should be the same as the lenght of abstraction->type.abstraction.argc
 };
@@ -115,7 +114,6 @@ struct Type
         TypeStruct      structt    ;
         TypeFn          fn         ;
         TypeScheme      scheme     ;
-        TypeAbstraction abstraction;
         TypeApplication application;
         TypeConstructor constructor;
     }

@@ -523,8 +523,8 @@ void type_expr_print(FILE* file, TypeExpr* type_expr)
             fprintf(file, "[TE_INSTANCE]");
             return;
 
-        case TYPE_EXPR_ABSTRACTION:
-            decl_print(file, type_expr->type_expr.abstraction.decl);
+        case TYPE_EXPR_APPLICATION:
+            decl_print(file, type_expr->type_expr.application.decl);
             return;
     }
 
@@ -606,8 +606,12 @@ void type_print(FILE* file, Type* type)
         //     fprintf(file, "[T_ALIAS]");
         //     return;
 
-        case TYPE_ABSTRACTION:
-            fprintf(file, "[T_ABSTRACTION]");
+        case TYPE_APPLICATION:
+            fprintf(file, "[T_APPLICATION]");
+            return;
+
+        case TYPE_CONSTRUCTOR:
+            fprintf(file, "[T_CONSTRUCTOR]");
             return;
     }
 

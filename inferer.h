@@ -72,6 +72,7 @@ bool inferer_resolve         (Inferer* inferer, Type* type, Type** resolved_type
 bool inferer_attempt_unify   (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
 bool inferer_unify           (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
 bool inferer_generalize      (Inferer* inferer, Type* type, Type** scheme)        ;
+bool inferer_instantiate     (Inferer* inferer, TypeScheme scheme, Type** type)   ;
 
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
@@ -79,12 +80,18 @@ bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstrai
 Type* inferer_create_free_type_var      (Inferer* inferer);
 Type* inferer_create_free_list_type     (Inferer* inferer);
 Type* inferer_create_free_function_type (Inferer* inferer , int arity);
+
+TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
 Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl);
 void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type);
-Type* inferer_get_decl_new_type_type(Inferer* inferer, Decl* decl);
-void  inferer_set_decl_new_type_type(Inferer* inferer, Decl* decl, Type* type);
+TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
 Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl);
 void  inferer_set_decl_var_return_type(Inferer* inferer, Decl* decl, Type* type);
+TypeAbstraction* inferer_get_decl_type_abstraction(Inferer* inferer, Decl* decl);
+void  inferer_set_decl_type_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction);
+
+void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
+void  inferer_pop_type_variable (Inferer* inferer);
 Type* inferer_resolve_type_variable(Inferer* inferer, Type* var);
 bool  inferer_occurs_check(Inferer* inferer, Type* var, Type* type);
 bool  inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type* type);
@@ -94,6 +101,7 @@ void  inferer_unify_free_binds (Inferer* inferer);
 TypeEnv inferer_get_curr_type_env(Inferer* inferer);
 void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
 void assert_generic_operator_type_is_valid(TypeKind type);
+bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
 
 void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
 
