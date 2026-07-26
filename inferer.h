@@ -65,14 +65,14 @@ struct Inferer
 Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
 
-bool inferer_infer_stmt      (Inferer* inferer, Stmt* stmt)                       ;
-bool inferer_infer_type_expr (Inferer* inferer, TypeExpr* type_expr, Type** type) ;
-bool inferer_infer_expr      (Inferer* inferer, Expr* expr, Type** type)          ;
-bool inferer_resolve         (Inferer* inferer, Type* type, Type** resolved_type) ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
-bool inferer_attempt_unify   (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
-bool inferer_unify           (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
-bool inferer_generalize      (Inferer* inferer, Type* type, Type** scheme)        ;
-bool inferer_instantiate     (Inferer* inferer, TypeScheme scheme, Type** type)   ;
+bool inferer_infer_stmt        (Inferer* inferer, Stmt* stmt)                       ;
+bool inferer_convert_type_expr (Inferer* inferer, TypeExpr* type_expr, Type** type) ;
+bool inferer_infer_expr        (Inferer* inferer, Expr* expr, Type** type)          ;
+bool inferer_resolve           (Inferer* inferer, Type* type, Type** resolved_type) ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
+bool inferer_attempt_unify     (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
+bool inferer_unify             (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
+bool inferer_generalize        (Inferer* inferer, Type* type, Type** scheme)        ;
+bool inferer_instantiate       (Inferer* inferer, TypeScheme scheme, Type** type)   ;
 
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);

@@ -646,7 +646,7 @@ bool inferer_infer_expr_primary_struct(Inferer* inferer, ExprPrimaryStruct struc
         {
             Type* inferred_type = NULL;
 
-            if (!inferer_infer_type_expr(inferer, curr_field->type, &inferred_type))
+            if (!inferer_convert_type_expr(inferer, curr_field->type, &inferred_type))
             {
                 return false;
             }
@@ -1108,7 +1108,7 @@ bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
     }
 }
 
-bool inferer_infer_type_expr_variable(Inferer* inferer, TypeExprVariable variable, Type** type)
+bool inferer_convert_type_expr_variable(Inferer* inferer, TypeExprVariable variable, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1126,7 +1126,7 @@ bool inferer_infer_type_expr_variable(Inferer* inferer, TypeExprVariable variabl
     return true;
 }
 
-bool inferer_infer_type_expr_list(Inferer* inferer, TypeExprList list, Type** type)
+bool inferer_convert_type_expr_list(Inferer* inferer, TypeExprList list, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1135,7 +1135,7 @@ bool inferer_infer_type_expr_list(Inferer* inferer, TypeExprList list, Type** ty
     Type  type_mem;
     Type* sub_type = NULL;
 
-    if (!inferer_infer_type_expr(inferer, list.type, &sub_type))
+    if (!inferer_convert_type_expr(inferer, list.type, &sub_type))
     {
         inferer_throw_compiler_error(inferer, (CompileError)
         {
@@ -1158,7 +1158,7 @@ bool inferer_infer_type_expr_list(Inferer* inferer, TypeExprList list, Type** ty
     return true;
 }
 
-bool inferer_infer_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Type** type)
+bool inferer_convert_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1178,7 +1178,7 @@ bool inferer_infer_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Ty
 
 
         curr_type_field.key = curr_field->key;
-        if (!inferer_infer_type_expr(inferer, curr_field->value, &curr_type_field.value))
+        if (!inferer_convert_type_expr(inferer, curr_field->value, &curr_type_field.value))
         {
             inferer_throw_compiler_error(inferer, (CompileError)
             {
@@ -1214,7 +1214,7 @@ bool inferer_infer_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Ty
     return true;
 }
 
-bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
+bool inferer_convert_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1226,7 +1226,7 @@ bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
     Type* right_type = NULL;
 
 
-    if (!inferer_infer_type_expr(inferer, fn.left , &left_type ))
+    if (!inferer_convert_type_expr(inferer, fn.left , &left_type ))
     {
         inferer_throw_compiler_error(inferer, (CompileError)
         {
@@ -1239,7 +1239,7 @@ bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
         return false;
     }
 
-    if (!inferer_infer_type_expr(inferer, fn.right, &right_type))
+    if (!inferer_convert_type_expr(inferer, fn.right, &right_type))
     {
         inferer_throw_compiler_error(inferer, (CompileError)
         {
@@ -1266,7 +1266,7 @@ bool inferer_infer_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
     return true;
 }
 
-bool inferer_infer_type_expr_application(Inferer* inferer, TypeExprApplication application, Type** type)
+bool inferer_convert_type_expr_application(Inferer* inferer, TypeExprApplication application, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1285,7 +1285,7 @@ bool inferer_infer_type_expr_application(Inferer* inferer, TypeExprApplication a
         TypeExpr* te = application.argv[i];
         Type*     t  = NULL;
 
-        if (!inferer_infer_type_expr(inferer, te, &t))
+        if (!inferer_convert_type_expr(inferer, te, &t))
         {
             inferer_throw_compiler_error(inferer, (CompileError)
             {
@@ -1321,10 +1321,7 @@ bool inferer_infer_type_expr_application(Inferer* inferer, TypeExprApplication a
     return true;
 }
 
-// TODO: This is technically not inferring,
-// so it may be a good idea to rename all the references to inference to conversion,
-// or something similiar.
-bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
+bool inferer_convert_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
 {
     assert(inferer   != NULL);
     assert(type_expr != NULL);
@@ -1341,7 +1338,7 @@ bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
                 return ls_b
             end
          */
-        case TYPE_EXPR_VARIABLE   : return inferer_infer_type_expr_variable (inferer, type_expr->type_expr.variable, type);
+        case TYPE_EXPR_VARIABLE   : return inferer_convert_type_expr_variable (inferer, type_expr->type_expr.variable, type);
         case TYPE_EXPR_IDENTIFIER : assert(false); // Shouldn't be encountered at this stage.
 
         case TYPE_EXPR_NIL        : *type = builtin_type_nil   ; return true;
@@ -1351,13 +1348,13 @@ bool inferer_infer_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
         case TYPE_EXPR_REAL       : *type = builtin_type_real  ; return true;
         case TYPE_EXPR_STRING     : *type = builtin_type_string; return true;
 
-        case TYPE_EXPR_LIST       : return inferer_infer_type_expr_list   (inferer, type_expr->type_expr.list   , type);
-        case TYPE_EXPR_STRUCT     : return inferer_infer_type_expr_struct (inferer, type_expr->type_expr.structt, type);
-        case TYPE_EXPR_FN         : return inferer_infer_type_expr_fn     (inferer, type_expr->type_expr.fn     , type);
+        case TYPE_EXPR_LIST       : return inferer_convert_type_expr_list   (inferer, type_expr->type_expr.list   , type);
+        case TYPE_EXPR_STRUCT     : return inferer_convert_type_expr_struct (inferer, type_expr->type_expr.structt, type);
+        case TYPE_EXPR_FN         : return inferer_convert_type_expr_fn     (inferer, type_expr->type_expr.fn     , type);
 
         case TYPE_EXPR_INSTANCE   : assert(false);
         case TYPE_EXPR_APPLICATION:
-            return inferer_infer_type_expr_application
+            return inferer_convert_type_expr_application
                 (inferer, type_expr->type_expr.application, type);
     }
 
@@ -1475,7 +1472,7 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
 
     if (let.type != NULL)
     {
-        is_successful = inferer_infer_type_expr(inferer, let.type, &annotation_type);
+        is_successful = inferer_convert_type_expr(inferer, let.type, &annotation_type);
         if (!is_successful)
         {
             return false;
@@ -1518,7 +1515,7 @@ Type* inferer_get_stmt_fn_type(Inferer* inferer, StmtFn fn)
     Type* curr_branch = NULL;
     Type* return_type = NULL;
 
-    inferer_infer_type_expr(inferer, fn.return_type, &return_type);
+    inferer_convert_type_expr(inferer, fn.return_type, &return_type);
     type_mem = (Type)
     {
         .kind = TYPE_FN,
@@ -1541,7 +1538,7 @@ Type* inferer_get_stmt_fn_type(Inferer* inferer, StmtFn fn)
 
         if (arg_type_expr != NULL)
         {
-            inferer_infer_type_expr(inferer, arg_type_expr, &arg_type);
+            inferer_convert_type_expr(inferer, arg_type_expr, &arg_type);
         }
         else
         {
