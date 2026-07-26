@@ -57,6 +57,7 @@ The following functions are defined:
 #include "arena.h"
 
 #define DYNAMIC_ARRAY(x) x
+#define HASHMAP(x) x
 
 char* find_string_in_string_list(DYNAMIC_ARRAY(char** strs), char* str);
 

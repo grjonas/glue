@@ -954,25 +954,11 @@ Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
         id   = NULL;
         switch (decl->kind)
         {
-            case DECL_VAR:
-                id = decl->identifier;
-                break;
-
-            case DECL_TYPE_VAR:
-                id = decl->identifier;
-                break;
-
-            case DECL_ALIAS:
-                id = decl->identifier;
-                break;
-
-            case DECL_TYPE:
-                id = decl->identifier;
-                break;
-
-            case DECL_TYPE_CONSTRUCTOR:
-                id = decl->identifier;
-                break;
+            case DECL_VAR             : id = decl->identifier; break; 
+            case DECL_TYPE_VAR        : id = decl->identifier; break; 
+            case DECL_ALIAS           : id = decl->identifier; break;
+            case DECL_TYPE            : id = decl->identifier; break;
+            case DECL_TYPE_CONSTRUCTOR: id = decl->identifier; break;
         }
 
         if (strlen(id) == id_len && memcmp(id, identifier, id_len) == 0)

@@ -9,6 +9,7 @@ typedef struct Inferer         Inferer        ;
 typedef enum   TypeConstraint  TypeConstraint ;
 typedef struct Bind            Bind           ;
 typedef struct TypeEnv         TypeEnv        ;
+typedef struct Subst           Subst          ;
 
 enum TypeConstraint
 {
@@ -33,6 +34,12 @@ struct Bind
 struct TypeEnv
 {
     int type_variable_length;
+};
+
+struct Subst
+{
+    Type* key;
+    int   value;
 };
 
 // There are a couple of things that should be known about the inferer:
@@ -65,14 +72,17 @@ struct Inferer
 Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
 
-bool inferer_infer_stmt        (Inferer* inferer, Stmt* stmt)                       ;
-bool inferer_convert_type_expr (Inferer* inferer, TypeExpr* type_expr, Type** type) ;
-bool inferer_infer_expr        (Inferer* inferer, Expr* expr, Type** type)          ;
-bool inferer_resolve           (Inferer* inferer, Type* type, Type** resolved_type) ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
-bool inferer_attempt_unify     (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
-bool inferer_unify             (Inferer* inferer, Type** left_ref, Type** right_ref); // Unifies the two types
-bool inferer_generalize        (Inferer* inferer, Type* type, Type** scheme)        ;
-bool inferer_instantiate       (Inferer* inferer, TypeScheme scheme, Type** type)   ;
+bool inferer_infer_stmt          (Inferer* inferer, Stmt* stmt)                         ;
+bool inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** type)   ;
+bool inferer_infer_expr          (Inferer* inferer, Expr* expr, Type** type)            ;
+bool inferer_resolve             (Inferer* inferer, Type* type, Type** resolved_type)   ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
+bool inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
+bool inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
+void inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
+void inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
+void inferer_get_substs          (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
+void inferer_apply_subst         (Inferer* inferer, Type* type, Subst subst)            ;
+void inferer_apply_subst_reverse (Inferer* inferer, Type* type, Subst subst)            ;
 
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
@@ -82,8 +92,8 @@ Type* inferer_create_free_list_type     (Inferer* inferer);
 Type* inferer_create_free_function_type (Inferer* inferer , int arity);
 
 TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
-Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl);
-void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type);
+bool  inferer_get_decl_var_type(Inferer* inferer, Decl* decl, TypeScheme* scheme_ref);
+void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, TypeScheme scheme);
 TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
 Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl);
 void  inferer_set_decl_var_return_type(Inferer* inferer, Decl* decl, Type* type);

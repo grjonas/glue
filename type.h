@@ -38,12 +38,12 @@ enum TypeKind
     // Special types
     TYPE_FREE_VAR   ,
     TYPE_BOUNDED_VAR,
-    TYPE_SCHEME     ,
 
     TYPE_APPLICATION, // instance of abstraction
     TYPE_CONSTRUCTOR, // basically a function,
 
     // TYPE_ALIAS      , // a type representing an alias to an existing type.
+    // TYPE_SCHEME     ,
 };
 
 struct TypeFreeVar
@@ -79,12 +79,6 @@ struct TypeFn
     Type* right;
 };
 
-struct TypeScheme
-{
-    int quantified_count;
-    Type* type;
-};
-
 struct TypeAbstraction
 {
     int argc;
@@ -103,6 +97,12 @@ struct TypeConstructor
     Type* right;
 };
 
+struct TypeScheme
+{
+    int quantified_count;
+    Type* type;
+};
+
 struct Type
 {
     TypeKind kind;
@@ -113,7 +113,6 @@ struct Type
         TypeList        list       ;
         TypeStruct      structt    ;
         TypeFn          fn         ;
-        TypeScheme      scheme     ;
         TypeApplication application;
         TypeConstructor constructor;
     }

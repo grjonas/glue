@@ -374,7 +374,6 @@ bool inferer_attempt_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
 
         case TYPE_FREE_VAR   : is_successful = inferer_bind_variable_to_type(inferer, left, right); break;
         case TYPE_BOUNDED_VAR: assert(false); // Should be instantiated before this point.
-        case TYPE_SCHEME     : assert(false); // Should be instantiated before this point.
 
         case TYPE_APPLICATION:
             is_successful = inferer_attempt_unify_left_type_application
@@ -417,35 +416,227 @@ bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
 
 // The function 'inferer_generalize' abstracts a type over all type variables
 // which are free in the type but not free in the given type environment.
-bool inferer_generalize(Inferer* inferer, Type* type, Type** scheme)
+void inferer_generalize(Inferer* inferer, Type* type, TypeScheme** scheme)
 {
     assert(inferer != NULL);
     assert(type    != NULL);
     assert(scheme  != NULL);
-    assert(*scheme == NULL);
 
     // IMPLEMENT:
     assert(false);
 
-    /*
-        let a = 3
-        fn fun(fun1, b)
-        do
-            let c = fun(b) + 10
-            let d = c + a
-            return d
-        end
-     */
+    TypeScheme scheme_mem;
+
+    HASHMAP(Subst*) substs = NULL;
+
+    inferer_get_substs(inferer, type, &substs);
+
+    for (int i = 0; i < hmlen(substs); ++i)
+    {
+        inferer_apply_subst(inferer, type, substs[i]);
+    }
+
+    scheme_mem = (TypeScheme)
+    {
+        .quantified_count = hmlen(substs),
+        .type = type,
+    };
+    hmfree(substs);
+
+    *scheme = (TypeScheme*) arena_push(&inferer->type_arena, &scheme_mem, sizeof(TypeScheme));
 }
 
-bool inferer_instantiate(Inferer* inferer, TypeScheme scheme, Type** type)
+void inferer_instantiate(Inferer* inferer, TypeScheme* scheme, Type** type)
 {
     assert(inferer != NULL);
     assert(type    != NULL);
     assert(*type   == NULL);
+    assert(scheme->quantified_count >= 0);
 
-    // IMPLEMENT:
-    assert(false);
+    for (int i = 0; scheme->quantified_count; ++i)
+    {
+        Subst subst = (Subst)
+        {
+            .key   = inferer_create_free_type_var(inferer),
+            .value = i,
+        };
+
+        inferer_apply_subst_reverse(inferer, scheme->type, subst);
+    }
+
+    *type = scheme->type;
+}
+
+void inferer_get_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* substs)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+    assert(substs  != NULL);
+
+    switch(type->kind)
+    {
+        case TYPE_NIL        :
+        case TYPE_BOOL       :
+        case TYPE_NUMERIC    :
+        case TYPE_NAT        :
+        case TYPE_INT        :
+        case TYPE_REAL       :
+        case TYPE_STRING     :
+            return;
+
+        case TYPE_LIST       : inferer_get_substs(inferer, type->type.list.type, substs); return;
+        case TYPE_STRUCT     :
+            for (int i = 0; i < type->type.structt.field_num; ++i)
+            {
+                TypeStructField* field = type->type.structt.fields[i];
+                inferer_get_substs(inferer, field->value, substs);
+            }
+            return;
+
+        case TYPE_FN         : inferer_get_substs(inferer, type->type.fn.left , substs);
+                               inferer_get_substs(inferer, type->type.fn.right, substs);
+                               return;
+
+        case TYPE_FREE_VAR   : hmput(*substs, type->type.free_var.type, hmlen(*substs)); return;
+        case TYPE_BOUNDED_VAR: assert(false);
+
+        case TYPE_APPLICATION:
+            for (int i = 0; i < type->type.application.argc; ++i)
+            {
+                Type* arg = type->type.application.argv[i];
+
+                inferer_get_substs(inferer, arg, substs);
+            }
+            return;
+
+        case TYPE_CONSTRUCTOR: inferer_get_substs(inferer, type->type.constructor.left , substs);
+                               inferer_get_substs(inferer, type->type.constructor.right, substs);
+                               return;
+    }
+
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
+    exit(1);
+}
+
+// TODO: Simplify this and reverse subst functions.
+void inferer_apply_subst(Inferer* inferer, Type* type, Subst subst)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+
+    switch (type->kind)
+    {
+        case TYPE_NIL        :
+        case TYPE_BOOL       :
+        case TYPE_NUMERIC    :
+        case TYPE_NAT        :
+        case TYPE_INT        :
+        case TYPE_REAL       :
+        case TYPE_STRING     :
+            return;
+
+        case TYPE_LIST       : inferer_apply_subst(inferer, type->type.list.type, subst); return;
+        case TYPE_STRUCT     :
+            for (int i = 0; i < type->type.structt.field_num; ++i)
+            {
+                TypeStructField* field = type->type.structt.fields[i];
+                inferer_apply_subst(inferer, field->value, subst);
+            }
+            return;
+
+        case TYPE_FN         : inferer_apply_subst(inferer, type->type.fn.left , subst);
+                               inferer_apply_subst(inferer, type->type.fn.right, subst);
+                               return;
+
+        case TYPE_FREE_VAR   :
+            if (type == subst.key)
+            {
+                *type = (Type)
+                {
+                    .kind = TYPE_BOUNDED_VAR,
+                    .type.bounded_var = (TypeBoundedVar) { .id = subst.value }, 
+                };
+            }
+            return;
+
+        case TYPE_BOUNDED_VAR: assert(false);
+
+        case TYPE_APPLICATION:
+            for (int i = 0; i < type->type.application.argc; ++i)
+            {
+                Type* arg = type->type.application.argv[i];
+
+                inferer_apply_subst(inferer, arg, subst);
+            }
+            return;
+
+        case TYPE_CONSTRUCTOR: inferer_apply_subst(inferer, type->type.constructor.left , subst);
+                               inferer_apply_subst(inferer, type->type.constructor.right, subst);
+                               return;
+    }
+
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
+    exit(1);
+}
+
+void inferer_apply_subst_reverse(Inferer* inferer, Type* type, Subst subst)
+{
+    assert(inferer != NULL);
+    assert(type    != NULL);
+
+    switch (type->kind)
+    {
+        case TYPE_NIL        :
+        case TYPE_BOOL       :
+        case TYPE_NUMERIC    :
+        case TYPE_NAT        :
+        case TYPE_INT        :
+        case TYPE_REAL       :
+        case TYPE_STRING     :
+            return;
+
+        case TYPE_LIST       : inferer_apply_subst_reverse(inferer, type->type.list.type, subst); return;
+        case TYPE_STRUCT     :
+            for (int i = 0; i < type->type.structt.field_num; ++i)
+            {
+                TypeStructField* field = type->type.structt.fields[i];
+                inferer_apply_subst_reverse(inferer, field->value, subst);
+            }
+            return;
+
+        case TYPE_FN         : inferer_apply_subst_reverse(inferer, type->type.fn.left , subst);
+                               inferer_apply_subst_reverse(inferer, type->type.fn.right, subst);
+                               return;
+
+        case TYPE_FREE_VAR   : return;
+
+        case TYPE_BOUNDED_VAR:
+            if (type->type.bounded_var.id == subst.value)
+            {
+                *type = (Type)
+                {
+                    .kind = TYPE_FREE_VAR,
+                    .type.free_var= (TypeFreeVar) { .type = subst.key }, 
+                };
+            }
+            return;
+
+        case TYPE_APPLICATION:
+            for (int i = 0; i < type->type.application.argc; ++i)
+            {
+                Type* arg = type->type.application.argv[i];
+
+                inferer_apply_subst_reverse(inferer, arg, subst);
+            }
+            return;
+
+        case TYPE_CONSTRUCTOR: inferer_apply_subst_reverse(inferer, type->type.constructor.left , subst);
+                               inferer_apply_subst_reverse(inferer, type->type.constructor.right, subst);
+                               return;
+    }
+
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
+    exit(1);
 }
 
 bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Type** type)
@@ -699,11 +890,19 @@ void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
     assert(type    != NULL);
     assert(*type   == NULL);
 
-    *type = inferer_get_decl_var_type(inferer, decl);
-    if (*type == NULL)
+    bool is_successful = false;
+    TypeScheme scheme;
+
+    is_successful = inferer_get_decl_var_type(inferer, decl, &scheme);
+    if (!is_successful)
     {
         *type = inferer_create_free_type_var(inferer);
-        inferer_set_decl_var_type(inferer, decl, *type);
+        inferer_generalize(inferer, &type, &scheme);
+        inferer_set_decl_var_type(inferer, decl, scheme);
+    }
+    else
+    {
+        inferer_instantiate(inferer, scheme, type);
     }
 }
 
@@ -1114,13 +1313,20 @@ bool inferer_convert_type_expr_variable(Inferer* inferer, TypeExprVariable varia
     assert(type      != NULL);
     assert(*type     == NULL);
 
+    bool is_successful = false;
     Type* var_type = NULL;
+    TypeScheme scheme;
 
-    var_type = inferer_get_decl_var_type(inferer, variable.decl);
-    if (var_type == NULL)
+    is_successful = inferer_get_decl_var_type(inferer, variable.decl, &scheme);
+    if (!is_successful)
     {
-        var_type = inferer_create_free_type_var(inferer);
-        inferer_set_decl_var_type(inferer, variable.decl, var_type);
+        *type = inferer_create_free_type_var(inferer);
+        inferer_generalize(inferer, type, &scheme);
+        inferer_set_decl_var_type(inferer, variable.decl, scheme);
+    }
+    else
+    {
+        inferer_instantiate(inferer, scheme, type);
     }
 
     return true;
@@ -1459,8 +1665,8 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     Type* expr_type       = NULL;
     Type* annotation_type = NULL;
     Type* final_type      = NULL;
-    Type* scheme          = NULL;
-    TypeEnv type_env;
+    TypeScheme scheme;
+    TypeEnv  type_env;
 
     type_env = inferer_get_curr_type_env(inferer);
 
@@ -1491,15 +1697,7 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
         final_type = expr_type;
     }
 
-    is_successful = inferer_generalize(inferer, final_type, &scheme);
-    if (!is_successful)
-    {
-        return false;
-    }
-
-    assert(scheme != NULL);
-    assert(scheme->kind == TYPE_SCHEME);
-
+    inferer_generalize(inferer, final_type, &scheme);
     inferer_set_decl_var_type(inferer, let.decl, scheme);
     inferer_set_curr_type_env(inferer, type_env);
 
@@ -1720,23 +1918,32 @@ TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_
     return abstraction;
 }
 
-Type* inferer_get_decl_var_type(Inferer* inferer, Decl* decl)
+bool inferer_get_decl_var_type(Inferer* inferer, Decl* decl, TypeScheme* scheme_ref)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
 
-    return decl->decl.var.type;
+    if (decl->decl.var.has_scheme)
+    {
+        *scheme_ref = decl->decl.var.scheme;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
-void inferer_set_decl_var_type(Inferer* inferer, Decl* decl, Type* type)
+void inferer_set_decl_var_type(Inferer* inferer, Decl* decl, TypeScheme scheme)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
     // type can be NULL ?
 
-    decl->decl.var.type = type;
+    decl->decl.var.has_scheme = true  ;
+    decl->decl.var.scheme     = scheme;
 }
 
 TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl)
@@ -1763,11 +1970,12 @@ Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.type->kind == TYPE_FN);
+    assert(decl->decl.var.has_scheme);
+    assert(decl->decl.var.scheme.type->kind == TYPE_FN);
 
-    Type* old_type = decl->decl.var.type;
+    TypeScheme scheme = decl->decl.var.scheme;
 
-    while (old_type->type.fn.right->kind == TYPE_FN)
+    while (scheme.type->type.fn.right->kind == TYPE_FN)
     {
         old_type = old_type->type.fn.right;
     }
