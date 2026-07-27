@@ -31,7 +31,6 @@ enum DeclVarKind
     DECL_VAR_INFERRING,
 };
 
-// IMPLEMENT:
 struct DeclVar
 {
     DeclVarKind kind;
@@ -45,6 +44,7 @@ struct DeclVar
 
 struct DeclTypeVar
 {
+    Type* type;
 };
 
 struct DeclAlias

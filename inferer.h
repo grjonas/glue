@@ -91,14 +91,22 @@ Type* inferer_create_free_type_var      (Inferer* inferer);
 Type* inferer_create_free_list_type     (Inferer* inferer);
 Type* inferer_create_free_function_type (Inferer* inferer , int arity);
 
+void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl, Type* type);
+Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
+void  inferer_decl_var_set_type            (Inferer* inferer, Decl* decl, Type* type);
+Type* inferer_decl_var_get_return_type     (Inferer* inferer, Decl* decl);
+void  inferer_decl_var_set_return_type     (Inferer* inferer, Decl* decl, Type* type);
+Type* inferer_decl_type_var_get_type       (Inferer* inferer, Decl* decl);
+void  inferer_decl_type_var_set_type       (Inferer* inferer, Decl* decl, Type* type);
+
+void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
+TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
+void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
+
 TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
-bool  inferer_get_decl_var_type(Inferer* inferer, Decl* decl, TypeScheme* scheme_ref);
-void  inferer_set_decl_var_type(Inferer* inferer, Decl* decl, TypeScheme scheme);
 TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
-Type* inferer_get_decl_var_return_type(Inferer* inferer, Decl* decl);
-void  inferer_set_decl_var_return_type(Inferer* inferer, Decl* decl, Type* type);
-TypeAbstraction* inferer_get_decl_type_abstraction(Inferer* inferer, Decl* decl);
-void  inferer_set_decl_type_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction);
+TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl);
+void             inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction);
 
 void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
 void  inferer_pop_type_variable (Inferer* inferer);

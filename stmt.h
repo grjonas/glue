@@ -87,7 +87,7 @@ struct StmtFnArg
 struct StmtReturn
 {
     Expr* expr;
-    Decl* fn  ; // Function to which the return is tied to.
+    Decl* decl; // Function to which the return is tied to.
 };
 
 struct StmtAlias

@@ -362,7 +362,7 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
             return false;
         }
     }
-    curr_stmt->stmt.returnn.fn = resolver->curr_fn;
+    curr_stmt->stmt.returnn.decl = resolver->curr_fn;
 
     return true;
 }
@@ -875,6 +875,17 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
 
         case TYPE_EXPR_INSTANCE  :
             return resolver_resolve_type_expr_instance(resolver, type_expr);
+
+        case TYPE_EXPR_APPLICATION:
+            for (int i = 0; i < type_expr->type_expr.application.argc; ++i)
+            {
+                TypeExpr* te = type_expr->type_expr.application.argv[i];
+                if (!resolver_resolve_type_expr(resolver, te))
+                {
+                    return false;
+                }
+            }
+            return true;
     }
 
     fprintf(stderr, "[%s:%d] Type expression resolution: Failed to recognise type expression kind.\n", __FILE__, __LINE__);
@@ -951,15 +962,7 @@ Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
     for (int i = len - 1; 0 <= i; --i)
     {
         decl = resolver->context[i];
-        id   = NULL;
-        switch (decl->kind)
-        {
-            case DECL_VAR             : id = decl->identifier; break; 
-            case DECL_TYPE_VAR        : id = decl->identifier; break; 
-            case DECL_ALIAS           : id = decl->identifier; break;
-            case DECL_TYPE            : id = decl->identifier; break;
-            case DECL_TYPE_CONSTRUCTOR: id = decl->identifier; break;
-        }
+        id   = decl->identifier;
 
         if (strlen(id) == id_len && memcmp(id, identifier, id_len) == 0)
         {
@@ -981,6 +984,10 @@ Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
         .kind       = DECL_VAR           ,
         .identifier = existing_identifier,
         .id         = resolver->decl_id++,
+        .decl.var = (DeclVar)
+        {
+            .kind = DECL_VAR_NONE,
+        }
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));
@@ -1000,6 +1007,10 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
         .kind       = DECL_TYPE_VAR      ,
         .identifier = existing_identifier,
         .id         = resolver->decl_id++,
+        .decl.type_var = (DeclTypeVar)
+        {
+            .type = NULL,
+        }
     };
 
     decl_ptr = (Decl*) arena_push(&resolver->arena, &decl, sizeof(Decl));

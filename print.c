@@ -598,10 +598,6 @@ void type_print(FILE* file, Type* type)
             fprintf(file, "@%d", type->type.bounded_var.id);
             return;
 
-        case TYPE_SCHEME     :
-            fprintf(file, "[T_SCHEME]");
-            return;
-
         // case TYPE_ALIAS      :
         //     fprintf(file, "[T_ALIAS]");
         //     return;
@@ -616,6 +612,33 @@ void type_print(FILE* file, Type* type)
     }
 
     fprintf(file, "[TYPE]");
+}
+
+void type_scheme_print(FILE* file, TypeScheme* scheme)
+{
+    if (scheme == NULL)
+    {
+        fprintf(file, "[T_SCHEME_NULL]");
+        return;
+    }
+
+    fprintf(file, "forall");
+    if (scheme->quantified_count > 0)
+    {
+        fprintf(file, " ");
+    }
+    for (int i = 0; i < scheme->quantified_count; ++i)
+    {
+        fprintf(file, "%d", i);
+
+        if (i + 1 < scheme->quantified_count)
+        {
+            fprintf(file, ", ");
+        }
+    }
+    fprintf(file, ".");
+
+    type_print(file, scheme->type);
 }
 
 void decl_print_top_level(FILE* file, Decl* decl)
@@ -656,8 +679,17 @@ void decl_print(FILE* file, Decl* decl)
             case DECL_VAR             :
                 fprintf(file, "let");
                 decl_print_top_level(file, decl);
-                fprintf(file, " type: ");
-                type_print(file, decl->decl.var.type);
+                fprintf(file, " type ");
+                if (decl->decl.var.kind == DECL_VAR_INFERRING)
+                {
+                    fprintf(file, ": ");
+                    type_print(file, decl->decl.var.var.inferring);
+                }
+                else if (decl->decl.var.kind == DECL_VAR_INFERRED)
+                {
+                    fprintf(file, ": ");
+                    type_scheme_print(file, decl->decl.var.var.inferred);
+                }
                 fprintf(file, " : ");
                 break;
 

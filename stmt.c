@@ -544,7 +544,7 @@ Stmt* parser_parse_stmt_return(Parser* parser)
         .stmt.returnn = (StmtReturn)
         {
             .expr = expr,
-            .fn   = NULL,
+            .decl = NULL,
         }
     };
 
