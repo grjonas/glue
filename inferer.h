@@ -91,13 +91,15 @@ Type* inferer_create_free_type_var      (Inferer* inferer);
 Type* inferer_create_free_list_type     (Inferer* inferer);
 Type* inferer_create_free_function_type (Inferer* inferer , int arity);
 
-void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl, Type* type);
+void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl);
 Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
 void  inferer_decl_var_set_type            (Inferer* inferer, Decl* decl, Type* type);
 Type* inferer_decl_var_get_return_type     (Inferer* inferer, Decl* decl);
 void  inferer_decl_var_set_return_type     (Inferer* inferer, Decl* decl, Type* type);
 Type* inferer_decl_type_var_get_type       (Inferer* inferer, Decl* decl);
 void  inferer_decl_type_var_set_type       (Inferer* inferer, Decl* decl, Type* type);
+Type* inferer_decl_alias_get_type          (Inferer* inferer, Decl* decl);
+void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl, Type* type);
 
 void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
 TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);

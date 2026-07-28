@@ -104,6 +104,21 @@ int main(int argc, char** argv)
 
     Inferer inferer = inferer_init(&resolver);
 
+    inferer_infer_stmt(&inferer, inferer.stmts);
+
+    arena_print_memory_usage(&inferer.arena);
+    arena_print_memory_usage(&inferer.type_arena);
+
+    fprintf(file, "Declarations:\n");
+    for (int i = 0; i < arrlen(inferer.declarations); ++i)
+    {
+        Decl* d = inferer.declarations[i];
+        fprintf(file, "    ");
+        decl_print(file, d);
+        fprintf(file, "\n");
+    }
+    stmt_print(file, inferer.stmts);
+
     inferer_free(&inferer);
 
     return 0;

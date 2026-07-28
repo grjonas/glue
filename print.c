@@ -526,6 +526,10 @@ void type_expr_print(FILE* file, TypeExpr* type_expr)
         case TYPE_EXPR_APPLICATION:
             decl_print(file, type_expr->type_expr.application.decl);
             return;
+
+        case TYPE_EXPR_ALIAS     :
+            decl_print(file, type_expr->type_expr.alias.decl);
+            return;
     }
 
     fprintf(file, "[TYPE_EXPR]");
@@ -539,46 +543,54 @@ void type_print(FILE* file, Type* type)
         return;
     }
 
-    fprintf(file, "[TYPE]");
-
+    fprintf(file, "[TYPE:");
     switch (type->kind)
     {
         case TYPE_NIL        :
             fprintf(file, "Nil");
+            fprintf(file, "]");
             return;
 
         case TYPE_BOOL       :
             fprintf(file, "Bool");
+            fprintf(file, "]");
             return;
 
         case TYPE_NUMERIC    :
             fprintf(file, "[NUMERIC]");
+            fprintf(file, "]");
             return;
 
         case TYPE_NAT        :
             fprintf(file, "Nat");
+            fprintf(file, "]");
             return;
 
         case TYPE_INT        :
             fprintf(file, "Int");
+            fprintf(file, "]");
             return;
 
         case TYPE_REAL       :
             fprintf(file, "Real");
+            fprintf(file, "]");
             return;
 
         case TYPE_STRING     :
             fprintf(file, "String");
+            fprintf(file, "]");
             return;
 
         case TYPE_LIST       :
             fprintf(file, "[");
             type_print(file, type->type.list.type);
             fprintf(file, "]");
+            fprintf(file, "]");
             return;
 
         case TYPE_STRUCT     :
             fprintf(file, "[TYPE_STRUCT]");
+            fprintf(file, "]");
             return;
 
         case TYPE_FN         :
@@ -588,14 +600,17 @@ void type_print(FILE* file, Type* type)
             if (type_fn.left->kind == TYPE_FN) fprintf(file, ")");
             fprintf(file, " -> ");
             type_print(file, type_fn.right);
+            fprintf(file, "]");
             return;
 
         case TYPE_FREE_VAR   :
             fprintf(file, "@%p", type->type.free_var.type);
+            fprintf(file, "]");
             return;
 
         case TYPE_BOUNDED_VAR:
             fprintf(file, "@%d", type->type.bounded_var.id);
+            fprintf(file, "]");
             return;
 
         // case TYPE_ALIAS      :
@@ -604,14 +619,19 @@ void type_print(FILE* file, Type* type)
 
         case TYPE_APPLICATION:
             fprintf(file, "[T_APPLICATION]");
+            fprintf(file, "]");
             return;
 
         case TYPE_CONSTRUCTOR:
             fprintf(file, "[T_CONSTRUCTOR]");
+            fprintf(file, "]");
+            return;
+
+        case TYPE_ALIAS      :
+            fprintf(file, "[T_ALIAS]");
+            fprintf(file, "]");
             return;
     }
-
-    fprintf(file, "[TYPE]");
 }
 
 void type_scheme_print(FILE* file, TypeScheme* scheme)
@@ -679,7 +699,7 @@ void decl_print(FILE* file, Decl* decl)
             case DECL_VAR             :
                 fprintf(file, "let");
                 decl_print_top_level(file, decl);
-                fprintf(file, " type ");
+                fprintf(file, " type-");
                 if (decl->decl.var.kind == DECL_VAR_INFERRING)
                 {
                     fprintf(file, ": ");
@@ -690,7 +710,10 @@ void decl_print(FILE* file, Decl* decl)
                     fprintf(file, ": ");
                     type_scheme_print(file, decl->decl.var.var.inferred);
                 }
-                fprintf(file, " : ");
+                else
+                {
+                    fprintf(file, "[DECL_VAR_NONE]");
+                }
                 break;
 
             case DECL_TYPE_VAR   :

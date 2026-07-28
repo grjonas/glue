@@ -20,6 +20,7 @@ typedef struct TypeExprList        TypeExprList       ;
 typedef struct TypeExprStructField TypeExprStructField;
 typedef struct TypeExprStruct      TypeExprStruct     ;
 typedef struct TypeExprFn          TypeExprFn         ; // example: map : (a -> b) -> [a] -> [b]
+typedef struct TypeExprAlias       TypeExprAlias      ;
 typedef struct TypeExprInstance    TypeExprInstance   ; // example: Maybe(a), which can be instantiated as such - Maybe(Int), etc.
 typedef struct TypeExprApplication TypeExprApplication;
 
@@ -36,6 +37,7 @@ enum TypeExprKind
     TYPE_EXPR_LIST       ,
     TYPE_EXPR_STRUCT     ,
     TYPE_EXPR_FN         ,
+    TYPE_EXPR_ALIAS      ,
     TYPE_EXPR_INSTANCE   ,
     TYPE_EXPR_APPLICATION,
 };
@@ -73,6 +75,11 @@ struct TypeExprFn
     TypeExpr* right;
 };
 
+struct TypeExprAlias
+{
+    Decl* decl;
+};
+
 // Shouldn't be encountered after the resolution step.
 struct TypeExprInstance
 {
@@ -105,6 +112,7 @@ struct TypeExpr
         TypeExprList        list       ;
         TypeExprStruct      structt    ;
         TypeExprFn          fn         ;
+        TypeExprAlias       alias      ;
         TypeExprInstance    instance   ;
         TypeExprApplication application;
     }

@@ -265,7 +265,7 @@ bool resolver_resolve_stmt_continue(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_fn_inner(Resolver* resolver, StmtFn fn)
+bool resolver_resolve_stmt_fn_args(Resolver* resolver, StmtFn fn)
 {
     if (!resolver_resolve_type_expr(resolver, fn.return_type))
     {
@@ -275,6 +275,9 @@ bool resolver_resolve_stmt_fn_inner(Resolver* resolver, StmtFn fn)
     for (int i = 0; i < fn.argc; ++i)
     {
         StmtFnArg* arg = fn.argv[i];
+
+        arg->decl = resolver_declare_variable(resolver, arg->identifier);
+        resolver_push_decl_to_context(resolver, arg->decl);
 
         if (arg->type != NULL)
         {
@@ -293,22 +296,22 @@ bool resolver_resolve_stmt_fn(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
-    StmtFn fn;
+    StmtFn* fn;
     Stmt*  stmt = NULL;
     Decl*  decl = NULL;
     ResolverSnapshot snapshot;
 
-    fn   = curr_stmt->stmt.fn;
-    stmt = fn.body;
+    fn   = &curr_stmt->stmt.fn;
+    stmt = fn->body;
 
     // Does not return NULL
-    decl = resolver_declare_variable(resolver, fn.identifier);
-    fn.decl = decl;
+    decl = resolver_declare_variable(resolver, fn->identifier);
+    fn->decl = decl;
     resolver_push_decl_to_context(resolver, decl);
 
     snapshot = resolver_get_context_snapshot(resolver);
 
-    if (!resolver_resolve_stmt_fn_inner(resolver, fn))
+    if (!resolver_resolve_stmt_fn_args(resolver, *fn))
     {
         return false;
     }
@@ -740,15 +743,34 @@ bool resolver_resolve_type_expr_identifier(Resolver* resolver, TypeExpr* type_ex
     decl       = resolver_get_decl_by_identifier(resolver, identifier);
     if (decl != NULL)
     {
-        if
-        (
-            decl_is_type_variable(*decl)
-            || decl_is_alias(*decl)
-            || (decl_is_new_type(*decl) && decl_get_new_type_parameter_num(*decl) == 0)
-        )
+        if (decl_is_type_variable(*decl))
         {
-            type_expr->kind = TYPE_EXPR_VARIABLE;
-            type_expr->type_expr.variable.decl = decl;
+            *type_expr = (TypeExpr)
+            {
+                .kind = TYPE_EXPR_VARIABLE,
+                .type_expr.variable = (TypeExprVariable) { .decl = decl }
+            };
+        }
+        else if (decl_is_alias(*decl))
+        {
+            *type_expr = (TypeExpr)
+            {
+                .kind = TYPE_EXPR_ALIAS,
+                .type_expr.alias = (TypeExprAlias) { .decl = decl }
+            };
+        }
+        else if (decl_is_new_type(*decl) && decl_get_new_type_parameter_num(*decl) == 0)
+        {
+            *type_expr = (TypeExpr)
+            {
+                .kind = TYPE_EXPR_APPLICATION,
+                .type_expr.application = (TypeExprApplication)
+                {
+                    .decl = decl,
+                    .argv = NULL,
+                    .argc = 0   ,
+                },
+            };
         }
         else
         {
@@ -886,6 +908,9 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
                 }
             }
             return true;
+
+        // Similiar to TYPE_EXPR_VARIABLE, shouldn't really be encountered in this stage.
+        case TYPE_EXPR_ALIAS      : assert(false);
     }
 
     fprintf(stderr, "[%s:%d] Type expression resolution: Failed to recognise type expression kind.\n", __FILE__, __LINE__);

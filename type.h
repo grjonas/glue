@@ -16,6 +16,7 @@ typedef struct TypeScheme      TypeScheme     ;
 typedef struct TypeAbstraction TypeAbstraction;
 typedef struct TypeApplication TypeApplication;
 typedef struct TypeConstructor TypeConstructor;
+typedef struct TypeAlias       TypeAlias      ;
 
 // typedef struct TypeAlias       TypeAlias      ;
 
@@ -42,7 +43,7 @@ enum TypeKind
     TYPE_APPLICATION, // instance of abstraction
     TYPE_CONSTRUCTOR, // basically a function,
 
-    // TYPE_ALIAS      , // a type representing an alias to an existing type.
+    TYPE_ALIAS      , // a type representing an alias to an existing type.
     // TYPE_SCHEME     ,
 };
 
@@ -97,6 +98,11 @@ struct TypeConstructor
     Type* right;
 };
 
+struct TypeAlias
+{
+    Type* type;
+};
+
 struct TypeScheme
 {
     int quantified_count;
@@ -115,6 +121,7 @@ struct Type
         TypeFn          fn         ;
         TypeApplication application;
         TypeConstructor constructor;
+        TypeAlias       alias      ;
     }
     type;
 };

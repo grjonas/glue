@@ -895,6 +895,14 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
+// TODO: Redo this a bit, such we can have the following syntax:
+// ```
+// type NewType
+// type Enum
+// | EnumOne
+// | EnumTwo(Int, Nil)
+// end
+// ```
 StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
 {
     StmtTypeConstructor constructor;
