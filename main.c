@@ -106,8 +106,22 @@ int main(int argc, char** argv)
 
     inferer_infer_stmt(&inferer, inferer.stmts);
 
-    arena_print_memory_usage(&inferer.arena);
-    arena_print_memory_usage(&inferer.type_arena);
+    arr_len = arrlen(inferer.errs);
+    for (int i = 0; i < arr_len; ++i)
+    {
+        CompileError t = *(inferer.errs[i]);
+
+        fprintf(
+            stderr,
+            "[%d:%d:%d]: %s\n",
+            t.line  ,
+            t.column,
+            t.length,
+            t.msg   
+        );
+    }
+    if (arr_len > 0)
+        exit(1);
 
     fprintf(file, "Declarations:\n");
     for (int i = 0; i < arrlen(inferer.declarations); ++i)
@@ -118,6 +132,9 @@ int main(int argc, char** argv)
         fprintf(file, "\n");
     }
     stmt_print(file, inferer.stmts);
+
+    arena_print_memory_usage(&inferer.arena);
+    arena_print_memory_usage(&inferer.type_arena);
 
     inferer_free(&inferer);
 

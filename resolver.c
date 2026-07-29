@@ -340,7 +340,7 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
 
     Expr* expr = NULL;
 
-    assert(curr_stmt == NULL);
+    assert(curr_stmt != NULL);
     assert(curr_stmt->kind == STMT_RETURN);
 
     // TODO: Somehow bind this to it's respective function declaration.

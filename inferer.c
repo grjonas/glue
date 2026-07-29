@@ -896,7 +896,7 @@ bool inferer_infer_expr_primary_lambda(Inferer* inferer, ExprPrimary primary, Ty
     assert(false);
 }
 
-void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
+void O_inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
 {
     assert(inferer != NULL);
     assert(type    != NULL);
@@ -907,6 +907,41 @@ void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
     scheme = inferer_decl_var_get_scheme(inferer, decl);
     assert(scheme != NULL);
     inferer_instantiate(inferer, scheme, type);
+}
+
+void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_VAR);
+    assert(type    != NULL);
+    assert(*type   == NULL);
+
+    TypeScheme* scheme = NULL;
+
+    // Not sure if this is a good way of doing things
+    switch (decl->decl.var.kind)
+    {
+        // This is primarily for function arguments,
+        // which should always be monotypes.
+        // This code is not really explicit about that,
+        // so it could probably be better.
+        case DECL_VAR_INFERRING:
+            *type = inferer_decl_var_get_type(inferer, decl);
+            return;
+
+        // For polytypes, i.e. let statements, or function declarations.
+        case DECL_VAR_INFERRED :
+            scheme = inferer_decl_var_get_scheme(inferer, decl);
+            assert(scheme != NULL);
+            inferer_instantiate(inferer, scheme, type);
+            return;
+
+        case DECL_VAR_NONE     :
+            assert(false);
+    }
+    fprintf(stderr, "[%s:%d] Type inference: Logical error while infering types.\n", __FILE__, __LINE__);
+    exit(1);
 }
 
 void inferer_infer_expr_primary_identifier(Inferer* inferer, char* identifier, Type** type)
@@ -1288,6 +1323,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, ExprFn fn, Type** type)
         curr_fn_ptr = fn_type->type.fn.right;
     }
 
+    *type = fn_type;
     return true;
 }
 
@@ -2029,14 +2065,13 @@ Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
     assert(decl->decl.var.var.inferring->kind == TYPE_FN);
 
     Type* type = decl->decl.var.var.inferring;
-    Type* old_type = NULL;
 
     while (type->type.fn.right->kind == TYPE_FN)
     {
-        old_type = old_type->type.fn.right;
+        type  = type->type.fn.right;
     }
 
-    return old_type->type.fn.right;
+    return type;
 }
 
 void inferer_decl_var_set_return_type(Inferer* inferer, Decl* decl, Type* type)

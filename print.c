@@ -686,7 +686,7 @@ void decl_print(FILE* file, Decl* decl)
     TypeExpr** types           = NULL;
     int        type_num        = 0   ;
 
-    fprintf(file, "<");
+    fprintf(file, "<decl-");
 
     if (decl == NULL)
     {
@@ -697,7 +697,7 @@ void decl_print(FILE* file, Decl* decl)
         switch (decl->kind)
         {
             case DECL_VAR             :
-                fprintf(file, "let");
+                fprintf(file, "var");
                 decl_print_top_level(file, decl);
                 fprintf(file, " type-");
                 if (decl->decl.var.kind == DECL_VAR_INFERRING)
@@ -717,7 +717,7 @@ void decl_print(FILE* file, Decl* decl)
                 break;
 
             case DECL_TYPE_VAR   :
-                fprintf(file, "type_var");
+                fprintf(file, "type-var");
                 decl_print_top_level(file, decl);
                 break;
 
