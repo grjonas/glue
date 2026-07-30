@@ -4,7 +4,7 @@
 Resolver resolver_init(Parser* parser, Stmt* stmts)
 {
     // Parser cleanup
-    arrfree(parser->errs);
+    diagnostic_component_free(&parser->diagnostic_component);
 
     *parser = (Parser)
     {
@@ -14,7 +14,7 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
         .start   = -1                   ,
         .end     = -1                   ,
         .current = -1                   ,
-        .errs    = NULL                 ,
+        .diagnostic_component = NULL    ,
     };
 
     Resolver resolver = (Resolver)
@@ -31,7 +31,7 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
         .context          = NULL          ,
         .declarations     = NULL          ,
         .identifiers      = NULL          ,
-        .errs             = NULL          ,
+        .diagnostic_component = diagnostic_component_init(),
     };
     return resolver;
 }
@@ -45,7 +45,7 @@ void resolver_free(Resolver* resolver)
     arrfree(resolver->context     );
     arrfree(resolver->declarations);
     arrfree(resolver->identifiers );
-    arrfree(resolver->errs        );
+    diagnostic_component_free(&resolver->diagnostic_component);
 
     *resolver = (Resolver)
     {
@@ -61,7 +61,7 @@ void resolver_free(Resolver* resolver)
         .context          = NULL           ,
         .declarations     = NULL           ,
         .identifiers      = NULL           ,
-        .errs             = NULL           ,
+        .diagnostic_component = NULL      ,
     };
 }
 
@@ -231,14 +231,7 @@ bool resolver_resolve_stmt_break(Resolver* resolver)
 
     if (resolver->loop_depth <= 0)
     {
-        resolver_throw_compiler_error(resolver, (CompileError)
-        {
-            .kind   = ERROR_ERROR      ,
-            .line   = curr_stmt->line  ,
-            .column = curr_stmt->column,
-            .length = curr_stmt->line  ,
-            .msg    = "Statement resolution: Breaking while not in loop.",
-        });
+        resolver_throw_err_stmt_break_not_in_loop(resolver, curr_stmt);
         return false;
     }
 
@@ -251,14 +244,7 @@ bool resolver_resolve_stmt_continue(Resolver* resolver)
 
     if (resolver->loop_depth <= 0)
     {
-        resolver_throw_compiler_error(resolver, (CompileError)
-        {
-            .kind   = ERROR_ERROR      ,
-            .line   = curr_stmt->line  ,
-            .column = curr_stmt->column,
-            .length = curr_stmt->line  ,
-            .msg    = "Statement resolution: Continuing while not in loop.",
-        });
+        resolver_throw_err_stmt_continue_not_in_loop(resolver, curr_stmt);
         return false;
     }
 
@@ -346,14 +332,7 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
     // TODO: Somehow bind this to it's respective function declaration.
     if (resolver->curr_fn == NULL)
     {
-        resolver_throw_compiler_error(resolver, (CompileError)
-        {
-            .kind   = ERROR_ERROR      ,
-            .line   = curr_stmt->line  ,
-            .column = curr_stmt->column,
-            .length = curr_stmt->line  ,
-            .msg    = "Statement resolution: Cannot return while not in function.",
-        });
+        resolver_throw_err_stmt_return_not_in_fn(resolver, curr_stmt);
         return false;
     }
 
@@ -559,14 +538,7 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
             }
             else if (decl->kind != DECL_VAR && decl->kind != DECL_TYPE_CONSTRUCTOR)
             {
-                resolver_throw_compiler_error(resolver, (CompileError)
-                {
-                    .kind   = ERROR_ERROR      ,
-                    .line   = expr->line  ,
-                    .column = expr->column,
-                    .length = expr->length,
-                    .msg    = "Type resolution: Could not resolve expression identifier to variable declaration.",
-                });
+                resolver_throw_err_expr_failed_to_resolve_identifier(resolver, expr);
                 return false;
             }
 
@@ -621,21 +593,16 @@ bool resolver_resolve_expr_binary_access_operator(Resolver* resolver, Expr* expr
             && expr->expr.binary.left->expr.primary.kind == EXPR_PRIMARY_IDENTIFIER
         )
     {
-        char** identifier = &expr->expr.binary.left->expr.primary.primary.identifier;
+        char** identifier =
+            &expr->expr.binary.left->expr.primary.primary.identifier;
         *identifier =
             resolver_get_existing_identifier(resolver, *identifier);
-        return resolver_resolve_expr_binary_access_operator(resolver, expr->expr.binary.right);
+        return resolver_resolve_expr_binary_access_operator
+            (resolver, expr->expr.binary.right);
     }
     else
     {
-        resolver_throw_compiler_error(resolver, (CompileError)
-        {
-            .kind   = ERROR_ERROR      ,
-            .line   = expr->line  ,
-            .column = expr->column,
-            .length = expr->length,
-            .msg    = "Type resolution: Could not resolve struct access operator - does not match pattern.",
-        });
+        resolver_throw_err_expr_failed_to_resolve_access_op(resolver, expr);
         return false;
     }
 }
@@ -774,14 +741,7 @@ bool resolver_resolve_type_expr_identifier(Resolver* resolver, TypeExpr* type_ex
         }
         else
         {
-            resolver_throw_compiler_error(resolver, (CompileError)
-            {
-                .kind   = ERROR_ERROR      ,
-                .line   = type_expr->line  ,
-                .column = type_expr->column,
-                .length = type_expr->length,
-                .msg    = "Type resolution: Type variable can only be a type variable, an alias or a new type with no parameters.",
-            });
+            resolver_throw_err_type_expr_failed_to_resolve_identifier(resolver, type_expr);
             return false;
         }
     }
@@ -836,14 +796,7 @@ bool resolver_resolve_type_expr_instance(Resolver* resolver, TypeExpr* type_expr
     }
     else
     {
-        resolver_throw_compiler_error(resolver, (CompileError)
-        {
-            .kind   = ERROR_ERROR      ,
-            .line   = type_expr->line  ,
-            .column = type_expr->column,
-            .length = type_expr->line  ,
-            .msg    = "Type resolution: Could not find declaration of new type that also has the required number of parameters.",
-        });
+        resolver_throw_err_type_expr_failed_to_find_type(resolver, type_expr);
         return false;
     }
 }
@@ -910,7 +863,7 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
             return true;
 
         // Similiar to TYPE_EXPR_VARIABLE, shouldn't really be encountered in this stage.
-        case TYPE_EXPR_ALIAS      : assert(false);
+        case TYPE_EXPR_ALIAS      : UNREACHABLE;
     }
 
     fprintf(stderr, "[%s:%d] Type expression resolution: Failed to recognise type expression kind.\n", __FILE__, __LINE__);
@@ -1101,9 +1054,65 @@ Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier
     return decl_ptr;
 }
 
-void resolver_throw_compiler_error(Resolver* resolver, CompileError err)
+void resolver_throw_err_stmt_break_not_in_loop(Resolver* resolver, Stmt* stmt)
 {
-    CompileError* err_ptr = NULL;
-    err_ptr = (CompileError*) arena_push(&resolver->arena, &err, sizeof(CompileError));
-    arrput(resolver->errs, err_ptr);
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&stmt);
+}
+
+void resolver_throw_err_stmt_continue_not_in_loop(Resolver* resolver, Stmt* stmt)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&stmt);
+}
+
+void resolver_throw_err_stmt_return_not_in_fn(Resolver* resolver, Stmt* stmt)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&stmt);
+}
+
+void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Expr* expr)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&expr);
+}
+
+void resolver_throw_err_expr_failed_to_resolve_access_op(Resolver* resolver, Expr* expr)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&expr);
+}
+
+void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolver, TypeExpr* type_expr)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&type_expr);
+}
+
+void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeExpr* type_expr)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    assert(&resolver);
+    assert(&type_expr);
 }

@@ -5,11 +5,33 @@
 #include "type.h"
 
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
-typedef struct Inferer         Inferer        ;
-typedef enum   TypeConstraint  TypeConstraint ;
-typedef struct Bind            Bind           ;
-typedef struct TypeEnv         TypeEnv        ;
-typedef struct Subst           Subst          ;
+typedef struct Inferer          Inferer         ;
+typedef enum   TypeConstraint   TypeConstraint  ;
+typedef struct Bind             Bind            ;
+typedef struct TypeEnv          TypeEnv         ;
+typedef struct Subst            Subst           ;
+
+typedef enum   ConstraintOriginKind ConstraintOriginKind;
+typedef struct ConstraintOrigin     ConstraintOrigin    ;
+
+enum ConstraintOriginKind
+{
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_NIL    ,
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_BOOL   ,
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_NUMERIC,
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_NAT    ,
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_INT    ,
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_REAL   ,
+    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_STRING ,
+    CONSTRAINT_ORIGIN_DERIVATIVE_TYPE_LIST  ,
+    CONSTRAINT_ORIGIN_DERIVATIVE_TYPE_VAR   ,
+};
+
+struct ConstraintOrigin
+{
+    ConstraintOriginKind kind;
+    Expr* expr;
+};
 
 enum TypeConstraint
 {
@@ -66,18 +88,19 @@ struct Inferer
     // Outputs
 
     // Errs
-    DYNAMIC_ARRAY(CompileError** errs);
+    DiagnosticComponent* diagnostic_component;
 };
 
 Inferer inferer_init(Resolver* resolver);
 void    inferer_free(Inferer* inferer  );
 
 bool inferer_infer_stmt          (Inferer* inferer, Stmt* stmt)                         ;
-bool inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** type)   ;
+void inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** type)   ;
 bool inferer_infer_expr          (Inferer* inferer, Expr* expr, Type** type)            ;
 bool inferer_resolve             (Inferer* inferer, Type* type, Type** resolved_type)   ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
-bool inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
-bool inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
+bool inferer_unify_inner         (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
+bool inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref, ConstraintOrigin origin)  ; // Unifies the two types
+bool inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ;
 void inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
 void inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
 void inferer_get_substs          (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
@@ -89,7 +112,8 @@ bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstrai
 
 Type* inferer_create_free_type_var      (Inferer* inferer);
 Type* inferer_create_free_list_type     (Inferer* inferer);
-Type* inferer_create_free_function_type (Inferer* inferer , int arity);
+Type* inferer_create_free_function_type (Inferer* inferer, int arity);
+Type* inferer_create_list_type          (Inferer* inferer, Type* inferred_type);
 
 void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl);
 Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
@@ -123,6 +147,12 @@ void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
 void assert_generic_operator_type_is_valid(TypeKind type);
 bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
 
-void inferer_throw_compiler_error(Inferer* inferer, CompileError err);
+void inferer_throw_err_unify_failed                                        (Inferer* inferer, ConstraintOrigin origin);
+void inferer_throw_err_type_failed_constraint_numeric                      (Inferer* inferer);
+void inferer_throw_err_type_failed_constraint_equality                     (Inferer* inferer);
+void inferer_throw_err_expr_binary_arithmetic_constraint_failed            (Inferer* inferer, Expr* expr);
+void inferer_throw_err_expr_binary_equality_constraint_failed              (Inferer* inferer, Expr* expr);
+void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);
+void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field (Inferer* inferer, Expr* expr);
 
 #endif

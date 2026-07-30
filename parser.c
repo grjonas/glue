@@ -12,7 +12,7 @@ Parser init_parser(Scanner scanner)
         .start        = 0                         ,
         .end          = arrlen(scanner.token_list),
         .current      = 0                         ,
-        .errs         = NULL                      ,
+        .diagnostic_component = diagnostic_component_init(),
     };
 
     return parser;
@@ -24,7 +24,7 @@ void parser_free(Parser* parser)
     arrfree(parser->tokens);
     arena_free(&parser->arena);
     // assert(parser->log == NULL); // Idk, placed it here just in case.
-    arrfree(parser->errs);
+    diagnostic_component_free(&parser->diagnostic_component);
 
     *parser = (Parser)
     {
@@ -34,7 +34,7 @@ void parser_free(Parser* parser)
         .start   = -1                   ,
         .end     = -1                   ,
         .current = -1                   ,
-        .errs    = NULL                 ,
+        .diagnostic_component = NULL    ,
     };
 }
 
@@ -131,25 +131,20 @@ char* parser_parse_identifier(Parser* parser)
     Token token;
 
     token = parser_peek(parser);
-    parser_expect_token(parser, TOKEN_IDENTIFIER);
+    if (!parser_expect_token(parser, TOKEN_IDENTIFIER))
+    {
+        return NULL;
+    }
     identifier = copy_string_to_arena(&parser->arena, token.start, token.length);
 
     return identifier;
 }
 
-bool parser_expect_token(Parser* parser, TokenType type)
+bool parser_accept_token(Parser* parser, TokenType type)
 {
     Token token = parser_peek(parser);
     if (token.type != type)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Unexpected token encountered",
-        });
         return false;
     }
 
@@ -157,9 +152,90 @@ bool parser_expect_token(Parser* parser, TokenType type)
     return true;
 }
 
-void parser_throw_compiler_error(Parser* parser, CompileError err)
+bool parser_expect_token(Parser* parser, TokenType type)
 {
-    CompileError* err_ptr = NULL;
-    err_ptr = (CompileError*) arena_push(&parser->arena, &err, sizeof(CompileError));
-    arrput(parser->errs, err_ptr);
+    Token token = parser_peek(parser);
+    if (!parser_accept_token(parser, type))
+    {
+        TokenType expected[] =
+        {
+            type
+        };
+        parser_throw_err_unexpected_token(parser, token, expected, 1);
+        return false;
+    }
+
+    return true;
+}
+
+bool parser_dont_except_token(Parser* parser, TokenType type)
+{
+    Token token = parser_peek(parser);
+    if (parser_accept_token(parser, type))
+    {
+        TokenType expected[] =
+        {
+            type
+        };
+        parser_throw_err_expected_token(parser, token, expected, 1);
+        return false;
+    }
+
+    return true;
+};
+
+void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    // To silence warnings
+    assert(&parser);
+    assert(&token);
+    assert(&file);
+    assert(&line);
+}
+
+void parser_throw_err_unexpected_token(Parser* parser, Token token, TokenType expected[], int expected_count)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    // To silence warnings
+    assert(&parser);
+    assert(&token);
+    assert(&expected);
+    assert(&expected_count);
+}
+
+void parser_throw_err_expected_token(Parser* parser, Token token, TokenType expected[], int expected_count)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    // To silence warnings
+    assert(&parser);
+    assert(&token);
+    assert(&expected);
+    assert(&expected_count);
+}
+
+void parser_throw_err_unexpected_prefix_operator(Parser* parser, Token token)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    // To silence warnings
+    assert(&parser);
+    assert(&token);
+}
+
+void parser_throw_err_struct_duplicate_identifier(Parser* parser, Token identifier_token)
+{
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    // To silence warnings
+    assert(&parser);
+    assert(&identifier_token);
 }

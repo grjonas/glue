@@ -27,14 +27,6 @@ TypeExpr* parser_parse_type_expr_inner(Parser* parser, int min_bp)
             lhs = parser_parse_type_expr_primitive(parser);
             if (lhs == NULL)
             {
-                parser_throw_compiler_error(parser, (CompileError)
-                {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Type parsing: Failed to parser primitive type expression.",
-                });
                 return NULL;
             }
     }
@@ -82,15 +74,7 @@ TypeExpr* parser_parse_type_expr_inner(Parser* parser, int min_bp)
         {
             if (lhs->kind != TYPE_EXPR_IDENTIFIER)
             {
-                parser_throw_compiler_error(parser, (CompileError)
-                {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Type parsing: Left-hand side of polymorphic type instantiation has to be an identifier.",
-                });
-                return NULL;
+                UNREACHABLE;
             }
 
             parser_next(parser);
@@ -182,6 +166,8 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
         // On TOKEN_LEFT_PAREN, we exit the loop.
         while (true)
         {
+            Token identifier_token = parser_peek(parser);
+
             identifier = parser_parse_identifier(parser);
             if (identifier == NULL)
             {
@@ -207,39 +193,28 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
             arrput(argv, curr_arg);
 
             token = parser_peek(parser);
-            if (token.type == TOKEN_COMMA)
+            if (parser_accept_token(parser, TOKEN_COMMA))
             {
-                parser_next(parser);
                 continue;
             }
-            else if (token.type == TOKEN_RIGHT_BRACE)
+            else if (parser_accept_token(parser, TOKEN_RIGHT_BRACE))
             {
-                parser_next(parser);
                 break;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Type parsing: Expected ',' or '}' after function argument.",
-                });
+                    TOKEN_COMMA,
+                    TOKEN_RIGHT_BRACE,
+                };
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
 
             if (find_string_in_string_list(parsed_keys, identifier) != NULL)
             {
-                parser_throw_compiler_error(parser, (CompileError)
-                {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Expression parsing: Found duplicate identifier while parsing struct.",
-                });
+                parser_throw_err_struct_duplicate_identifier(parser, identifier_token);
                 return NULL;
             }
             arrput(parsed_keys, identifier);
@@ -305,27 +280,24 @@ TypeExpr* parser_parse_type_expr_instance(Parser* parser)
             }
 
             arrput(argv, curr_arg);
+
             token = parser_peek(parser);
-            if (token.type == TOKEN_COMMA)
+            if (parser_accept_token(parser, TOKEN_COMMA))
             {
-                parser_next(parser);
                 continue;
             }
-            else if (token.type == TOKEN_RIGHT_PAREN)
+            else if (parser_accept_token(parser, TOKEN_RIGHT_PAREN))
             {
-                parser_next(parser);
                 break;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Type parsing: Expected ',' or ')' after function argument.",
-                });
+                    TOKEN_COMMA,
+                    TOKEN_RIGHT_PAREN,
+                };
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
         }
@@ -409,14 +381,18 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
             break;
 
         default:
-            parser_throw_compiler_error(parser, (CompileError)
+            TokenType expected[] =
             {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Type parsing: Unexpected token encountered.",
-            });
+                TOKEN_NIL_T     ,
+                TOKEN_BOOL      ,
+                TOKEN_NAT       ,
+                TOKEN_INT       ,
+                TOKEN_REAL      ,
+                TOKEN_STRING    ,
+                TOKEN_IDENTIFIER
+            };
+            parser_throw_err_unexpected_token
+                (parser, token, expected, ARRAY_SIZE(expected));
             return NULL;
     }
     parser_next(parser);
@@ -447,142 +423,3 @@ TypeExpr* construct_primitive_type_expr(Arena* arena, TypeExprKind kind)
 
     return (TypeExpr*) arena_push(arena, &type_expr, sizeof(TypeExpr));
 }
-
-// Type* type_convert_type_expr_to_type(Arena* arena, TypeExpr* type_expr)
-// {
-//     assert(type_expr != NULL);
-// 
-//     Type type;
-//     TypeStructField** fields = NULL;
-// 
-//     // Old
-//     int argc = 0;
-//     TypeExprStructField** argv= NULL;
-// 
-//     switch (type_expr->kind)
-//     {
-//         case TYPE_EXPR_IDENTIFIER:
-//             type = (Type)
-//             {
-//                 .kind      = TYPE_VARIABLE,
-//                 .type.none = NULL         ,
-//             };
-// 
-//             break;
-// 
-//         case TYPE_EXPR_NIL:
-//             type = (Type)
-//             {
-//                 .kind      = TYPE_NIL,
-//                 .type.none = NULL    ,
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_BOOL:
-//             type = (Type)
-//             {
-//                 .kind      = TYPE_BOOL,
-//                 .type.none = NULL     ,
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_INT:
-//             type = (Type)
-//             {
-//                 .kind      = TYPE_INT ,
-//                 .type.none = NULL     ,
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_REAL:
-//             type = (Type)
-//             {
-//                 .kind      = TYPE_REAL,
-//                 .type.none = NULL     ,
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_STRING:
-//             type = (Type)
-//             {
-//                 .kind      = TYPE_STRING,
-//                 .type.none = NULL       ,
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_LIST:
-//             type = (Type)
-//             {
-//                 .kind = TYPE_LIST,
-//                 .type.list = (TypeList)
-//                 {
-//                     .type = type_convert_type_expr_to_type(arena, type_expr->type_expr.list.type),
-//                 }
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_STRUCT:
-//             argc = type_expr->type_expr.structt.argc;
-//             argv = type_expr->type_expr.structt.argv;
-// 
-//             for (int i = 0; i < argc; ++i) 
-//             {
-//                 TypeExprStructField* f = argv[i];
-//                 TypeStructField converted_field = (TypeStructField)
-//                 {
-//                     .key   = f->key,
-//                     .value = type_convert_type_expr_to_type(arena, f->value),
-//                 };
-//                 TypeStructField* new_field = (TypeStructField*) arena_push(arena, &converted_field, sizeof(TypeStructField));
-//                 arrput(fields, new_field);
-//             }
-// 
-//             type = (Type)
-//             {
-//                 .kind = TYPE_STRUCT,
-//                 .type.structt = (TypeStruct)
-//                 {
-//                     .field_num = argc,
-//                     .fields    = (TypeStructField**) arena_push(arena, fields, argc * sizeof(TypeStructField*)),
-//                 }
-//             };
-// 
-//             arrfree(fields);
-//             fields = NULL;
-//             break;
-// 
-//         case TYPE_EXPR_FN:
-//             type = (Type)
-//             {
-//                 .kind = TYPE_FN,
-//                 .type.fn = (TypeFn)
-//                 {
-//                     .left  = type_convert_type_expr_to_type(arena, type_expr->type_expr.fn.left ),
-//                     .right = type_convert_type_expr_to_type(arena, type_expr->type_expr.fn.right),
-//                 }
-//             };
-//             break;
-// 
-//         case TYPE_EXPR_INSTANCE:
-//             // struct TypeExprInstance
-//             // {
-//                 // TypeExpr* caller;
-//                 // int argc;
-//                 // TypeExpr** argv;
-//             // };
-// 
-//             // type = (Type)
-//             // {
-//                 // .kind = TYPE_
-//             // };
-// 
-//             fprintf(stderr, "Type conversion: Not implemented yet.\n");
-//             exit(1);
-//             break;
-// 
-//         default:
-//             assert(false);
-//     }
-// 
-//     return (Type*) arena_push(arena, &type, sizeof(Type));
-// }

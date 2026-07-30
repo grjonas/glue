@@ -51,42 +51,16 @@ int main(int argc, char** argv)
     // Stmt* stmt = parser_parse_stmt(&parser);
     Stmt* stmt = parser_parse_stmts(&parser);
 
-    int arr_len = arrlen(parser.errs);
-    for (int i = 0; i < arr_len; ++i)
-    {
-        CompileError t = *(parser.errs[i]);
-
-        fprintf(
-            stderr,
-            "[%d:%d:%d]: %s\n",
-            t.line  ,
-            t.column,
-            t.length,
-            t.msg   
-        );
-    }
-    if (arr_len > 0)
+    diagnostic_component_print(parser.diagnostic_component);
+    if (diagnostic_component_is_empty(parser.diagnostic_component))
         exit(1);
 
     Resolver resolver = resolver_init(&parser, stmt);
 
     resolver_resolve_stmt(&resolver);
 
-    arr_len = arrlen(resolver.errs);
-    for (int i = 0; i < arr_len; ++i)
-    {
-        CompileError t = *(resolver.errs[i]);
-
-        fprintf(
-            stderr,
-            "[%d:%d:%d]: %s\n",
-            t.line  ,
-            t.column,
-            t.length,
-            t.msg   
-        );
-    }
-    if (arr_len > 0)
+    diagnostic_component_print(resolver.diagnostic_component);
+    if (diagnostic_component_is_empty(resolver.diagnostic_component))
         exit(1);
 
     arena_print_memory_usage(&resolver.arena);
@@ -106,21 +80,8 @@ int main(int argc, char** argv)
 
     inferer_infer_stmt(&inferer, inferer.stmts);
 
-    arr_len = arrlen(inferer.errs);
-    for (int i = 0; i < arr_len; ++i)
-    {
-        CompileError t = *(inferer.errs[i]);
-
-        fprintf(
-            stderr,
-            "[%d:%d:%d]: %s\n",
-            t.line  ,
-            t.column,
-            t.length,
-            t.msg   
-        );
-    }
-    if (arr_len > 0)
+    diagnostic_component_print(inferer.diagnostic_component);
+    if (diagnostic_component_is_empty(inferer.diagnostic_component))
         exit(1);
 
     fprintf(file, "Declarations:\n");

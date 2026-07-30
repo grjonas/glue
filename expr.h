@@ -5,6 +5,9 @@
 #include "type_expr.h"
 #include "decl.h"
 
+// TODO: Refactor 'expr.h' and 'expr.c' to make it cleaner.
+// Also, replace the 'parser_throw_err_generic' functions as part of a larger rewrite.
+
 typedef struct Expr            Expr           ;
 typedef struct ExprPrimary     ExprPrimary    ;
 typedef struct ExprUnary       ExprUnary      ;

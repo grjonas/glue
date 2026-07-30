@@ -241,14 +241,6 @@ Stmt* parser_parse_stmt_let(Parser* parser)
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Could not find identifier.",
-        });
         return NULL;
     }
     stmt.stmt.let.identifier = identifier;
@@ -261,14 +253,6 @@ Stmt* parser_parse_stmt_let(Parser* parser)
         type = parser_parse_type_expr(parser);
         if (type == NULL)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Could not find type while parsing the type of let statement.",
-            });
             return NULL;
         }
         stmt.stmt.let.type = type;
@@ -283,14 +267,6 @@ Stmt* parser_parse_stmt_let(Parser* parser)
         expr = parser_parse_expr(parser);
         if (expr == NULL)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Could not find expression on rhs of let statement.",
-            });
             return NULL;
         }
         // This is to make is that the expresseion attached isn't just the expression,
@@ -340,14 +316,6 @@ Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
         condition = parser_parse_expr(parser);
         if (condition == NULL)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Could not find expression while parsing if statement condition.",
-            });
             return NULL;
         }
         stmt.stmt.iff.condition = condition;
@@ -356,14 +324,6 @@ Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Could not find inner statement in if statement.",
-        });
         return NULL;
     }
     stmt.stmt.iff.body = body;
@@ -431,14 +391,6 @@ Stmt* parser_parse_stmt_while(Parser* parser)
     condition = parser_parse_expr(parser);
     if (condition == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Could not find expression while parsing while statement condition.",
-        });
         return NULL;
     }
     stmt.stmt.whilee.condition = condition;
@@ -446,14 +398,6 @@ Stmt* parser_parse_stmt_while(Parser* parser)
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Could not find inner statement in while statement.",
-        });
         return NULL;
     }
     stmt.stmt.whilee.body = body;
@@ -527,9 +471,8 @@ Stmt* parser_parse_stmt_return(Parser* parser)
     }
 
     // If it's NULL, then there are no expressions after return.
-    int old_errs = arrlen(parser->errs);
     expr = parser_parse_expr(parser);
-    if (arrlen(parser->errs) > old_errs)
+    if (expr == NULL && diagnostic_component_is_empty(parser->diagnostic_component))
     {
         return NULL;
     }
@@ -592,28 +535,11 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Could not parse function name.",
-        });
         return NULL;
     }
 
-    token = parser_next(parser);
-    if (token.type != TOKEN_LEFT_PAREN)
+    if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Expected '(' after function name.",
-        });
         return NULL;
     }
 
@@ -634,39 +560,29 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
             curr_arg = parser_parse_stmt_fn_arg(parser);
             if (curr_arg == NULL)
             {
-                parser_throw_compiler_error(parser, (CompileError)
-                {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Statement parsing: Failed to parse function argument.",
-                });
                 return NULL;
             }
 
             arrput(argv, curr_arg);
+
             token = parser_peek(parser);
-            if (token.type == TOKEN_COMMA)
+            if (parser_accept_token(parser, TOKEN_COMMA))
             {
-                parser_next(parser);
                 continue;
             }
-            else if (token.type == TOKEN_RIGHT_PAREN)
+            else if (parser_accept_token(parser, TOKEN_RIGHT_PAREN))
             {
-                parser_next(parser);
                 break;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Statement parsing: Expected ',' or ')' after function argument.",
-                });
+                    TOKEN_COMMA,
+                    TOKEN_RIGHT_PAREN,
+                };
+
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
         }
@@ -681,20 +597,6 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         parser_next(parser);
     }
 
-//    int old_errs = arrlen(parser->errs);
-//    if (arrlen(parser->errs) > old_errs)
-//    {
-//        parser_throw_compiler_error(parser, (CompileError)
-//        {
-//            .kind   = ERROR_ERROR ,
-//            .line   = token.line  ,
-//            .column = token.column,
-//            .length = token.line  ,
-//            .msg    = "Statement parsing: Failed to parse function return type.",
-//        });
-//        return NULL;
-//    }
-
     token = parser_peek(parser);
     if (token.type == TOKEN_COLON)
     {
@@ -702,17 +604,10 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         return_type = parser_parse_type_expr(parser);
         if (return_type == NULL)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Failed to parse function return type.",
-            });
             return NULL;
         }
     }
+
     // This is not something that should be done,
     // since there's not telling the return type of a function
     // if it's type expression is ommited.
@@ -724,14 +619,6 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Failed to parse function body.",
-        });
         return NULL;
     }
 
@@ -768,14 +655,6 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Failed to parse function argument name.",
-        });
         return NULL;
     }
     stmt_fn_arg.identifier = identifier;
@@ -788,14 +667,6 @@ StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
         type = parser_parse_type_expr(parser);
         if (type == NULL)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Failed to parse function argument type declaration.",
-            });
             return NULL;
         }
         stmt_fn_arg.type = type;
@@ -814,18 +685,9 @@ Stmt* parser_parse_stmt_expr(Parser* parser)
     stmt.kind = STMT_EXPR;
     stmt.stmt.expr = NULL     ;
 
-    Token token = parser_peek(parser);
     expr = parser_parse_expr(parser);
     if (expr == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Failed to parse expression.",
-        });
         return NULL;
     }
     stmt.line   = expr->line  ;
@@ -850,16 +712,8 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
 
     // Parse identifier
     identifier = parser_parse_identifier(parser);
-    if (identifier== NULL)
+    if (identifier == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Failed to parse identifier in 'alias' statement.",
-        });
         return NULL;
     }
 
@@ -867,14 +721,6 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
     type = parser_parse_type_expr(parser);
     if (type == NULL)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Statement parsing: Failed to parse type in 'alias' statement.",
-        });
         return NULL;
     }
 
@@ -915,9 +761,6 @@ StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
 
     Token token;
 
-    if (!parser_expect_token(parser, TOKEN_PIPE))
-        return NULL;
-
     identifier = parser_parse_identifier(parser);
     if (identifier == NULL)
     {
@@ -938,25 +781,23 @@ StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
             }
             arrput(types, type);
 
-            token = parser_next(parser);
-            if (token.type == TOKEN_RIGHT_PAREN)
+            token = parser_peek(parser);
+            if (parser_accept_token(parser, TOKEN_RIGHT_PAREN))
             {
                 break;
             }
-            else if (token.type == TOKEN_COMMA)
+            else if (parser_accept_token(parser, TOKEN_COMMA))
             {
                 continue;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Statement parsing: Unexpected token encountered",
-                });
+                    TOKEN_RIGHT_PAREN,
+                    TOKEN_COMMA
+                };
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
         }
@@ -1016,25 +857,23 @@ Stmt* parser_parse_stmt_type(Parser* parser)
             }
             arrput(argv, arg);
 
-            token = parser_next(parser);
-            if (token.type == TOKEN_RIGHT_PAREN)
+            token = parser_peek(parser);
+            if (parser_accept_token(parser, TOKEN_RIGHT_PAREN))
             {
                 break;
             }
-            else if (token.type == TOKEN_COMMA)
+            else if (parser_accept_token(parser, TOKEN_COMMA))
             {
                 continue;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Statement parsing: Unexpected token encountered",
-                });
+                    TOKEN_RIGHT_PAREN,
+                    TOKEN_COMMA
+                };
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
         }
@@ -1052,8 +891,7 @@ Stmt* parser_parse_stmt_type(Parser* parser)
         parser_skip(parser, is_newline);
 
         token = parser_peek(parser);
-
-        if (token.type == TOKEN_PIPE)
+        if (parser_accept_token(parser, TOKEN_PIPE))
         {
             constructor = parser_parse_stmt_type_constructor(parser);
             if (constructor == NULL)
@@ -1062,21 +900,18 @@ Stmt* parser_parse_stmt_type(Parser* parser)
             }
             arrput(constructors, constructor);
         }
-        else if (token.type == TOKEN_END)
+        else if (parser_accept_token(parser, TOKEN_END))
         {
-            parser_next(parser);
             break;
         }
         else
         {
-            parser_throw_compiler_error(parser, (CompileError)
+            TokenType expected[] =
             {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Statement parsing: Failed to type constructor in 'type' statement.",
-            });
+                TOKEN_PIPE,
+                TOKEN_END
+            };
+            parser_throw_err_unexpected_token(parser, token, expected, 2);
             return NULL;
         }
 

@@ -71,14 +71,12 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
                     break;
 
                 default:
-                    parser_throw_compiler_error(parser, (CompileError)
+                    TokenType expected[] =
                     {
-                        .kind   = ERROR_ERROR ,
-                        .line   = token.line  ,
-                        .column = token.column,
-                        .length = token.line  ,
-                        .msg    = "Expression parsing: Unexpected token encountered.",
-                    });
+                        TOKEN_LEFT_SQUARE,
+                        TOKEN_LEFT_PAREN
+                    };
+                    parser_throw_err_unexpected_token(parser, token, expected, 2);
                     return NULL;
             }
 
@@ -93,20 +91,13 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
                 break;
             }
 
-            parser_next(parser);
+            Token err_token = parser_next(parser);
 
             // If managed to parse left hand side, and left_bp < min_bp, we try to parse the right hand side.
             rhs = parser_parse_expr_inner(parser, right_bp);
             if (rhs == NULL)
             {
-                parser_throw_compiler_error(parser, (CompileError)
-                {
-                    .kind   = ERROR_ERROR ,
-                    .line   = -1          ,
-                    .column = -1          ,
-                    .length = -1          ,
-                    .msg    = "Expression parsing: Failed to parser right-hand side of expression.",
-                });
+                parser_throw_err_generic(parser, err_token, __FILE__, __LINE__);
                 return NULL;
             }
 
@@ -116,14 +107,7 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
                 // We check if the rhs is a function call - if not, then it's an error
                 if (rhs->kind != EXPR_FN)
                 {
-                    parser_throw_compiler_error(parser, (CompileError)
-                    {
-                        .kind   = ERROR_ERROR ,
-                        .line   = -1          ,
-                        .column = -1          ,
-                        .length = -1          ,
-                        .msg    = "Expression parsing: Cannot chain non-functions.",
-                    });
+                    parser_throw_err_generic(parser, err_token, __FILE__, __LINE__);
                 }
                 return NULL;
 
@@ -196,14 +180,7 @@ Expr* parser_parse_expr_prefix(Parser* parser)
     unary_kind  = get_prefix_operator(token.type, &right_bp);
     if (unary_kind == EXPR_UNARY_UNKNOWN)
     {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Expression parsing: Unexpected token encountered during prefix parsing.",
-        });
+        parser_throw_err_unexpected_prefix_operator(parser, token);
         return NULL;
     }
     parser_next(parser);
@@ -379,25 +356,25 @@ Expr* parser_parse_expr_list(Parser* parser)
             }
 
             arrput(list, element);
-            token = parser_next(parser);
-            if (token.type == TOKEN_RIGHT_SQUARE)
+
+            token = parser_peek(parser);
+            if (parser_accept_token(parser, TOKEN_RIGHT_SQUARE))
             {
                 break;
             }
-            else if (token.type == TOKEN_COMMA)
+            else if (parser_accept_token(parser, TOKEN_COMMA))
             {
                 continue;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Expression parsing: Unexpected token encountered.",
-                });
+                    TOKEN_RIGHT_SQUARE,
+                    TOKEN_COMMA,
+                };
+
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
         }
@@ -449,7 +426,12 @@ Expr* parser_parse_expr_struct(Parser* parser)
         ExprPrimaryStructField  field     ;
         ExprPrimaryStructField* arg = NULL;
 
+        Token identifier_token = parser_peek(parser);
         identifier = parser_parse_identifier(parser);
+        if (identifier == NULL)
+        {
+            return NULL;
+        }
 
         token = parser_peek(parser);
         if (token.type == TOKEN_COLON)
@@ -465,20 +447,14 @@ Expr* parser_parse_expr_struct(Parser* parser)
         if (!parser_expect_token(parser, TOKEN_EQUAL))
             return NULL;
 
-        int old_errs = arrlen(parser->errs);
+        Token err_token = parser_peek(parser);
+        int old_errs = diagnostic_component_get_msg_num(parser->diagnostic_component);
         value = parser_parse_expr_inner(parser, 0);
         if (value == NULL)
         {
-            if (arrlen(parser->errs) == old_errs)
+            if (diagnostic_component_get_msg_num(parser->diagnostic_component) == old_errs)
             {
-                parser_throw_compiler_error(parser, (CompileError)
-                {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Expression parsing: Failed to parse expression inside of brackets.",
-                });
+                parser_throw_err_generic(parser, err_token, __FILE__, __LINE__);
             }
             return NULL;
         }
@@ -493,38 +469,30 @@ Expr* parser_parse_expr_struct(Parser* parser)
         arg = (ExprPrimaryStructField*) arena_push(&parser->arena, &field, sizeof(ExprPrimaryStructField));
         arrput(argv, arg);
 
-        token = parser_next(parser);
-        if (token.type == TOKEN_COMMA)
+        token = parser_peek(parser);
+        if (parser_accept_token(parser, TOKEN_COMMA))
         {
             continue;
         }
-        else if (token.type == TOKEN_RIGHT_BRACE)
+        else if (parser_accept_token(parser, TOKEN_RIGHT_BRACE))
         {
             break;
         }
         else
         {
-            parser_throw_compiler_error(parser, (CompileError)
+            TokenType expected[] =
             {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Expression parsing: Unexpected token encountered.",
-            });
+                TOKEN_COMMA,
+                TOKEN_RIGHT_BRACE,
+            };
+
+            parser_throw_err_unexpected_token(parser, token, expected, 2);
             return NULL;
         }
 
         if (find_string_in_string_list(parsed_keys, identifier) != NULL)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = token.line  ,
-                .column = token.column,
-                .length = token.line  ,
-                .msg    = "Expression parsing: Found duplicate identifier while parsing struct.",
-            });
+            parser_throw_err_struct_duplicate_identifier(parser, identifier_token);
             return NULL;
         }
         arrput(parsed_keys, identifier);
@@ -558,23 +526,18 @@ Expr* parser_parse_expr_struct(Parser* parser)
 
 Expr* parser_parse_expr_parens(Parser* parser)
 {
+    Token token = parser_peek(parser);
+
     if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
         return NULL;
 
-    int old_errs = arrlen(parser->errs);
+    int old_errs = diagnostic_component_get_msg_num(parser->diagnostic_component);
     Expr* expr = parser_parse_expr_inner(parser, 0);
     if (expr == NULL)
     {
-        if (arrlen(parser->errs) == old_errs)
+        if (diagnostic_component_get_msg_num(parser->diagnostic_component) == old_errs)
         {
-            parser_throw_compiler_error(parser, (CompileError)
-            {
-                .kind   = ERROR_ERROR ,
-                .line   = -1          ,
-                .column = -1          ,
-                .length = -1          ,
-                .msg    = "Expression parsing: Failed to parse expression inside of parentheses.",
-            });
+            parser_throw_err_generic(parser, token, __FILE__, __LINE__);
         }
         return NULL;
     }
@@ -598,35 +561,12 @@ Expr* parser_parse_expr_index(Parser* parser)
         exit(1);
     }
 
-    token = parser_peek(parser);
-    if (token.type == TOKEN_RIGHT_SQUARE)
-    {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Expression parsing: Nothing found in square brackets.",
-        });
-        return NULL;
-    }
+    parser_dont_except_token(parser, TOKEN_RIGHT_SQUARE);
 
     rhs = parser_parse_expr_inner(parser, 0);
 
-    token = parser_next(parser);
-    if (token.type != TOKEN_RIGHT_SQUARE)
-    {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Expression parsing: Exprected right square bracket immediately after index argument.",
-        });
+    if (!parser_expect_token(parser, TOKEN_RIGHT_SQUARE))
         return NULL;
-    }
 
     expr = (Expr)
     {
@@ -653,20 +593,8 @@ Expr* parser_parse_expr_fn(Parser* parser)
     Expr** argv = NULL;
     Expr expr;
 
-    token = parser_peek(parser);
-    if (token.type != TOKEN_LEFT_PAREN)
-    {
-        parser_throw_compiler_error(parser, (CompileError)
-        {
-            .kind   = ERROR_ERROR ,
-            .line   = token.line  ,
-            .column = token.column,
-            .length = token.line  ,
-            .msg    = "Expression parsing: Expected '('.",
-        });
+    if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
         return NULL;
-    }
-    parser_next(parser);
 
     token = parser_peek(parser);
     // We check to see if the function is a prcedure or not.
@@ -688,27 +616,25 @@ Expr* parser_parse_expr_fn(Parser* parser)
             }
 
             arrput(argv, curr_arg);
+
             token = parser_peek(parser);
-            if (token.type == TOKEN_COMMA)
+            if (parser_accept_token(parser, TOKEN_COMMA))
             {
-                parser_next(parser);
                 continue;
             }
-            else if (token.type == TOKEN_RIGHT_PAREN)
+            else if (parser_accept_token(parser, TOKEN_RIGHT_PAREN))
             {
-                parser_next(parser);
                 break;
             }
             else
             {
-                parser_throw_compiler_error(parser, (CompileError)
+                TokenType expected[] =
                 {
-                    .kind   = ERROR_ERROR ,
-                    .line   = token.line  ,
-                    .column = token.column,
-                    .length = token.line  ,
-                    .msg    = "Statement parsing: Expected ',' or ')' after function argument.",
-                });
+                    TOKEN_COMMA,
+                    TOKEN_RIGHT_PAREN,
+                };
+
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
                 return NULL;
             }
         }

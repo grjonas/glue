@@ -1,6 +1,11 @@
 #ifndef COMPILE_ERROR_H
 #define COMPILE_ERROR_H
 
+/*
+# Compiler error refactor
+
+ */
+
 #include "dependencies.h"
 
 typedef enum   CompileErrorKind CompileErrorKind;

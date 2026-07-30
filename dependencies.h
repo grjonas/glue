@@ -61,4 +61,8 @@ The following functions are defined:
 
 char* find_string_in_string_list(DYNAMIC_ARRAY(char** strs), char* str);
 
+#define UNREACHABLE do { assert(false && "This code should be unreachable"); } while(false)
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 #endif
