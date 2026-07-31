@@ -11,28 +11,6 @@ typedef struct Bind             Bind            ;
 typedef struct TypeEnv          TypeEnv         ;
 typedef struct Subst            Subst           ;
 
-typedef enum   ConstraintOriginKind ConstraintOriginKind;
-typedef struct ConstraintOrigin     ConstraintOrigin    ;
-
-enum ConstraintOriginKind
-{
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_NIL    ,
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_BOOL   ,
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_NUMERIC,
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_NAT    ,
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_INT    ,
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_REAL   ,
-    CONSTRAINT_ORIGIN_PRIMITIVE_TYPE_STRING ,
-    CONSTRAINT_ORIGIN_DERIVATIVE_TYPE_LIST  ,
-    CONSTRAINT_ORIGIN_DERIVATIVE_TYPE_VAR   ,
-};
-
-struct ConstraintOrigin
-{
-    ConstraintOriginKind kind;
-    Expr* expr;
-};
-
 enum TypeConstraint
 {
     TYPE_CONSTRAINT_NIL        ,
@@ -70,6 +48,7 @@ struct Subst
 struct Inferer
 {
     // Inputs
+    const char* filename;
     const char* txt;
     DYNAMIC_ARRAY(Token* tokens);
     Stmt*  stmts;
@@ -99,7 +78,7 @@ void inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** 
 bool inferer_infer_expr          (Inferer* inferer, Expr* expr, Type** type)            ;
 bool inferer_resolve             (Inferer* inferer, Type* type, Type** resolved_type)   ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
 bool inferer_unify_inner         (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
-bool inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref, ConstraintOrigin origin)  ; // Unifies the two types
+bool inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref, Span span); // Unifies the two types
 bool inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ;
 void inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
 void inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
@@ -147,9 +126,11 @@ void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
 void assert_generic_operator_type_is_valid(TypeKind type);
 bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
 
-void inferer_throw_err_unify_failed                                        (Inferer* inferer, ConstraintOrigin origin);
-void inferer_throw_err_type_failed_constraint_numeric                      (Inferer* inferer);
-void inferer_throw_err_type_failed_constraint_equality                     (Inferer* inferer);
+Span inferer_get_expr_span(Inferer* inferer, Expr* expr);
+
+void inferer_throw_err_unify_failed                                        (Inferer* inferer, Span span, Type* left, Type* right);
+void inferer_throw_err_type_failed_constraint_numeric                      (Inferer* inferer, Span  span);
+void inferer_throw_err_type_failed_constraint_equality                     (Inferer* inferer, Span  span);
 void inferer_throw_err_expr_binary_arithmetic_constraint_failed            (Inferer* inferer, Expr* expr);
 void inferer_throw_err_expr_binary_equality_constraint_failed              (Inferer* inferer, Expr* expr);
 void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);

@@ -2,19 +2,22 @@
 all:
 	gcc \
 		main.c \
-		dependencies.c \
-		scanner.c \
-		parser.c \
 		arena.c \
+		dependencies.c \
 		stmt.c \
 		type_expr.c \
+		expr.c \
 		decl.c \
 		type.c \
-		expr.c \
+		diagnostic.c \
+		print.c \
+		scanner.c \
+		parser.c \
+		parser_stmt.c \
+		parser_type_expr.c \
+		parser_expr.c \
 		resolver.c \
 		inferer.c \
-		print.c \
-		diagnostic.c
 	-o main -g \
 		-Wall \
     	-Wextra \

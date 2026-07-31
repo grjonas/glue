@@ -20,6 +20,7 @@ Inferer inferer_init(Resolver* resolver)
 
     Inferer inferer = (Inferer)
     {
+        .filename       = resolver->filename,
         .txt            = resolver->txt   ,
         .tokens         = resolver->tokens,
         .stmts          = resolver->stmts ,
@@ -37,6 +38,7 @@ Inferer inferer_init(Resolver* resolver)
 
     *resolver = (Resolver)
     {
+        .filename         = NULL ,
         .txt              = NULL ,
         .tokens           = NULL ,
         .stmts            = NULL ,
@@ -393,7 +395,7 @@ bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
     return is_successful;
 }
 
-bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, ConstraintOrigin origin)
+bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, Span span)
 {
     assert(inferer    != NULL);
     assert(left_ref   != NULL);
@@ -404,7 +406,7 @@ bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, Constrai
     if (!inferer_unify_inner(inferer, left_ref, right_ref))
     {
         inferer_unify_free_binds(inferer);
-        inferer_throw_err_unify_failed(inferer, origin);
+        inferer_throw_err_unify_failed(inferer, span, *left_ref, *right_ref);
         return false;
     }
 
@@ -657,7 +659,7 @@ void inferer_apply_subst_reverse(Inferer* inferer, Type* type, Subst subst)
     UNREACHABLE;
 }
 
-bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Type** type)
+bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Span span, Type** type)
 {
     assert(inferer    != NULL);
     assert(constraint != NULL);
@@ -689,11 +691,11 @@ bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Typ
         return true;
     }
 
-    inferer_throw_err_type_failed_constraint_numeric(inferer);
+    inferer_throw_err_type_failed_constraint_numeric(inferer, span);
     return false;
 }
 
-bool inferer_constrain_equality(Inferer* inferer, TypeConstraint* constraint, Type** type)
+bool inferer_constrain_equality(Inferer* inferer, TypeConstraint* constraint, Span span, Type** type)
 {
     assert(inferer    != NULL);
     assert(constraint != NULL);
@@ -741,7 +743,7 @@ bool inferer_constrain_equality(Inferer* inferer, TypeConstraint* constraint, Ty
         return true;
     }
 
-    inferer_throw_err_type_failed_constraint_equality(inferer);
+    inferer_throw_err_type_failed_constraint_equality(inferer, span);
     return false;
 }
 
@@ -768,23 +770,23 @@ bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstrai
         // These are special cases:
         // Instead of unifying with a specific type, we go down the tree, and attempt to figure out which
         // of a list of types is the correct one.
-        case TYPE_CONSTRAINT_NUMERIC    : return inferer_constrain_numeric (inferer, constraint, type);
-        case TYPE_CONSTRAINT_EQUALITY   : return inferer_constrain_equality(inferer, constraint, type);
+        case TYPE_CONSTRAINT_NUMERIC    : return inferer_constrain_numeric (inferer, constraint, inferer_get_expr_span(inferer, expr), type);
+        case TYPE_CONSTRAINT_EQUALITY   : return inferer_constrain_equality(inferer, constraint, inferer_get_expr_span(inferer, expr), type);
 
-        case TYPE_CONSTRAINT_NIL        : return inferer_unify(inferer, type, &builtin_type_nil   );
-        case TYPE_CONSTRAINT_BOOL       : return inferer_unify(inferer, type, &builtin_type_bool  );
-        case TYPE_CONSTRAINT_NAT        : return inferer_unify(inferer, type, &builtin_type_nat   );
-        case TYPE_CONSTRAINT_INT        : return inferer_unify(inferer, type, &builtin_type_int   );
-        case TYPE_CONSTRAINT_REAL       : return inferer_unify(inferer, type, &builtin_type_real  );
-        case TYPE_CONSTRAINT_STRING     : return inferer_unify(inferer, type, &builtin_type_string);
+        case TYPE_CONSTRAINT_NIL        : return inferer_unify(inferer, type, &builtin_type_nil   , inferer_get_expr_span(inferer, expr));
+        case TYPE_CONSTRAINT_BOOL       : return inferer_unify(inferer, type, &builtin_type_bool  , inferer_get_expr_span(inferer, expr));
+        case TYPE_CONSTRAINT_NAT        : return inferer_unify(inferer, type, &builtin_type_nat   , inferer_get_expr_span(inferer, expr));
+        case TYPE_CONSTRAINT_INT        : return inferer_unify(inferer, type, &builtin_type_int   , inferer_get_expr_span(inferer, expr));
+        case TYPE_CONSTRAINT_REAL       : return inferer_unify(inferer, type, &builtin_type_real  , inferer_get_expr_span(inferer, expr));
+        case TYPE_CONSTRAINT_STRING     : return inferer_unify(inferer, type, &builtin_type_string, inferer_get_expr_span(inferer, expr));
 
         case TYPE_CONSTRAINT_LIST       :
             new_type = inferer_create_free_list_type(inferer);
-            return inferer_unify(inferer, type, &new_type);
+            return inferer_unify(inferer, type, &new_type, inferer_get_expr_span(inferer, expr));
 
         case TYPE_CONSTRAINT_VAR        :
             new_type = inferer_create_free_type_var(inferer);
-            return inferer_unify(inferer, type, &new_type);
+            return inferer_unify(inferer, type, &new_type, inferer_get_expr_span(inferer, expr));
     }
     UNREACHABLE;
 }
@@ -815,7 +817,7 @@ bool inferer_infer_expr_primary_list(Inferer* inferer, Expr* expr, Type** type)
         {
             inferred_type = curr_type;
         }
-        else if (!inferer_unify(inferer, &inferred_type, &curr_type))
+        else if (!inferer_unify(inferer, &inferred_type, &curr_type, inferer_get_expr_span(inferer, expr)))
         {
             return false;
         }
@@ -861,7 +863,10 @@ bool inferer_infer_expr_primary_struct(Inferer* inferer, Expr* expr, Type** type
 
             inferer_convert_type_expr(inferer, curr_field->type, &converted_type);
 
-            inferer_unify(inferer, &converted_type, &curr_type);
+            if (!inferer_unify(inferer, &converted_type, &curr_type, inferer_get_expr_span(inferer, expr)))
+            {
+                return false;
+            }
         }
 
         curr_type_field.value = curr_type;
@@ -1212,7 +1217,7 @@ bool inferer_infer_expr_binary_assign_operator(Inferer* inferer, Expr* expr, Typ
     if (!is_successful)
         return false;
 
-    is_successful = inferer_unify(inferer, &left_return_type, &right_return_type);
+    is_successful = inferer_unify(inferer, &left_return_type, &right_return_type, inferer_get_expr_span(inferer, expr));
     if (!is_successful)
         return false;
 
@@ -1325,7 +1330,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
             return false;
         }
 
-        is_successful = inferer_unify(inferer, &curr_fn_ptr->type.fn.left, &curr_arg_type);
+        is_successful = inferer_unify(inferer, &curr_fn_ptr->type.fn.left, &curr_arg_type, inferer_get_expr_span(inferer, expr));
         if (!is_successful)
         {
             return false;
@@ -1642,7 +1647,7 @@ bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
 
     return_type = inferer_decl_var_get_return_type(inferer, returnn.decl);
 
-    is_successful = inferer_unify(inferer, &return_type, &expr_type);
+    is_successful = inferer_unify(inferer, &return_type, &expr_type, inferer_get_expr_span(inferer, returnn.expr));
     if (!is_successful)
     {
         return false;
@@ -1684,7 +1689,7 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     {
         inferer_convert_type_expr(inferer, let.type, &annotation_type);
 
-        inferer_unify(inferer, &expr_type, &annotation_type);
+        inferer_unify(inferer, &expr_type, &annotation_type, inferer_get_expr_span(inferer, let.expr));
 
         final_type = annotation_type;
     }
@@ -2302,4 +2307,102 @@ bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_
 
     return left_application.argc == right_application.argc
         && left_application.abstraction == right_application.abstraction;
+}
+
+Span inferer_get_expr_span(Inferer* inferer, Expr* expr)
+{
+    assert(inferer != NULL);
+    assert(expr != NULL);
+
+    return (Span)
+    {
+        .filename = inferer->filename,
+        .line     = expr->line       ,
+        .column   = expr->column     ,
+        .length   = expr->length     ,
+    };
+}
+
+void inferer_throw_err_unify_failed(Inferer* inferer, Span span, Type* left, Type* right)
+{
+    assert(inferer != NULL);
+    assert(left    != NULL);
+    assert(right   != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_UNIFY_FAILED,
+        .span = span,
+        .err.unify_failed =
+        {
+            .left  = left,
+            .right = right,
+        }
+    });
+}
+
+void inferer_throw_err_type_failed_constraint_numeric(Inferer* inferer, Span span)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC,
+        .span = span,
+    });
+}
+
+void inferer_throw_err_type_failed_constraint_equality(Inferer* inferer, Span span)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY,
+        .span = span,
+    });
+}
+
+void inferer_throw_err_expr_binary_arithmetic_constraint_failed(Inferer* inferer, Expr* expr)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED,
+        .span = inferer_get_expr_span(inferer, expr),
+    });
+}
+
+void inferer_throw_err_expr_binary_equality_constraint_failed(Inferer* inferer, Expr* expr)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED,
+        .span = inferer_get_expr_span(inferer, expr),
+    });
+}
+
+void inferer_throw_err_expr_binary_access_op_left_kind_not_struct(Inferer* inferer, Expr* expr)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT,
+        .span = inferer_get_expr_span(inferer, expr),
+    });
+}
+
+void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field( Inferer* inferer, Expr* expr)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD,
+        .span = inferer_get_expr_span(inferer, expr),
+    });
 }

@@ -782,3 +782,4 @@ void decl_print(FILE* file, Decl* decl)
 
     fprintf(file, ">");
 }
+

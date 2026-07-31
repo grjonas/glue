@@ -6,6 +6,7 @@ Parser init_parser(Scanner scanner)
 {
     Parser parser =
     {
+        .filename     = scanner.filename          ,
         .state        = PARSER_STATE_UNPARSED     ,
         .txt          = scanner.init              ,
         .tokens       = scanner.token_list        ,
@@ -28,13 +29,14 @@ void parser_free(Parser* parser)
 
     *parser = (Parser)
     {
-        .state   = PARSER_STATE_FREED   ,
-        .txt     = NULL                 ,
-        .tokens  = NULL                 ,
-        .start   = -1                   ,
-        .end     = -1                   ,
-        .current = -1                   ,
-        .diagnostic_component = NULL    ,
+        .filename = NULL              ,
+        .state    = PARSER_STATE_FREED,
+        .txt      = NULL              ,
+        .tokens   = NULL              ,
+        .start    = -1                ,
+        .end      = -1                ,
+        .current  = -1                ,
+        .diagnostic_component = NULL  ,
     };
 }
 
@@ -184,58 +186,97 @@ bool parser_dont_except_token(Parser* parser, TokenType type)
     return true;
 };
 
+Span parser_get_token_span(Parser* parser, Token token)
+{
+    assert(parser != NULL);
+
+    return (Span)
+    {
+        .filename = parser->filename,
+        .line     = token.line      ,
+        .column   = token.column    ,
+        .length   = token.length    ,
+    };
+}
+
 void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(parser != NULL);
 
-    // To silence warnings
-    assert(&parser);
-    assert(&token);
-    assert(&file);
-    assert(&line);
+    diagnostic_component_push_err(parser->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_GENERIC,
+        .span = parser_get_token_span(parser, token),
+        .err.generic =
+        {
+            .file = file,
+            .line = line,
+        }
+    });
 }
 
 void parser_throw_err_unexpected_token(Parser* parser, Token token, TokenType expected[], int expected_count)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(parser != NULL);
 
-    // To silence warnings
-    assert(&parser);
-    assert(&token);
-    assert(&expected);
-    assert(&expected_count);
+    diagnostic_component_push_err(parser->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_UNEXPECTED_TOKEN,
+        .span = parser_get_token_span(parser, token),
+        .err.unexpected_token =
+        {
+            .expected = (TokenType*) arena_push
+                (&parser->diagnostic_component->arena, expected, sizeof(TokenType) * expected_count),
+            .expected_count = expected_count,
+        }
+    });
 }
 
 void parser_throw_err_expected_token(Parser* parser, Token token, TokenType expected[], int expected_count)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(parser != NULL);
 
-    // To silence warnings
-    assert(&parser);
-    assert(&token);
-    assert(&expected);
-    assert(&expected_count);
+    diagnostic_component_push_err(parser->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_EXPECTED_TOKEN,
+        .span = parser_get_token_span(parser, token),
+        .err.expected_token =
+        {
+            .expected = (TokenType*) arena_push
+                (&parser->diagnostic_component->arena, expected, sizeof(TokenType) * expected_count),
+            .expected_count = expected_count,
+        }
+    });
 }
 
 void parser_throw_err_unexpected_prefix_operator(Parser* parser, Token token)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(parser != NULL);
 
-    // To silence warnings
-    assert(&parser);
-    assert(&token);
+    diagnostic_component_push_err(parser->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP,
+        .span = parser_get_token_span(parser, token),
+        .err.unexpected_prefix_op =
+        {
+            .token_type = token.type,
+        }
+    });
 }
 
 void parser_throw_err_struct_duplicate_identifier(Parser* parser, Token identifier_token)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(parser != NULL);
+    assert(identifier_token.type == TOKEN_IDENTIFIER);
 
-    // To silence warnings
-    assert(&parser);
-    assert(&identifier_token);
+    diagnostic_component_push_err(parser->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER,
+        .span = parser_get_token_span(parser, identifier_token),
+        .err.struct_duplicate_identifier =
+        {
+            .identifier = diagnostic_component_add_identifier
+                (parser->diagnostic_component, identifier_token.start, identifier_token.length)
+        }
+    });
 }

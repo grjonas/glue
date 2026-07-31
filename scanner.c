@@ -127,10 +127,13 @@ char* read_file(const char* filename)
     return file_contents;
 }
 
-Scanner init_scanner(char* txt)
+Scanner init_scanner(const char* filename)
 {
+    char* txt = read_file(filename);
+
     Scanner scanner =
     {
+        .filename = filename,
         .init = (char*)txt,
         .start = txt,
         .current = txt,

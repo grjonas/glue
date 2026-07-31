@@ -1,8 +1,10 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "dependencies.h"
 #include "scanner.h"
+#include "stmt.h"
+#include "type_expr.h"
+#include "expr.h"
 #include "diagnostic.h"
 
 typedef struct Parser       Parser      ;
@@ -19,6 +21,7 @@ enum ParserState
 struct Parser
 {
     // Input
+    const char* filename;
     const char* txt   ;
     DYNAMIC_ARRAY(Token* tokens);
 
@@ -48,6 +51,8 @@ char* parser_parse_identifier (Parser* parser);
 bool  parser_accept_token(Parser* parser, TokenType type);
 bool  parser_expect_token(Parser* parser, TokenType type);
 bool  parser_dont_except_token(Parser* parser, TokenType type);
+
+Span  parser_get_token_span(Parser* parser, Token token);
 
 void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line);
 void parser_throw_err_unexpected_token(Parser* parser, Token token, TokenType expected[], int expected_count);

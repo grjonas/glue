@@ -1,13 +1,19 @@
+#include "arena.h"
 #include "dependencies.h"
-#include "scanner.h"
-#include "parser.h"
 #include "stmt.h"
 #include "type_expr.h"
-#include "type.h"
 #include "expr.h"
+#include "decl.h"
+#include "type.h"
+#include "diagnostic.h"
+#include "print.h"
+#include "scanner.h"
+#include "parser.h"
+#include "parser_stmt.h"
+#include "parser_type_expr.h"
+#include "parser_expr.h"
 #include "resolver.h"
 #include "inferer.h"
-#include "print.h"
 
 // Returns a null-terminated string that has the file's contents.
 // Needs to be freed.
@@ -19,12 +25,10 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    char* str = read_file(argv[argc - 1]);
-
-    printf("%s\n", str);
-
-    Scanner scanner = init_scanner(str);
+    Scanner scanner = init_scanner(argv[argc - 1]);
     scanner_scan_tokens(&scanner);
+
+    printf("%s\n", scanner.init);
 
     for (int i = 0; i < arrlen(scanner.token_list); ++i)
     {

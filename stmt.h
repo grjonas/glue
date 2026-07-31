@@ -1,8 +1,6 @@
 #ifndef STMT_H
 #define STMT_H
 
-#include "scanner.h"
-#include "parser.h"
 #include "expr.h"
 #include "decl_definition.h"
 
@@ -138,24 +136,5 @@ struct Stmt
     }
     stmt;
 };
-
-// Stmt
-Stmt               * parser_parse_stmts                (Parser* parser);
-
-Stmt               * parser_parse_stmt                 (Parser* parser);
-
-Stmt               * parser_parse_stmt_block           (Parser* parser);
-Stmt               * parser_parse_stmt_let             (Parser* parser);
-Stmt               * parser_parse_stmt_if              (Parser* parser, TokenType type);
-Stmt               * parser_parse_stmt_while           (Parser* parser);
-Stmt               * parser_parse_stmt_fn              (Parser* parser);
-StmtFnArg          * parser_parse_stmt_fn_arg          (Parser* parser);
-Stmt               * parser_parse_stmt_expr            (Parser* parser);
-Stmt               * parser_parse_stmt_break           (Parser* parser);
-Stmt               * parser_parse_stmt_continue        (Parser* parser);
-Stmt               * parser_parse_stmt_return          (Parser* parser);
-Stmt               * parser_parse_stmt_alias           (Parser* parser);
-StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser);
-Stmt               * parser_parse_stmt_type            (Parser* parser);
 
 #endif

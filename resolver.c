@@ -8,29 +8,31 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
 
     *parser = (Parser)
     {
-        .state   = PARSER_STATE_FREED   ,
-        .txt     = NULL                 ,
-        .tokens  = NULL                 ,
-        .start   = -1                   ,
-        .end     = -1                   ,
-        .current = -1                   ,
-        .diagnostic_component = NULL    ,
+        .filename = NULL                 ,
+        .state    = PARSER_STATE_FREED   ,
+        .txt      = NULL                 ,
+        .tokens   = NULL                 ,
+        .start    = -1                   ,
+        .end      = -1                   ,
+        .current  = -1                   ,
+        .diagnostic_component = NULL     ,
     };
 
     Resolver resolver = (Resolver)
     {
-        .txt              = parser->txt   ,
-        .tokens           = parser->tokens,
-        .stmts            = stmts         ,
-        .arena            = parser->arena ,
-        .type_variable_id = 0             ,
-        .decl_id          = 0             ,
-        .loop_depth       = 0             ,
-        // .inside_function  = false         ,
-        .curr_fn          = NULL          ,
-        .context          = NULL          ,
-        .declarations     = NULL          ,
-        .identifiers      = NULL          ,
+        .filename         = parser->filename,
+        .txt              = parser->txt     ,
+        .tokens           = parser->tokens  ,
+        .stmts            = stmts           ,
+        .arena            = parser->arena   ,
+        .type_variable_id = 0               ,
+        .decl_id          = 0               ,
+        .loop_depth       = 0               ,
+        // .inside_function  = false           ,
+        .curr_fn          = NULL            ,
+        .context          = NULL            ,
+        .declarations     = NULL            ,
+        .identifiers      = NULL            ,
         .diagnostic_component = diagnostic_component_init(),
     };
     return resolver;
@@ -538,7 +540,7 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
             }
             else if (decl->kind != DECL_VAR && decl->kind != DECL_TYPE_CONSTRUCTOR)
             {
-                resolver_throw_err_expr_failed_to_resolve_identifier(resolver, expr);
+                resolver_throw_err_expr_failed_to_resolve_identifier(resolver, expr, identifier);
                 return false;
             }
 
@@ -741,7 +743,7 @@ bool resolver_resolve_type_expr_identifier(Resolver* resolver, TypeExpr* type_ex
         }
         else
         {
-            resolver_throw_err_type_expr_failed_to_resolve_identifier(resolver, type_expr);
+            resolver_throw_err_type_expr_failed_to_resolve_identifier(resolver, type_expr, identifier);
             return false;
         }
     }
@@ -796,7 +798,7 @@ bool resolver_resolve_type_expr_instance(Resolver* resolver, TypeExpr* type_expr
     }
     else
     {
-        resolver_throw_err_type_expr_failed_to_find_type(resolver, type_expr);
+        resolver_throw_err_type_expr_failed_to_find_type(resolver, type_expr, caller);
         return false;
     }
 }
@@ -905,7 +907,6 @@ void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
 {
     arrput(resolver->context, decl);
 }
-
 
 char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
 {
@@ -1054,65 +1055,143 @@ Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier
     return decl_ptr;
 }
 
+Span resolver_get_stmt_span(Resolver* resolver, Stmt* stmt)
+{
+    assert(resolver != NULL);
+    assert(stmt     != NULL);
+
+    return (Span)
+    {
+        .filename = resolver->filename,
+        .line     = stmt->line        ,
+        .column   = stmt->column      ,
+        .length   = stmt->length      ,
+    };
+}
+
+Span resolver_get_expr_span(Resolver* resolver, Expr* expr)
+{
+    assert(resolver != NULL);
+    assert(expr     != NULL);
+
+    return (Span)
+    {
+        .filename = resolver->filename,
+        .line     = expr->line        ,
+        .column   = expr->column      ,
+        .length   = expr->length      ,
+    };
+}
+
+Span resolver_get_type_expr_span(Resolver* resolver, TypeExpr* type_expr)
+{
+    assert(resolver  != NULL);
+    assert(type_expr != NULL);
+
+    return (Span)
+    {
+        .filename = resolver->filename,
+        .line     = type_expr->line   ,
+        .column   = type_expr->column ,
+        .length   = type_expr->length ,
+    };
+}
+
 void resolver_throw_err_stmt_break_not_in_loop(Resolver* resolver, Stmt* stmt)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(resolver != NULL);
+    assert(stmt     != NULL);
 
-    assert(&resolver);
-    assert(&stmt);
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP,
+        .span = resolver_get_stmt_span(resolver, stmt),
+    });
 }
 
 void resolver_throw_err_stmt_continue_not_in_loop(Resolver* resolver, Stmt* stmt)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(resolver != NULL);
+    assert(stmt     != NULL);
 
-    assert(&resolver);
-    assert(&stmt);
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP,
+        .span = resolver_get_stmt_span(resolver, stmt),
+    });
 }
 
 void resolver_throw_err_stmt_return_not_in_fn(Resolver* resolver, Stmt* stmt)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(resolver != NULL);
+    assert(stmt     != NULL);
 
-    assert(&resolver);
-    assert(&stmt);
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_RETURN_NOT_IN_FN,
+        .span = resolver_get_stmt_span(resolver, stmt),
+    });
 }
 
-void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Expr* expr)
+void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Expr* expr, char* identifier)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(resolver != NULL);
+    assert(expr     != NULL);
 
-    assert(&resolver);
-    assert(&expr);
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER,
+        .span = resolver_get_expr_span(resolver, expr),
+        .err.failed_to_resolve_identifier =
+        {
+            .identifier = diagnostic_component_add_identifier
+                (resolver->diagnostic_component, identifier, strlen(identifier))
+        }
+    });
+}
+
+void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolver, TypeExpr* type_expr, char* identifier)
+{
+    assert(resolver  != NULL);
+    assert(type_expr != NULL);
+
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER,
+        .span = resolver_get_type_expr_span(resolver, type_expr),
+        .err.failed_to_resolve_identifier =
+        {
+            .identifier = diagnostic_component_add_identifier
+                (resolver->diagnostic_component, identifier, strlen(identifier))
+        }
+    });
 }
 
 void resolver_throw_err_expr_failed_to_resolve_access_op(Resolver* resolver, Expr* expr)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(resolver != NULL);
+    assert(expr     != NULL);
 
-    assert(&resolver);
-    assert(&expr);
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP,
+        .span = resolver_get_expr_span(resolver, expr),
+    });
 }
 
-void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolver, TypeExpr* type_expr)
+void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeExpr* type_expr, char* identifier)
 {
-    // IMPLEMENT:
-    UNREACHABLE;
+    assert(resolver  != NULL);
+    assert(type_expr != NULL);
 
-    assert(&resolver);
-    assert(&type_expr);
-}
-
-void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeExpr* type_expr)
-{
-    // IMPLEMENT:
-    UNREACHABLE;
-
-    assert(&resolver);
-    assert(&type_expr);
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE,
+        .span = resolver_get_type_expr_span(resolver, type_expr),
+        .err.type_expr_failed_to_find_type =
+        {
+            .identifier = diagnostic_component_add_identifier
+                (resolver->diagnostic_component, identifier, strlen(identifier))
+        }
+    });
 }
