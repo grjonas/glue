@@ -1,18 +1,20 @@
 #include "inferer.h"
 
-static Type private_builtin_type_nil    = (Type) { .kind = TYPE_NIL    };
-static Type private_builtin_type_bool   = (Type) { .kind = TYPE_BOOL   };
-static Type private_builtin_type_nat    = (Type) { .kind = TYPE_NAT    };
-static Type private_builtin_type_int    = (Type) { .kind = TYPE_INT    };
-static Type private_builtin_type_real   = (Type) { .kind = TYPE_REAL   };
-static Type private_builtin_type_string = (Type) { .kind = TYPE_STRING };
+static Type private_builtin_type_nil     = (Type) { .kind = TYPE_NIL     };
+static Type private_builtin_type_bool    = (Type) { .kind = TYPE_BOOL    };
+static Type private_builtin_type_numeric = (Type) { .kind = TYPE_NUMERIC };
+static Type private_builtin_type_nat     = (Type) { .kind = TYPE_NAT     };
+static Type private_builtin_type_int     = (Type) { .kind = TYPE_INT     };
+static Type private_builtin_type_real    = (Type) { .kind = TYPE_REAL    };
+static Type private_builtin_type_string  = (Type) { .kind = TYPE_STRING  };
 
-static Type* builtin_type_nil    = &private_builtin_type_nil   ;
-static Type* builtin_type_bool   = &private_builtin_type_bool  ;
-static Type* builtin_type_nat    = &private_builtin_type_nat   ;
-static Type* builtin_type_int    = &private_builtin_type_int   ;
-static Type* builtin_type_real   = &private_builtin_type_real  ;
-static Type* builtin_type_string = &private_builtin_type_string;
+static Type* builtin_type_nil     = &private_builtin_type_nil    ;
+static Type* builtin_type_bool    = &private_builtin_type_bool   ;
+static Type* builtin_type_numeric = &private_builtin_type_numeric;
+static Type* builtin_type_nat     = &private_builtin_type_nat    ;
+static Type* builtin_type_int     = &private_builtin_type_int    ;
+static Type* builtin_type_real    = &private_builtin_type_real   ;
+static Type* builtin_type_string  = &private_builtin_type_string ;
 
 Inferer inferer_init(Resolver* resolver)
 {
@@ -101,7 +103,15 @@ bool inferer_unify_inner_left_type_numeric_helper(Inferer* inferer, TypeKind lef
     }
     else if (right->kind == TYPE_NUMERIC)
     {
-        right->kind = left_kind;
+        // This is not very good..
+        switch (left_kind)
+        {
+            case TYPE_NAT : *right_ref = builtin_type_nat ; break;
+            case TYPE_INT : *right_ref = builtin_type_int ; break;
+            case TYPE_REAL: *right_ref = builtin_type_real; break;
+            default: UNREACHABLE;
+        }
+        // right->kind = left_kind;
         return true;
     }
     else
@@ -141,7 +151,15 @@ bool inferer_unify_inner_left_type_numeric(Inferer* inferer, Type** left_ref, Ty
              return inferer_unify_inner_left_type_numeric_helper(inferer, left->kind, right_ref);
 
         // Swap
-        case TYPE_NUMERIC: return inferer_unify_inner_left_type_numeric(inferer, right_ref, left_ref);
+        case TYPE_NUMERIC:
+            if ((*right_ref)->kind != TYPE_NUMERIC)
+            {
+                return inferer_unify_inner_left_type_numeric(inferer, right_ref, left_ref);
+            }
+            else
+            {
+                return true;
+            }
         default: UNREACHABLE;
     }
 }
@@ -809,26 +827,28 @@ bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Spa
     assert(constraint != NULL);
     assert(type       != NULL);
 
-    bool is_successful = false;
+    if (inferer_attempt_unify(inferer, type, &builtin_type_numeric))
+    {
+        *constraint = TYPE_CONSTRAINT_NUMERIC;
+        *type       = builtin_type_numeric   ;
+        return true;
+    }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_nat);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_nat))
     {
         *constraint = TYPE_CONSTRAINT_NAT;
         *type       = builtin_type_nat   ;
         return true;
     }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_int);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_int))
     {
         *constraint = TYPE_CONSTRAINT_INT;
         *type       = builtin_type_int   ;
         return true;
     }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_real);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_real))
     {
         *constraint = TYPE_CONSTRAINT_REAL;
         *type       = builtin_type_real   ;
@@ -845,42 +865,42 @@ bool inferer_constrain_equality(Inferer* inferer, TypeConstraint* constraint, Sp
     assert(constraint != NULL);
     assert(type       != NULL);
 
-    bool is_successful = false;
+    if (inferer_attempt_unify(inferer, type, &builtin_type_numeric))
+    {
+        *constraint = TYPE_CONSTRAINT_NUMERIC;
+        *type       = builtin_type_numeric   ;
+        return true;
+    }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_nat);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_nat))
     {
         *constraint = TYPE_CONSTRAINT_NAT;
         *type       = builtin_type_nat   ;
         return true;
     }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_int);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_int))
     {
         *constraint = TYPE_CONSTRAINT_INT;
         *type       = builtin_type_int   ;
         return true;
     }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_real);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_real))
     {
         *constraint = TYPE_CONSTRAINT_REAL;
         *type       = builtin_type_real   ;
         return true;
     }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_nil);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_nil))
     {
         *constraint = TYPE_CONSTRAINT_NIL ;
         *type       = builtin_type_nil    ;
         return true;
     }
 
-    is_successful = inferer_attempt_unify(inferer, type, &builtin_type_bool);
-    if (is_successful)
+    if (inferer_attempt_unify(inferer, type, &builtin_type_bool))
     {
         *constraint = TYPE_CONSTRAINT_BOOL;
         *type       = builtin_type_bool   ;
@@ -1227,11 +1247,15 @@ bool inferer_infer_expr_binary_arithmetic_operator(Inferer* inferer, Expr* expr,
 
     // Now we need to make sure that types on both sides are the same type.
     // This is to make sure that operators like (for example) 'Int -> Real -> Real' are not possible.
-    if (left_constraint != right_constraint)
-    {
-        inferer_throw_err_expr_binary_arithmetic_constraint_failed(inferer, expr);
+    is_successful = inferer_unify
+        (inferer, &left_return_type, &right_return_type, inferer_get_expr_span(inferer, expr));
+    if (!is_successful)
         return false;
-    }
+    // if (left_constraint != right_constraint)
+    // {
+    //     inferer_throw_err_expr_binary_arithmetic_constraint_failed(inferer, expr);
+    //     return false;
+    // }
 
     *type = left_return_type;
     return true;
@@ -1468,6 +1492,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
 
     for (int i = 0; i < fn.argc; ++i)
     {
+        curr_arg_type = NULL;
         is_successful = inferer_infer_expr(inferer, fn.argv[i], &curr_arg_type);
         if (!is_successful)
         {
@@ -2152,9 +2177,9 @@ Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
 
     Type* type = decl->decl.var.var.inferring;
 
-    while (type->type.fn.right->kind == TYPE_FN)
+    while (type->kind == TYPE_FN)
     {
-        type  = type->type.fn.right;
+        type = type->type.fn.right;
     }
 
     return type;
