@@ -49,23 +49,23 @@ int main(int argc, char** argv)
 
     parser = init_parser(scanner);
 
-    // ExprOp* expr = parser_parse_expr(&parser);
-    // print_expr_op(expr);
-
-    // Stmt* stmt = parser_parse_stmt(&parser);
     Stmt* stmt = parser_parse_stmts(&parser);
 
-    diagnostic_component_print(parser.diagnostic_component);
-    if (diagnostic_component_is_empty(parser.diagnostic_component))
+    if (!diagnostic_component_is_empty(parser.diagnostic_component))
+    {
+        diagnostic_component_print(parser.diagnostic_component);
         exit(1);
+    }
 
     Resolver resolver = resolver_init(&parser, stmt);
 
     resolver_resolve_stmt(&resolver);
 
-    diagnostic_component_print(resolver.diagnostic_component);
-    if (diagnostic_component_is_empty(resolver.diagnostic_component))
+    if (!diagnostic_component_is_empty(resolver.diagnostic_component))
+    {
+        diagnostic_component_print(resolver.diagnostic_component);
         exit(1);
+    }
 
     arena_print_memory_usage(&resolver.arena);
 
@@ -84,9 +84,11 @@ int main(int argc, char** argv)
 
     inferer_infer_stmt(&inferer, inferer.stmts);
 
-    diagnostic_component_print(inferer.diagnostic_component);
-    if (diagnostic_component_is_empty(inferer.diagnostic_component))
+    if (!diagnostic_component_is_empty(inferer.diagnostic_component))
+    {
+        diagnostic_component_print(inferer.diagnostic_component);
         exit(1);
+    }
 
     fprintf(file, "Declarations:\n");
     for (int i = 0; i < arrlen(inferer.declarations); ++i)

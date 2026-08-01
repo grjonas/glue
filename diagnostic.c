@@ -26,8 +26,8 @@ void diagnostic_component_free(DiagnosticComponent** diagnostic_component)
     assert(*diagnostic_component != NULL);
 
     arrfree((*diagnostic_component)->diagnostics);
-    free(*diagnostic_component);
     arena_free(&(*diagnostic_component)->arena);
+    free(*diagnostic_component);
 
     *diagnostic_component = NULL;
 }
@@ -54,7 +54,7 @@ void diagnostic_component_print(DiagnosticComponent* diagnostic_component)
 {
     assert(diagnostic_component != NULL);
 
-    for (int i = 0; i < arrlen(diagnostic_component); ++i)
+    for (int i = 0; i < arrlen(diagnostic_component->diagnostics); ++i)
     {
         Diagnostic diagnostic = diagnostic_component->diagnostics[i];
         diagnostic_print(diagnostic);
@@ -102,19 +102,19 @@ void diagnostic_err_print(DiagnosticErr err)
     switch (err.kind)
     {
         // Parser
-        case DIAGNOSTIC_ERR_GENERIC                     : printf(" DIAGNOSTIC_ERR_GENERIC\n"); break;
-        case DIAGNOSTIC_ERR_UNEXPECTED_TOKEN            : printf(" DIAGNOSTIC_ERR_UNEXPECTED_TOKEN\n"); break;
-        case DIAGNOSTIC_ERR_EXPECTED_TOKEN              : printf(" DIAGNOSTIC_ERR_EXPECTED_TOKEN\n"); break;
-        case DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP        : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP\n"); break;
-        case DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER : printf(" DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER\n"); break;
+        case DIAGNOSTIC_ERR_GENERIC                     : printf(" DIAGNOSTIC_ERR_GENERIC\n"); return;
+        case DIAGNOSTIC_ERR_UNEXPECTED_TOKEN            : printf(" DIAGNOSTIC_ERR_UNEXPECTED_TOKEN\n"); return;
+        case DIAGNOSTIC_ERR_EXPECTED_TOKEN              : printf(" DIAGNOSTIC_ERR_EXPECTED_TOKEN\n"); return;
+        case DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP        : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP\n"); return;
+        case DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER : printf(" DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER\n"); return;
 
         // Resolver
-        case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); break;
-        case DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP        : printf(" DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP\n"); break;
-        case DIAGNOSTIC_ERR_RETURN_NOT_IN_FN            : printf(" DIAGNOSTIC_ERR_RETURN_NOT_IN_FN\n"); break;
-        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER: printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER\n"); break;
-        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP\n"); break;
-        case DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE         : printf(" DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE\n"); break;
+        case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); return;
+        case DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP        : printf(" DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP\n"); return;
+        case DIAGNOSTIC_ERR_RETURN_NOT_IN_FN            : printf(" DIAGNOSTIC_ERR_RETURN_NOT_IN_FN\n"); return;
+        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER: printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER\n"); return;
+        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP\n"); return;
+        case DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE         : printf(" DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE\n"); return;
 
         // Inferer
         case DIAGNOSTIC_ERR_UNIFY_FAILED                                       :
@@ -123,15 +123,15 @@ void diagnostic_err_print(DiagnosticErr err)
             printf("\n    with\n");
             type_print(stdout, err.err.unify_failed.right);
             printf("\n");
-            break;
+            return;
 
-        case DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC                     : printf(" DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC\n"); break;
-        case DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY                    : printf(" DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY\n"); break;
-        case DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED           : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED\n"); break;
-        case DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED             : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED\n"); break;
-        case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT         : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT\n"); break;
-        case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD: printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD\n"); break;
-        default: printf("Default error");
+        case DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC                     : printf(" DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC\n"); return;
+        case DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY                    : printf(" DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY\n"); return;
+        case DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED           : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED\n"); return;
+        case DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED             : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED\n"); return;
+        case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT         : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT\n"); return;
+        case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD: printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD\n"); return;
+        default: printf("Default error"); return;
     }
     UNREACHABLE;
 }
