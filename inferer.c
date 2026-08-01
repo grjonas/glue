@@ -88,6 +88,7 @@ void inferer_free(Inferer* inferer)
     };
 }
 
+// TODO: Think about repurposing Binds for unification of numerics.
 bool inferer_unify_inner_left_type_numeric_helper(Inferer* inferer, TypeKind left_kind, Type** right_ref)
 {
     assert(inferer    != NULL);
@@ -1481,8 +1482,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
     Type* curr_fn_ptr   = NULL ;
     Type* curr_arg_type = NULL ;
 
-    is_successful = inferer_infer_expr(inferer, fn.caller, &caller_type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, fn.caller, &caller_type))
     {
         return false;
     }
@@ -1493,14 +1493,14 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
     for (int i = 0; i < fn.argc; ++i)
     {
         curr_arg_type = NULL;
-        is_successful = inferer_infer_expr(inferer, fn.argv[i], &curr_arg_type);
-        if (!is_successful)
+        if (!inferer_infer_expr(inferer, fn.argv[i], &curr_arg_type))
         {
             return false;
         }
 
-        is_successful = inferer_unify(inferer, &curr_fn_ptr->type.fn.left, &curr_arg_type, inferer_get_expr_span(inferer, expr));
-        if (!is_successful)
+        if (!inferer_unify
+            (inferer, &curr_fn_ptr->type.fn.left, &curr_arg_type,
+                inferer_get_expr_span(inferer, expr)))
         {
             return false;
         }
@@ -2156,7 +2156,7 @@ Type* inferer_decl_var_get_type(Inferer* inferer, Decl* decl)
     return decl->decl.var.var.inferring;
 }
 
-void  inferer_decl_var_set_type            (Inferer* inferer, Decl* decl, Type* type)
+void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
