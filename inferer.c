@@ -357,7 +357,7 @@ bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
 
     if (right->kind == TYPE_FREE_VAR)
     {
-        return inferer_bind_variable_to_type(inferer, right, left);
+        return inferer_bind_variable_to_type(inferer, right_ref, left);
     }
 
     // TODO: Rewrite this switch-case to account for attempt_unifying numerics properly.
@@ -376,7 +376,7 @@ bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
         case TYPE_STRUCT     : is_successful = inferer_unify_inner_left_type_struct (inferer, left->type.structt, right_ref); break;
         case TYPE_FN         : is_successful = inferer_unify_inner_left_type_fn     (inferer, left->type.fn     , right_ref); break;
 
-        case TYPE_FREE_VAR   : is_successful = inferer_bind_variable_to_type(inferer, left, right); break;
+        case TYPE_FREE_VAR   : is_successful = inferer_bind_variable_to_type(inferer, left_ref, right); break;
         case TYPE_BOUNDED_VAR: UNREACHABLE; // Should be instantiated before this point.
 
         case TYPE_APPLICATION:
@@ -662,22 +662,7 @@ void inferer_get_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* substs)
                                inferer_get_substs(inferer, type->type.fn.right, substs);
                                return;
 
-        case TYPE_FREE_VAR   :
-        {
-            Type* resolved = inferer_resolve_type(inferer, type);
-
-            if (resolved == type)
-            {
-                hmput(*substs, type, hmlen(*substs));
-            }
-            else
-            {
-                inferer_get_substs(inferer, resolved, substs);
-            }
-
-            return;
-        }
-
+        case TYPE_FREE_VAR   : hmput(*substs, type, hmlen(*substs)); return;
         case TYPE_BOUNDED_VAR: UNREACHABLE;
 
         case TYPE_APPLICATION:
@@ -759,10 +744,13 @@ void inferer_apply_subst(Inferer* inferer, Type* type, Subst subst)
     UNREACHABLE;
 }
 
-void inferer_apply_subst_reverse(Inferer* inferer, Type* type, Subst subst)
+void inferer_apply_subst_reverse(Inferer* inferer, Type** type_ref, Subst subst)
 {
-    assert(inferer != NULL);
-    assert(type    != NULL);
+    assert(inferer   != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
 
     switch (type->kind)
     {
@@ -775,17 +763,17 @@ void inferer_apply_subst_reverse(Inferer* inferer, Type* type, Subst subst)
         case TYPE_STRING     :
             return;
 
-        case TYPE_LIST       : inferer_apply_subst_reverse(inferer, type->type.list.type, subst); return;
+        case TYPE_LIST       : inferer_apply_subst_reverse(inferer, &type->type.list.type, subst); return;
         case TYPE_STRUCT     :
             for (int i = 0; i < type->type.structt.field_num; ++i)
             {
                 TypeStructField* field = type->type.structt.fields[i];
-                inferer_apply_subst_reverse(inferer, field->value, subst);
+                inferer_apply_subst_reverse(inferer, &field->value, subst);
             }
             return;
 
-        case TYPE_FN         : inferer_apply_subst_reverse(inferer, type->type.fn.left , subst);
-                               inferer_apply_subst_reverse(inferer, type->type.fn.right, subst);
+        case TYPE_FN         : inferer_apply_subst_reverse(inferer, &type->type.fn.left , subst);
+                               inferer_apply_subst_reverse(inferer, &type->type.fn.right, subst);
                                return;
 
         case TYPE_FREE_VAR   : return;
@@ -793,28 +781,24 @@ void inferer_apply_subst_reverse(Inferer* inferer, Type* type, Subst subst)
         case TYPE_BOUNDED_VAR:
             if (type->type.bounded_var.id == subst.value)
             {
-                *type = (Type)
-                {
-                    .kind = TYPE_FREE_VAR,
-                    .type.free_var= (TypeFreeVar) { .type = subst.key }, 
-                };
+                *type_ref = subst.key;
             }
             return;
 
         case TYPE_APPLICATION:
             for (int i = 0; i < type->type.application.argc; ++i)
             {
-                Type* arg = type->type.application.argv[i];
+                Type** arg_ref = type->type.application.argv + i;
 
-                inferer_apply_subst_reverse(inferer, arg, subst);
+                inferer_apply_subst_reverse(inferer, arg_ref, subst);
             }
             return;
 
-        case TYPE_CONSTRUCTOR: inferer_apply_subst_reverse(inferer, type->type.constructor.left , subst);
-                               inferer_apply_subst_reverse(inferer, type->type.constructor.right, subst);
+        case TYPE_CONSTRUCTOR: inferer_apply_subst_reverse(inferer, &type->type.constructor.left , subst);
+                               inferer_apply_subst_reverse(inferer, &type->type.constructor.right, subst);
                                return;
 
-        case TYPE_ALIAS      : inferer_apply_subst_reverse(inferer, type->type.alias.type, subst); return;
+        case TYPE_ALIAS      : inferer_apply_subst_reverse(inferer, &type->type.alias.type, subst); return;
     }
     UNREACHABLE;
 }
@@ -1826,8 +1810,6 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
 {
     assert(inferer != NULL);
 
-    bool is_successful = false;
-
     Type* expr_type       = NULL;
     Type* annotation_type = NULL;
     Type* final_type      = NULL;
@@ -1840,13 +1822,9 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     {
         expr_type = inferer_create_free_type_var(inferer);
     }
-    else
+    else if (!inferer_infer_expr(inferer, let.expr, &expr_type))
     {
-        is_successful = inferer_infer_expr(inferer, let.expr, &expr_type);
-        if (!is_successful)
-        {
-            return false;
-        }
+        return false;
     }
 
     if (let.type != NULL)
@@ -2006,14 +1984,7 @@ Type* inferer_create_free_type_var(Inferer* inferer)
     Type type_mem;
     Type* type = NULL;
 
-    type_mem = (Type)
-    {
-        .kind = TYPE_FREE_VAR,
-        .type.free_var = (TypeFreeVar)
-        {
-            .type = NULL,
-        }
-    };
+    type_mem = (Type) { .kind = TYPE_FREE_VAR, };
 
     type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
     inferer_push_type_variable(inferer, type);
@@ -2291,62 +2262,17 @@ void inferer_pop_type_variable(Inferer* inferer)
     inferer->curr_type_env.type_variable_length--;
 }
 
-Type* inferer_resolve_type(Inferer* inferer, Type* type)
-// {
-//     assert(inferer   != NULL         );
-//     assert(var       != NULL         );
-//     assert(var->kind == TYPE_FREE_VAR);
-// 
-//     Type* next = var->type.free_var.type;
-//     Type* type_var = NULL;
-// 
-//     if (next == NULL || next->kind != TYPE_FREE_VAR)
-//     {
-//         return var;
-//     }
-// 
-//     type_var = inferer_resolve_type(inferer, next);
-// 
-//     var->type.free_var.type = type_var;
-//     return type_var;
-// }
-{
-    assert(inferer != NULL);
-    assert(type != NULL);
-
-    if (type->kind != TYPE_FREE_VAR)
-    {
-        return type;
-    }
-
-    Type* next = type->type.free_var.type;
-
-    if (next == NULL)
-    {
-        return type;
-    }
-
-    Type* resolved = inferer_resolve_type(inferer, next);
-
-    type->type.free_var.type = resolved; // path compression
-
-    return resolved;
-}
-
 bool inferer_occurs_check_struct(Inferer* inferer, Type* var, TypeStruct structt)
 {
     assert(inferer   != NULL         );
     assert(var       != NULL         );
     assert(var->kind == TYPE_FREE_VAR);
 
-    Type* resolved_var = NULL;
-
-    resolved_var = inferer_resolve_type(inferer, var);
     for (int i = 0; i < structt.field_num; ++i)
     {
         TypeStructField* field = structt.fields[i];
 
-        if (!inferer_occurs_check(inferer, resolved_var, field->value))
+        if (!inferer_occurs_check(inferer, var, field->value))
         {
             return false;
         }
@@ -2361,14 +2287,11 @@ bool inferer_occurs_check_application(Inferer* inferer, Type* var, TypeApplicati
     assert(var       != NULL         );
     assert(var->kind == TYPE_FREE_VAR);
 
-    Type* resolved_var = NULL;
-
-    resolved_var = inferer_resolve_type(inferer, var);
     for (int i = 0; i < application.argc; ++i)
     {
         Type* type = application.argv[i];
 
-        if (!inferer_occurs_check(inferer, resolved_var, type))
+        if (!inferer_occurs_check(inferer, var, type))
         {
             return false;
         }
@@ -2383,11 +2306,8 @@ bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
     assert(inferer   != NULL         );
     assert(var       != NULL         );
     assert(type      != NULL         );
+    assert(var->kind == TYPE_FREE_VAR);
 
-    Type* resolved_var       = NULL;
-    Type* other_resolved_var = NULL;
-
-    resolved_var = inferer_resolve_type(inferer, var);
     switch (type->kind)
     {
         case TYPE_NIL        : return true;
@@ -2397,100 +2317,47 @@ bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
         case TYPE_INT        : return true;
         case TYPE_REAL       : return true;
         case TYPE_STRING     : return true;
-        case TYPE_LIST       : return inferer_occurs_check(inferer, resolved_var, type->type.list.type);
-        case TYPE_STRUCT     : return inferer_occurs_check_struct(inferer, resolved_var, type->type.structt);
-        case TYPE_FN         : return inferer_occurs_check(inferer, resolved_var, type->type.fn.left )
-                                   && inferer_occurs_check(inferer, resolved_var, type->type.fn.right);
-        case TYPE_FREE_VAR   :
-            other_resolved_var = inferer_resolve_type(inferer, type);
-            return resolved_var != other_resolved_var;
-
+        case TYPE_LIST       : return inferer_occurs_check(inferer, var, type->type.list.type);
+        case TYPE_STRUCT     : return inferer_occurs_check_struct(inferer, var, type->type.structt);
+        case TYPE_FN         : return inferer_occurs_check(inferer, var, type->type.fn.left )
+                                   && inferer_occurs_check(inferer, var, type->type.fn.right);
+        case TYPE_FREE_VAR   : return var != type;
         case TYPE_BOUNDED_VAR: UNREACHABLE;
 
-        case TYPE_APPLICATION: return inferer_occurs_check_application(inferer, resolved_var, type->type.application);
-        case TYPE_CONSTRUCTOR: return inferer_occurs_check(inferer, resolved_var, type->type.fn.left )
-                                   && inferer_occurs_check(inferer, resolved_var, type->type.fn.right);
-        case TYPE_ALIAS      : return inferer_occurs_check(inferer, resolved_var, type->type.alias.type);
+        case TYPE_APPLICATION: return inferer_occurs_check_application(inferer, var, type->type.application);
+        case TYPE_CONSTRUCTOR: return inferer_occurs_check(inferer, var, type->type.fn.left   )
+                                   && inferer_occurs_check(inferer, var, type->type.fn.right  );
+        case TYPE_ALIAS      : return inferer_occurs_check(inferer, var, type->type.alias.type);
     }
     UNREACHABLE;
 }
 
-// // TODO: Take a look at
-// bool inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type* type)
-// {
-//     assert(inferer   != NULL         );
-//     assert(var       != NULL         );
-//     assert(type      != NULL         );
-//     assert(var->kind == TYPE_FREE_VAR);
-// 
-//     Type* resolved_var  = NULL ;
-//     Type* resolved_type = NULL ;
-//     Bind  bind;
-// 
-//     resolved_var = inferer_resolve_type(inferer, var );
-//     if (type->kind == TYPE_FREE_VAR)
-//     {
-//         resolved_type = inferer_resolve_type(inferer, type);
-//     }
-//     else
-//     {
-//         resolved_type = type;
-//     }
-// 
-//     if (resolved_var == resolved_type)
-//     {
-//         return true;
-//     }
-//     if (!inferer_occurs_check(inferer, resolved_var, resolved_type))
-//     {
-//         return false;
-//     }
-// 
-//     bind = (Bind)
-//     {
-//         .var  = resolved_var,
-//         .type = type        ,
-//     };
-//     arrput(inferer->binds, bind);
-// 
-//     return true;
-// }
-
 // TODO: Take a look at
-bool inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type* type)
+bool inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type)
 {
-    assert(inferer   != NULL         );
-    assert(var       != NULL         );
-    assert(type      != NULL         );
-    assert(var->kind == TYPE_FREE_VAR);
+    assert(inferer  != NULL);
+    assert(var_ref  != NULL);
+    assert(*var_ref != NULL);
+    assert(type     != NULL);
+    assert((*var_ref)->kind == TYPE_FREE_VAR);
 
-    Type* resolved_var  = NULL ;
-    Type* resolved_type = NULL ;
     Bind  bind;
+    Type* var = *var_ref;
 
-    resolved_var = inferer_resolve_type(inferer, var );
-    if (type->kind == TYPE_FREE_VAR)
-    {
-        resolved_type = inferer_resolve_type(inferer, type);
-    }
-    else
-    {
-        resolved_type = type;
-    }
-
-    if (resolved_var == resolved_type)
+    if (var == type)
     {
         return true;
     }
-    if (!inferer_occurs_check(inferer, resolved_var, resolved_type))
+
+    if (!inferer_occurs_check(inferer, var, type))
     {
         return false;
     }
 
     bind = (Bind)
     {
-        .var  = resolved_var,
-        .type = type        ,
+        .var_ref  = var_ref,
+        .type     = type   ,
     };
     arrput(inferer->binds, bind);
 
@@ -2505,10 +2372,9 @@ void inferer_unify_apply_binds(Inferer* inferer)
 
     for (int i = 0; i < length; ++i)
     {
-        Bind bind = inferer->binds[i];
+        Bind* bind = inferer->binds + i;
 
-        bind.var->type.free_var.type = bind.type;
-        // (*bind.var) = (*bind.type);
+        (*bind->var_ref) = bind->type;
     }
 }
 
@@ -2555,9 +2421,9 @@ bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)
     assert(inferer != NULL);
 
     Type** type_variables = inferer->type_variables;
-    for (int i = 0; i < arrlen(inferer->type_variables); ++i)
+    for (int i = 0; i < arrlen(type_variables); ++i)
     {
-        Type* type_var = inferer->type_variables[i];
+        Type* type_var = type_variables[i];
         assert(type_var->kind == TYPE_FREE_VAR);
         if (type_var == subst.key)
         {

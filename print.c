@@ -604,15 +604,7 @@ void type_print(FILE* file, Type* type)
             return;
 
         case TYPE_FREE_VAR   :
-            if (type->type.free_var.type == NULL)
-            {
-                fprintf(file, "@%p", type->type.free_var.type);
-            }
-            else
-            {
-                fprintf(file, "FREE_VAR:");
-                type_print(file, type->type.free_var.type);
-            }
+            fprintf(file, "@%p", type);
             fprintf(file, "]");
             return;
 

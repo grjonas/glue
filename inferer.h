@@ -27,8 +27,8 @@ enum TypeConstraint
 
 struct Bind
 {
-    Type* var ;
-    Type* type;
+    Type** var_ref ;
+    Type*  type    ;
 };
 
 struct TypeEnv
@@ -84,7 +84,7 @@ void  inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** sc
 void  inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
 void  inferer_get_substs          (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
 void  inferer_apply_subst         (Inferer* inferer, Type* type, Subst subst)            ;
-void  inferer_apply_subst_reverse (Inferer* inferer, Type* type, Subst subst)            ;
+void  inferer_apply_subst_reverse (Inferer* inferer, Type** type_ref, Subst subst)            ;
 
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
@@ -115,9 +115,8 @@ void             inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl,
 
 void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
 void  inferer_pop_type_variable (Inferer* inferer);
-Type* inferer_resolve_type(Inferer* inferer, Type* type);
 bool  inferer_occurs_check(Inferer* inferer, Type* var, Type* type);
-bool  inferer_bind_variable_to_type(Inferer* inferer, Type* var, Type* type);
+bool  inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type);
 void  inferer_unify_apply_binds(Inferer* inferer);
 void  inferer_unify_free_binds (Inferer* inferer);
 

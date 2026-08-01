@@ -49,7 +49,6 @@ enum TypeKind
 
 struct TypeFreeVar
 {
-    Type*  type;
 };
 
 struct TypeBoundedVar
