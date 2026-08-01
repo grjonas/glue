@@ -86,6 +86,22 @@ int main(int argc, char** argv)
 
     if (!diagnostic_component_is_empty(inferer.diagnostic_component))
     {
+        if (true)
+        {
+            for (int i = 0; i < arrlen(inferer.declarations); ++i)
+            {
+                Decl* d = inferer.declarations[i];
+                fprintf(file, "    ");
+                decl_print(file, d);
+                fprintf(file, "\n");
+            }
+            stmt_print(file, inferer.stmts);
+
+            arena_print_memory_usage(&inferer.arena);
+            arena_print_memory_usage(&inferer.type_arena);
+
+        }
+        printf("Inference errors:\n");
         diagnostic_component_print(inferer.diagnostic_component);
         exit(1);
     }

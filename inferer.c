@@ -1850,12 +1850,30 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
 Type* inferer_get_stmt_fn_type(Inferer* inferer, StmtFn fn)
 {
     assert(inferer != NULL);
+    assert(fn.decl->kind == DECL_VAR);
 
     Type  type_mem;
     Type* curr_type   = NULL;
     Type* return_type = NULL;
 
-    inferer_convert_type_expr(inferer, fn.return_type, &return_type);
+    switch (fn.decl->decl.var.return_kind)
+    {
+        case DECL_VAR_RETURN_NONE    :
+        case DECL_VAR_RETURN_NULL    :
+            return_type = builtin_type_nil;
+            break;
+
+        case DECL_VAR_RETURN_NOT_NULL:
+            if (fn.return_type == NULL)
+            {
+                return_type = inferer_create_free_type_var(inferer);
+            }
+            else
+            {
+                inferer_convert_type_expr(inferer, fn.return_type, &return_type);
+            }
+            break;
+    }
     curr_type = return_type;
 
     // Special case if the function has no arguments - the left argument is NULL.

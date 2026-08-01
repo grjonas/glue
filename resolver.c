@@ -327,26 +327,50 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
     Stmt* curr_stmt  = resolver->stmts;
 
     Expr* expr = NULL;
+    Decl* curr_fn = resolver->curr_fn;
 
     assert(curr_stmt != NULL);
     assert(curr_stmt->kind == STMT_RETURN);
 
     // TODO: Somehow bind this to it's respective function declaration.
-    if (resolver->curr_fn == NULL)
+    if (curr_fn == NULL)
     {
         resolver_throw_err_stmt_return_not_in_fn(resolver, curr_stmt);
         return false;
     }
+    assert(curr_fn->kind == DECL_VAR);
 
     expr = curr_stmt->stmt.returnn.expr;
     if (expr != NULL)
     {
+        switch (curr_fn->decl.var.return_kind)
+        {
+            case DECL_VAR_RETURN_NONE    :
+                curr_fn->decl.var.return_kind = DECL_VAR_RETURN_NOT_NULL; break;
+            case DECL_VAR_RETURN_NULL    :
+                resolver_throw_err_stmt_returns_dont_match(resolver, curr_stmt);
+                return false;
+            case DECL_VAR_RETURN_NOT_NULL: break;
+        }
+
         if (!resolver_resolve_expr(resolver, expr))
         {
             return false;
         }
     }
-    curr_stmt->stmt.returnn.decl = resolver->curr_fn;
+    else
+    {
+        switch (curr_fn->decl.var.return_kind)
+        {
+            case DECL_VAR_RETURN_NONE    :
+                curr_fn->decl.var.return_kind = DECL_VAR_RETURN_NULL; break;
+            case DECL_VAR_RETURN_NULL    :
+                resolver_throw_err_stmt_returns_dont_match(resolver, curr_stmt);
+                return false;
+            case DECL_VAR_RETURN_NOT_NULL: break;
+        }
+    }
+    curr_stmt->stmt.returnn.decl = curr_fn;
 
     return true;
 }
@@ -966,6 +990,7 @@ Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
         .decl.var = (DeclVar)
         {
             .kind = DECL_VAR_NONE,
+            .return_kind = DECL_VAR_RETURN_NONE,
         }
     };
 
@@ -1129,6 +1154,18 @@ void resolver_throw_err_stmt_return_not_in_fn(Resolver* resolver, Stmt* stmt)
     diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
     {
         .kind = DIAGNOSTIC_ERR_RETURN_NOT_IN_FN,
+        .span = resolver_get_stmt_span(resolver, stmt),
+    });
+}
+
+void resolver_throw_err_stmt_returns_dont_match(Resolver* resolver, Stmt* stmt)
+{
+    assert(resolver != NULL);
+    assert(stmt     != NULL);
+
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_RETURNS_DONT_MATCH,
         .span = resolver_get_stmt_span(resolver, stmt),
     });
 }

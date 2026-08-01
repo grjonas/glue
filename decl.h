@@ -31,9 +31,18 @@ enum DeclVarKind
     DECL_VAR_INFERRING,
 };
 
+typedef enum
+{
+    DECL_VAR_RETURN_NONE,
+    DECL_VAR_RETURN_NULL,
+    DECL_VAR_RETURN_NOT_NULL,
+}
+DeclVarReturnKind;
+
 struct DeclVar
 {
-    DeclVarKind kind;
+    DeclVarKind   kind;
+    DeclVarReturnKind return_kind;  // This field does nothing if the declaration is not a function.
     union
     {
         TypeScheme* inferred;
