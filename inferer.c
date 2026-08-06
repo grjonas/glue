@@ -1095,26 +1095,19 @@ void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
 
     TypeScheme* scheme = NULL;
 
-    // Not sure if this is a good way of doing things
-    switch (decl->decl.var.kind)
+    if (decl->decl.var.type != NULL)
     {
-        // This is primarily for function arguments,
-        // which should always be monotypes.
-        // This code is not really explicit about that,
-        // so it could probably be better.
-        case DECL_VAR_INFERRING:
-            *type = inferer_decl_var_get_type(inferer, decl);
-            return;
-
-        // For polytypes, i.e. let statements, or function declarations.
-        case DECL_VAR_INFERRED :
-            scheme = inferer_decl_var_get_scheme(inferer, decl);
-            assert(scheme != NULL);
-            inferer_instantiate(inferer, scheme, type);
-            return;
-
-        case DECL_VAR_NONE     : UNREACHABLE;
+        *type = inferer_decl_var_get_type(inferer, decl);
+        return;
     }
+    else if (decl->decl.var.scheme != NULL)
+    {
+        scheme = inferer_decl_var_get_scheme(inferer, decl);
+        assert(scheme != NULL);
+        inferer_instantiate(inferer, scheme, type);
+        return;
+    }
+
     UNREACHABLE;
 }
 
@@ -1259,6 +1252,45 @@ bool inferer_infer_expr_binary_arithmetic_operator(Inferer* inferer, Expr* expr,
     // }
 
     *type = left_return_type;
+    return true;
+}
+
+bool inferer_infer_expr_binary_comparison_operator(Inferer* inferer, Expr* expr, Type** type)
+{
+    assert(inferer != NULL);
+    assert(expr    != NULL);
+    assert(expr->kind == EXPR_BINARY);
+    assert(type         != NULL);
+    assert(*type        == NULL);
+
+    ExprBinary binary = expr->expr.binary;
+    bool is_successful = false;
+    Type* left_return_type  = NULL;
+    Type* right_return_type = NULL;
+    TypeConstraint left_constraint  = TYPE_CONSTRAINT_NUMERIC;
+    TypeConstraint right_constraint = TYPE_CONSTRAINT_NUMERIC;
+
+    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
+    if (!is_successful)
+        return false;
+
+    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type);
+    if (!is_successful)
+        return false;
+
+    // Now we need to make sure that types on both sides are the same type.
+    // This is to make sure that operators like (for example) 'Int -> Real -> Real' are not possible.
+    is_successful = inferer_unify
+        (inferer, &left_return_type, &right_return_type, inferer_get_expr_span(inferer, expr));
+    if (!is_successful)
+        return false;
+    // if (left_constraint != right_constraint)
+    // {
+    //     inferer_throw_err_expr_binary_arithmetic_constraint_failed(inferer, expr);
+    //     return false;
+    // }
+
+    *type = builtin_type_bool;
     return true;
 }
 
@@ -1454,10 +1486,10 @@ bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type)
 
         // Comparison
         // for now, comparisons are resolved similiarly to arithmetic expressions.
-        case EXPR_BINARY_LESS_EQUAL   : return inferer_infer_expr_binary_arithmetic_operator(inferer, expr, type);
-        case EXPR_BINARY_LESS         : return inferer_infer_expr_binary_arithmetic_operator(inferer, expr, type);
-        case EXPR_BINARY_GREATER_EQUAL: return inferer_infer_expr_binary_arithmetic_operator(inferer, expr, type);
-        case EXPR_BINARY_GREATER      : return inferer_infer_expr_binary_arithmetic_operator(inferer, expr, type);
+        case EXPR_BINARY_LESS_EQUAL   : return inferer_infer_expr_binary_comparison_operator(inferer, expr, type);
+        case EXPR_BINARY_LESS         : return inferer_infer_expr_binary_comparison_operator(inferer, expr, type);
+        case EXPR_BINARY_GREATER_EQUAL: return inferer_infer_expr_binary_comparison_operator(inferer, expr, type);
+        case EXPR_BINARY_GREATER      : return inferer_infer_expr_binary_comparison_operator(inferer, expr, type);
         case EXPR_BINARY_CHAIN        : UNREACHABLE; // Shouldn't be encountered ideally
         case EXPR_BINARY_ACCESS       : return inferer_infer_expr_binary_access_operator    (inferer, expr, type);
         case EXPR_BINARY_ASSIGN       : return inferer_infer_expr_binary_assign_operator    (inferer, expr, type);
@@ -2139,10 +2171,7 @@ void inferer_decl_var_begin_inferrence(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
-    assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_NONE);
 
-    decl->decl.var.kind = DECL_VAR_INFERRING;
     inferer_decl_var_set_type(inferer, decl, inferer_create_free_type_var(inferer));
 }
 
@@ -2151,9 +2180,9 @@ Type* inferer_decl_var_get_type(Inferer* inferer, Decl* decl)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRING);
+    assert(decl->decl.var.type != NULL);
 
-    return decl->decl.var.var.inferring;
+    return decl->decl.var.type;
 }
 
 void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
@@ -2161,9 +2190,8 @@ void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRING);
 
-    decl->decl.var.var.inferring = type;
+    decl->decl.var.type = type;
 }
 
 Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
@@ -2171,11 +2199,10 @@ Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRING);
-    assert(decl->decl.var.var.inferring != NULL);
-    assert(decl->decl.var.var.inferring->kind == TYPE_FN);
+    assert(decl->decl.var.type != NULL);
+    assert(decl->decl.var.type->kind == TYPE_FN);
 
-    Type* type = decl->decl.var.var.inferring;
+    Type* type = decl->decl.var.type;
 
     while (type->kind == TYPE_FN)
     {
@@ -2190,11 +2217,10 @@ void inferer_decl_var_set_return_type(Inferer* inferer, Decl* decl, Type* type)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRING);
-    assert(decl->decl.var.var.inferring != NULL);
-    assert(decl->decl.var.var.inferring->kind == TYPE_FN);
+    assert(decl->decl.var.type != NULL);
+    assert(decl->decl.var.type->kind == TYPE_FN);
 
-    Type* old_type = decl->decl.var.var.inferring;
+    Type* old_type = decl->decl.var.type;
 
     while (old_type->type.fn.right->kind == TYPE_FN)
     {
@@ -2245,10 +2271,9 @@ void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRING);
+    assert(decl->decl.var.type != NULL);
 
-    decl->decl.var.kind = DECL_VAR_INFERRED;
-    inferer_generalize(inferer, decl->decl.var.var.inferring, &decl->decl.var.var.inferred);
+    inferer_generalize(inferer, decl->decl.var.type, &decl->decl.var.scheme);
 }
 
 TypeScheme* inferer_decl_var_get_scheme(Inferer* inferer, Decl* decl)
@@ -2256,9 +2281,9 @@ TypeScheme* inferer_decl_var_get_scheme(Inferer* inferer, Decl* decl)
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRED);
+    assert(decl->decl.var.scheme != NULL);
 
-    return decl->decl.var.var.inferred;
+    return decl->decl.var.scheme;
 }
 
 void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme* scheme)
@@ -2266,9 +2291,8 @@ void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme* schem
     assert(inferer != NULL);
     assert(decl    != NULL);
     assert(decl->kind == DECL_VAR);
-    assert(decl->decl.var.kind == DECL_VAR_INFERRED);
 
-    decl->decl.var.var.inferred = scheme;
+    decl->decl.var.scheme = scheme;
 }
 
 TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl)

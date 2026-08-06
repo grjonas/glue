@@ -700,15 +700,15 @@ void decl_print(FILE* file, Decl* decl)
                 fprintf(file, "var");
                 decl_print_top_level(file, decl);
                 fprintf(file, " type-");
-                if (decl->decl.var.kind == DECL_VAR_INFERRING)
+                if (decl->decl.var.scheme == NULL)
                 {
                     fprintf(file, ": ");
-                    type_print(file, decl->decl.var.var.inferring);
+                    type_print(file, decl->decl.var.type);
                 }
-                else if (decl->decl.var.kind == DECL_VAR_INFERRED)
+                else if (decl->decl.var.type != NULL)
                 {
                     fprintf(file, ": ");
-                    type_scheme_print(file, decl->decl.var.var.inferred);
+                    type_scheme_print(file, decl->decl.var.scheme);
                 }
                 else
                 {

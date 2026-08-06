@@ -989,7 +989,8 @@ Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
         .id         = resolver->decl_id++,
         .decl.var = (DeclVar)
         {
-            .kind = DECL_VAR_NONE,
+            .type   = NULL,
+            .scheme = NULL,
             .return_kind = DECL_VAR_RETURN_NONE,
         }
     };

@@ -41,14 +41,9 @@ DeclVarReturnKind;
 
 struct DeclVar
 {
-    DeclVarKind   kind;
+    Type*         type;
+    TypeScheme* scheme;
     DeclVarReturnKind return_kind;  // This field does nothing if the declaration is not a function.
-    union
-    {
-        TypeScheme* inferred;
-        Type*      inferring;
-    }
-    var;
 };
 
 struct DeclTypeVar
