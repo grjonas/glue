@@ -258,22 +258,21 @@ Stmt* parser_parse_stmt_let(Parser* parser)
         stmt.stmt.let.type = type;
     }
 
-    // TODO: Fix this later, not a high priority, but this is kind of bothering me.
-    token = parser_peek(parser);
-    if (token.type == TOKEN_EQUAL)
-    {
-        parser_next(parser);
+    // TODO: Later, make it so that expressions don't have to be initialised upfront (mayber)
+    // Currently, let expression have to be initialised upfront,
+    // because otherwise type inference becomes annoying to implement.
+    if (!parser_expect_token(parser, TOKEN_EQUAL))
+        return NULL;
 
-        expr = parser_parse_expr(parser);
-        if (expr == NULL)
-        {
-            return NULL;
-        }
-        // This is to make is that the expresseion attached isn't just the expression,
-        // but also assigns the result to the variable that is declared.
-        expr = construct_assign_expr(&parser->arena, identifier, expr);
-        stmt.stmt.let.expr = expr;
+    expr = parser_parse_expr(parser);
+    if (expr == NULL)
+    {
+        return NULL;
     }
+    // This is to make is that the expression attached isn't just the expression,
+    // but also assigns the result to the variable that is declared.
+    expr = construct_assign_expr(&parser->arena, identifier, expr);
+    stmt.stmt.let.expr = expr;
 
     stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
     return stmt_ptr;

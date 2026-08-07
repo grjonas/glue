@@ -27,8 +27,8 @@ enum TypeConstraint
 
 struct Bind
 {
-    Type** var_ref ;
-    Type*  type    ;
+    Type** var_ref;
+    Type*     type;
 };
 
 struct TypeEnv
@@ -38,8 +38,8 @@ struct TypeEnv
 
 struct Subst
 {
-    Type* key;
-    int   value;
+    Type*   key;
+    Type* value;
 };
 
 // There are a couple of things that should be known about the inferer:
@@ -82,9 +82,9 @@ bool  inferer_unify               (Inferer* inferer, Type** left_ref, Type** rig
 bool  inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ;
 void  inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
 void  inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
-void  inferer_get_substs          (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
-void  inferer_apply_subst         (Inferer* inferer, Type* type, Subst subst)            ;
-void  inferer_apply_subst_reverse (Inferer* inferer, Type** type_ref, Subst subst)            ;
+void  inferer_get_free_var_substs (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
+void  inferer_apply_subst         (Inferer* inferer, Type** type_ref, Subst subst)       ;
+void  inferer_decl_apply_subst    (Inferer* inferer, Decl* decl, Subst subst)            ;
 
 // Follows free type variables until until we find a concrete type.
 bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
@@ -135,5 +135,6 @@ void inferer_throw_err_expr_binary_arithmetic_constraint_failed            (Infe
 void inferer_throw_err_expr_binary_equality_constraint_failed              (Inferer* inferer, Expr* expr);
 void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);
 void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field (Inferer* inferer, Expr* expr);
+void inferer_throw_err_expr_fn_excessive_args                              (Inferer* inferer, Expr* expr);
 
 #endif

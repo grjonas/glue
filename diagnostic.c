@@ -112,6 +112,8 @@ void diagnostic_err_print(DiagnosticErr err)
         case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); return;
         case DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP        : printf(" DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP\n"); return;
         case DIAGNOSTIC_ERR_RETURN_NOT_IN_FN            : printf(" DIAGNOSTIC_ERR_RETURN_NOT_IN_FN\n"); return;
+
+        case DIAGNOSTIC_ERR_RETURNS_DONT_MATCH          : printf(" DIAGNOSTIC_ERR_RETURNS_DONT_MATCH\n"); return;
         case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER: printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER\n"); return;
         case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP\n"); return;
         case DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE         : printf(" DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE\n"); return;
@@ -131,7 +133,7 @@ void diagnostic_err_print(DiagnosticErr err)
         case DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED             : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED\n"); return;
         case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT         : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT\n"); return;
         case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD: printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD\n"); return;
-        default: printf("Default error"); return;
+        case DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS                             : printf(" DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS\n"); return;
     }
     UNREACHABLE;
 }

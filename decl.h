@@ -7,7 +7,6 @@
 #include "type.h"
 
 typedef enum   DeclKind            DeclKind           ;
-typedef enum   DeclVarKind         DeclVarKind        ;
 
 typedef struct DeclVar             DeclVar            ;
 typedef struct DeclTypeVar         DeclTypeVar        ;
@@ -22,13 +21,6 @@ enum DeclKind
     DECL_ALIAS           ,
     DECL_TYPE            ,
     DECL_TYPE_CONSTRUCTOR,
-};
-
-enum DeclVarKind
-{
-    DECL_VAR_NONE     ,
-    DECL_VAR_INFERRED ,
-    DECL_VAR_INFERRING,
 };
 
 typedef enum
