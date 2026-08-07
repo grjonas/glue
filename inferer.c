@@ -805,7 +805,7 @@ bool inferer_infer_expr_primary_struct(Inferer* inferer, Expr* expr, Type** type
     int field_num = 0;
     DYNAMIC_ARRAY(TypeStructField** fields) = NULL;
 
-    for (int i = 0; structt.argc; ++i)
+    for (int i = 0; i < structt.argc; ++i)
     {
         ExprPrimaryStructField* curr_field = structt.argv[i];
         TypeStructField  curr_type_field;

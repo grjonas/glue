@@ -1,2 +1,2 @@
-let a = { x = 0, y = false }
-let b = a.y
+let a = { x = 0, y = false, z = { a = nil, b = false } }
+let b = a.z.b
