@@ -309,6 +309,9 @@ Expr* parser_parse_expr_primary(Parser* parser)
         case TOKEN_LEFT_SQUARE:
             return parser_parse_expr_list(parser);
 
+        case TOKEN_FN         :
+            return parser_parse_expr_lambda(parser);
+
         default:
             fprintf(stderr, "[%s:%d] Expression parsing: Could not parse primary expression.\n", __FILE__, __LINE__);
             exit(1);
@@ -524,6 +527,116 @@ Expr* parser_parse_expr_struct(Parser* parser)
     return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
 }
 
+Expr* parser_parse_expr_lambda(Parser* parser)
+{
+    Expr expr;
+
+    int        argc        = 0   ;
+    FnArg   ** argv        = NULL;
+    TypeExpr * return_type = NULL;
+    Stmt     * body        = NULL;
+
+    Token token;
+
+    token = parser_peek(parser);
+    parser_expect_token(parser, TOKEN_FN);
+
+    if (!parser_expect_token(parser, TOKEN_LEFT_PAREN))
+    {
+        return NULL;
+    }
+
+    token = parser_peek(parser);
+    // We check to see if the function is a prcedure or not.
+    if (token.type != TOKEN_RIGHT_PAREN)
+    {
+        FnArg*  curr_arg = NULL;
+        FnArg** tmp_ptr;
+
+        // If it's not, then we parse an argument.
+        // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
+        // On TOKEN_COMMA, we continue the loop.
+        // On TOKEN_LEFT_PAREN, we exit the loop.
+        while (true)
+        {
+            // TODO: Make is so that arguments cannot have the same identifier as the function name.
+            curr_arg = parser_parse_fn_arg(parser);
+            if (curr_arg == NULL)
+            {
+                return NULL;
+            }
+
+            arrput(argv, curr_arg);
+
+            token = parser_peek(parser);
+            if (parser_accept_token(parser, TOKEN_COMMA))
+            {
+                continue;
+            }
+            else if (parser_accept_token(parser, TOKEN_RIGHT_PAREN))
+            {
+                break;
+            }
+            else
+            {
+                TokenType expected[] =
+                {
+                    TOKEN_COMMA,
+                    TOKEN_RIGHT_PAREN,
+                };
+
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
+                return NULL;
+            }
+        }
+
+        tmp_ptr = argv;
+        argc = arrlen(tmp_ptr);
+        argv = (FnArg**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(FnArg*));
+        arrfree(tmp_ptr);
+    }
+    else
+    {
+        parser_next(parser);
+    }
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_COLON)
+    {
+        parser_next(parser);
+        return_type = parser_parse_type_expr(parser);
+        if (return_type == NULL)
+        {
+            return NULL;
+        }
+    }
+
+    body = parser_parse_stmt(parser);
+    if (body == NULL)
+    {
+        return NULL;
+    }
+
+    expr = (Expr)
+    {
+        .kind = EXPR_PRIMARY,
+        .expr.primary = (ExprPrimary)
+        {
+            .kind = EXPR_PRIMARY_LAMBDA,
+            .primary.lambda = (ExprPrimaryLambda)
+            {
+                .decl        = NULL       ,
+                .argc        = argc       ,
+                .argv        = argv       ,
+                .return_type = return_type,
+                .body        = body       ,
+            }
+        }
+    };
+
+    return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
+}
+
 Expr* parser_parse_expr_parens(Parser* parser)
 {
     Token token = parser_peek(parser);
@@ -668,132 +781,4 @@ Expr* parser_parse_expr_fn(Parser* parser)
     };
 
     return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
-}
-
-ExprUnaryKind get_prefix_operator(TokenType type, int* right_bp)
-{
-    ExprUnaryKind kind = EXPR_UNARY_UNKNOWN;
-
-    switch (type)
-    {
-        case TOKEN_NOT : kind = EXPR_UNARY_NOT   ; *right_bp = 11; break;
-        case TOKEN_BANG: kind = EXPR_UNARY_NEGATE; *right_bp = 11; break;
-        default:
-            kind = EXPR_UNARY_UNKNOWN;
-            *right_bp = -1;
-    }
-
-    return kind;
-}
-
-ExprBinaryKind get_infix_operator(TokenType type, int* left_bp, int* right_bp)
-{
-    ExprBinaryKind kind = EXPR_BINARY_UNKNOWN;;
-
-    switch (type)
-    {
-        case TOKEN_EQUAL        : kind = EXPR_BINARY_ASSIGN       ; *left_bp =  1; *right_bp =  2; break;
-        case TOKEN_OR           : kind = EXPR_BINARY_OR           ; *left_bp =  3; *right_bp =  4; break;
-        case TOKEN_AND          : kind = EXPR_BINARY_AND          ; *left_bp =  5; *right_bp =  6; break;
-        case TOKEN_EQUAL_EQUAL  : kind = EXPR_BINARY_EQUAL        ; *left_bp =  7; *right_bp =  8; break;
-        case TOKEN_BANG_EQUAL   : kind = EXPR_BINARY_NOT_EQUAL    ; *left_bp =  7; *right_bp =  8; break;
-        case TOKEN_LESS_EQUAL   : kind = EXPR_BINARY_LESS_EQUAL   ; *left_bp =  9; *right_bp = 10; break;
-        case TOKEN_LESS         : kind = EXPR_BINARY_LESS         ; *left_bp =  9; *right_bp = 10; break;
-        case TOKEN_GREATER_EQUAL: kind = EXPR_BINARY_GREATER_EQUAL; *left_bp =  9; *right_bp = 10; break;
-        case TOKEN_GREATER      : kind = EXPR_BINARY_GREATER      ; *left_bp =  9; *right_bp = 10; break;
-        case TOKEN_PLUS         : kind = EXPR_BINARY_ADD          ; *left_bp = 11; *right_bp = 12; break;
-        case TOKEN_MINUS        : kind = EXPR_BINARY_SUBTRACT     ; *left_bp = 11; *right_bp = 12; break;
-        case TOKEN_STAR         : kind = EXPR_BINARY_MULTIPLY     ; *left_bp = 13; *right_bp = 14; break;
-        case TOKEN_SLASH        : kind = EXPR_BINARY_DIVIDE       ; *left_bp = 13; *right_bp = 14; break;
-        case TOKEN_PERCENT      : kind = EXPR_BINARY_MODULO       ; *left_bp = 13; *right_bp = 14; break;
-        case TOKEN_COLON        : kind = EXPR_BINARY_CHAIN        ; *left_bp = 16; *right_bp = 17; break;
-        case TOKEN_DOT          : kind = EXPR_BINARY_ACCESS       ; *left_bp = 16; *right_bp = 17; break;
-
-        default:
-            kind = EXPR_BINARY_UNKNOWN;
-            *left_bp  = -1;
-            *right_bp = -1;
-    }
-
-    return kind;
-}
-
-ExprUnaryKind get_postfix_operator(TokenType type, int* right_bp)
-{
-    ExprUnaryKind kind = EXPR_UNARY_UNKNOWN;
-
-    switch (type)
-    {
-        default:
-            kind = EXPR_UNARY_UNKNOWN;
-            *right_bp = -1;
-    }
-
-    return kind;
-}
-
-bool is_infix(TokenType type)
-{
-    int left_bp  = -1;
-    int right_bp = -1;
-
-    return get_infix_operator(type, &left_bp, &right_bp) == EXPR_BINARY_UNKNOWN ? false : true;
-}
-
-bool is_postfix(TokenType type, int* left_bp)
-{
-    switch (type)
-    {
-        case TOKEN_LEFT_SQUARE: *left_bp = 15; return true;
-        case TOKEN_LEFT_PAREN : *left_bp = 15; return true;
-        default:
-            *left_bp = -1;
-            return false;
-    }
-}
-
-Expr* construct_assign_expr(Arena* arena, char* identifier, Expr* expr)
-{
-    assert(identifier != NULL);
-    assert(expr       != NULL);
-
-    Expr identifier_expr = (Expr)
-    {
-        .kind = EXPR_PRIMARY,
-        .expr.primary = (ExprPrimary)
-        {
-            .kind = EXPR_PRIMARY_IDENTIFIER,
-            .primary.identifier = identifier,
-        }
-    };
-
-    Expr assign_expr = (Expr)
-    {
-        .kind = EXPR_BINARY,
-        .expr.binary = (ExprBinary)
-        {
-            .kind  = EXPR_BINARY_ASSIGN,
-            .left  = (Expr*) arena_push(arena, &identifier_expr, sizeof(Expr)),
-            .right = expr,
-        }
-    };
-
-    return (Expr*) arena_push(arena, &assign_expr, sizeof(Expr));
-}
-
-Expr** create_new_argument_list(Arena* arena, int old_argc, Expr** expr, Expr* lhs)
-{
-    // rhs->expr.fn.argv = create_new_argument_list(&parser->arena, rhs->expr.fn.argv, lhs);
-
-    Expr** new_expr = NULL;
-
-    new_expr = (Expr**) arena_push_empty(arena, (old_argc + 1) * sizeof(Expr*));
-
-    for (int i = 0; i < old_argc; ++i)
-    {
-        new_expr[i] = expr[i];
-    }
-    new_expr[old_argc] = lhs;
-
-    return new_expr;
 }

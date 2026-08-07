@@ -5,14 +5,13 @@
 
 Stmt               * parser_parse_stmts                (Parser* parser);
 
-Stmt               * parser_parse_stmt                 (Parser* parser);
+// Stmt               * parser_parse_stmt                 (Parser* parser);
 
 Stmt               * parser_parse_stmt_block           (Parser* parser);
 Stmt               * parser_parse_stmt_let             (Parser* parser);
 Stmt               * parser_parse_stmt_if              (Parser* parser, TokenType type);
 Stmt               * parser_parse_stmt_while           (Parser* parser);
 Stmt               * parser_parse_stmt_fn              (Parser* parser);
-StmtFnArg          * parser_parse_stmt_fn_arg          (Parser* parser);
 Stmt               * parser_parse_stmt_expr            (Parser* parser);
 Stmt               * parser_parse_stmt_break           (Parser* parser);
 Stmt               * parser_parse_stmt_continue        (Parser* parser);

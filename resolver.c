@@ -253,40 +253,14 @@ bool resolver_resolve_stmt_continue(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_fn_args(Resolver* resolver, StmtFn fn)
-{
-    if (!resolver_resolve_type_expr(resolver, fn.return_type))
-    {
-        return false;
-    }
-
-    for (int i = 0; i < fn.argc; ++i)
-    {
-        StmtFnArg* arg = fn.argv[i];
-
-        arg->decl = resolver_declare_variable(resolver, arg->identifier);
-        resolver_push_decl_to_context(resolver, arg->decl);
-
-        if (arg->type != NULL)
-        {
-            TypeExpr* te = arg->type;
-            if (!resolver_resolve_type_expr(resolver, te))
-            {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
 bool resolver_resolve_stmt_fn(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
     StmtFn* fn;
-    Stmt*  stmt = NULL;
-    Decl*  decl = NULL;
+    Stmt*    stmt = NULL;
+    Decl*    decl = NULL;
+    Decl* curr_fn = NULL;
     ResolverSnapshot snapshot;
 
     fn   = &curr_stmt->stmt.fn;
@@ -299,12 +273,12 @@ bool resolver_resolve_stmt_fn(Resolver* resolver)
 
     snapshot = resolver_get_context_snapshot(resolver);
 
-    if (!resolver_resolve_stmt_fn_args(resolver, *fn))
+    if (!resolver_resolve_fn_args(resolver, fn->argc, fn->argv, fn->return_type))
     {
         return false;
     }
 
-    Decl* curr_fn = resolver->curr_fn;
+    curr_fn = resolver->curr_fn;
     resolver->stmts = stmt;
     resolver->curr_fn = decl;
 
@@ -545,6 +519,49 @@ bool resolver_resolve_stmt(Resolver* resolver)
     return result;
 }
 
+bool resolver_resolve_expr_primary_lambda(Resolver* resolver, Expr* expr)
+{
+    Stmt* curr_stmt = resolver->stmts;
+
+    ExprPrimaryLambda* lambda = NULL;
+    Stmt*    stmt = NULL;
+    Decl*    decl = NULL;
+    Decl* curr_fn = NULL;
+    ResolverSnapshot snapshot;
+
+    lambda = &expr->expr.primary.primary.lambda;
+    stmt   = lambda->body;
+
+    // This is hacky asf, but it works, and that is what matters :)
+    decl = resolver_declare_variable(resolver, "");
+    lambda->decl = decl;
+    resolver_push_decl_to_context(resolver, decl);
+
+    snapshot = resolver_get_context_snapshot(resolver);
+
+    if (!resolver_resolve_fn_args(resolver, lambda->argc, lambda->argv, lambda->return_type))
+    {
+        return false;
+    }
+
+    curr_fn = resolver->curr_fn;
+    resolver->stmts = stmt;
+    resolver->curr_fn = decl;
+
+    // Assigning types to argument.
+    if (!resolver_resolve_stmt(resolver))
+    {
+        return false;
+    }
+
+    resolver->stmts = curr_stmt;
+    resolver->curr_fn = curr_fn;
+
+    resolver_restore_context_snapshot(resolver, snapshot);
+
+    return true;
+}
+
 // TODO: expand this later to functions, once we implement them.
 bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
 {
@@ -574,6 +591,7 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
 
         case EXPR_PRIMARY_STRUCT:
             expr_struct = expr->expr.primary.primary.structt;
+
             for (int i = 0; i < expr_struct.argc; ++i)
             {
                 ExprPrimaryStructField f = *(expr_struct.argv[i]);
@@ -582,6 +600,10 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
                     return false;
                 }
             }
+            break;
+
+        case EXPR_PRIMARY_LAMBDA:
+            resolver_resolve_expr_primary_lambda(resolver, expr);
             break;
 
         default:
@@ -894,6 +916,33 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
 
     fprintf(stderr, "[%s:%d] Type expression resolution: Failed to recognise type expression kind.\n", __FILE__, __LINE__);
     exit(1);
+}
+
+bool resolver_resolve_fn_args(Resolver* resolver, int argc, FnArg** argv, TypeExpr* return_type)
+{
+    if (!resolver_resolve_type_expr(resolver, return_type))
+    {
+        return false;
+    }
+
+    for (int i = 0; i < argc; ++i)
+    {
+        FnArg* arg = argv[i];
+
+        arg->decl = resolver_declare_variable(resolver, arg->identifier);
+        resolver_push_decl_to_context(resolver, arg->decl);
+
+        if (arg->type != NULL)
+        {
+            TypeExpr* te = arg->type;
+            if (!resolver_resolve_type_expr(resolver, te))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 ResolverSnapshot resolver_get_context_snapshot(Resolver* resolver)

@@ -167,7 +167,7 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
 
             for (int i = 0; i < stmt_fn.argc; ++i)
             {
-                StmtFnArg* arg = stmt_fn.argv[i];
+                FnArg* arg = stmt_fn.argv[i];
                 fprintf(file, "%s", arg->identifier);
                 decl_print(file, arg->decl);
                 fprintf(file, " : ");

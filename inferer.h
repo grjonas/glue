@@ -106,11 +106,9 @@ Type* inferer_decl_type_var_get_type       (Inferer* inferer, Decl* decl);
 void  inferer_decl_type_var_set_type       (Inferer* inferer, Decl* decl, Type* type);
 Type* inferer_decl_alias_get_type          (Inferer* inferer, Decl* decl);
 void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl, Type* type);
-
 void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
 TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
 void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
-
 TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
 TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
 TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl);
@@ -125,9 +123,11 @@ void  inferer_unify_free_binds (Inferer* inferer);
 
 TypeEnv inferer_get_curr_type_env(Inferer* inferer);
 void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
-void assert_generic_operator_type_is_valid(TypeKind type);
-bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
-bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst);
+void  assert_generic_operator_type_is_valid(TypeKind type);
+bool  inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
+bool  inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst);
+Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind);
+Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type);
 
 Span inferer_get_expr_span(Inferer* inferer, Expr* expr);
 

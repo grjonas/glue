@@ -1,9 +1,9 @@
 #ifndef PARSER_TYPE_EXPR_H
 #define PARSER_TYPE_EXPR_H
 
-#include "parser.h"
+#include "parser_definitions.h"
 
-TypeExpr* parser_parse_type_expr          (Parser* parser);
+// TypeExpr* parser_parse_type_expr          (Parser* parser);
 
 TypeExpr* parser_parse_type_expr_primitive(Parser* parser);
 TypeExpr* parser_parse_type_expr_list     (Parser* parser);

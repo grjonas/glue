@@ -1,6 +1,8 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include "dependencies.h"
+
 typedef enum   TokenType TokenType;
 typedef struct Token     Token    ;
 

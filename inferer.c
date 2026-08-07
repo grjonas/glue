@@ -303,6 +303,7 @@ bool inferer_unify_inner_left_type_alias(Inferer* inferer, TypeAlias left_alias,
 //     makes changes to both the left and right types.
 //     * 'false' on failure to attempt_unify,
 //     does not modify the types on either the left or right
+// TODO: Change the way 'TYPE_ALIAS' is unified.
 bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
 {
     assert(inferer    != NULL);
@@ -849,7 +850,7 @@ bool inferer_infer_expr_primary_struct(Inferer* inferer, Expr* expr, Type** type
 
     *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
     return true;
-}
+} 
 
 // Lambda functions are not yet implemented in this language.
 bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type** type)
@@ -860,22 +861,37 @@ bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type** type
     assert(expr->expr.primary.kind == EXPR_PRIMARY_LAMBDA);
     assert(type    != NULL);
     assert(*type   == NULL);
+    assert(expr->expr.primary.primary.lambda.decl->kind == DECL_VAR);
 
-    // IMPLEMENT:
-    UNREACHABLE;
-}
+    TypeEnv type_env;
+    ExprPrimaryLambda lambda = expr->expr.primary.primary.lambda;
+    Type* lambda_type = NULL;
+    Type* return_type = NULL;
 
-void O_inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
-{
-    assert(inferer != NULL);
-    assert(type    != NULL);
-    assert(*type   == NULL);
+    // What we need to do to infer the type of a function
+    // We need it go inside, and resolve the individual arguments.
+    // We also need to resolve all instances of return type.
 
-    TypeScheme* scheme = NULL;
+    type_env = inferer_get_curr_type_env(inferer);
+    inferer_decl_var_begin_inferrence(inferer, lambda.decl);
 
-    scheme = inferer_decl_var_get_scheme(inferer, decl);
-    assert(scheme != NULL);
-    inferer_instantiate(inferer, scheme, type);
+    return_type =
+        inferer_convert_return_kind_to_default_type
+            (inferer, lambda.return_type, lambda.decl->decl.var.return_kind);
+
+    lambda_type = inferer_get_fn_type(inferer, lambda.argc, lambda.argv, return_type);
+    inferer_decl_var_set_type(inferer, lambda.decl, lambda_type);
+
+    if (!inferer_infer_stmt(inferer, lambda.body))
+    {
+        return false;
+    }
+    // I think this is not needed.
+    // inferer_decl_var_generalize_inferred(inferer, fn.decl);
+    inferer_set_curr_type_env(inferer, type_env);
+
+    *type = lambda_type;
+    return true;
 }
 
 void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
@@ -1721,84 +1737,13 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     return true;
 }
 
-Type* inferer_get_stmt_fn_type(Inferer* inferer, StmtFn fn)
-{
-    assert(inferer != NULL);
-    assert(fn.decl->kind == DECL_VAR);
-
-    Type  type_mem;
-    Type* curr_type   = NULL;
-    Type* return_type = NULL;
-
-    switch (fn.decl->decl.var.return_kind)
-    {
-        case DECL_VAR_RETURN_NONE    :
-        case DECL_VAR_RETURN_NULL    :
-            return_type = builtin_type_nil;
-            break;
-
-        case DECL_VAR_RETURN_NOT_NULL:
-            if (fn.return_type == NULL)
-            {
-                return_type = inferer_create_free_type_var(inferer);
-            }
-            else
-            {
-                inferer_convert_type_expr(inferer, fn.return_type, &return_type);
-            }
-            break;
-    }
-    curr_type = return_type;
-
-    // Special case if the function has no arguments - the left argument is NULL.
-    if (fn.argc == 0)
-    {
-        type_mem = (Type)
-        {
-            .kind = TYPE_FN,
-            .type.fn = { .left = NULL, .right = curr_type }
-        };
-        curr_type = arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
-    }
-
-    for (int i = fn.argc - 1; i >= 0; --i)
-    {
-        StmtFnArg* arg      = fn.argv[i];
-        Type*      arg_type = NULL;
-
-        // NOTE: We NEVER generalize each the declarations of the function arguments.
-        inferer_decl_var_begin_inferrence(inferer, arg->decl);
-
-        if (arg->type != NULL)
-        {
-            inferer_convert_type_expr(inferer, arg->type, &arg_type);
-        }
-        else
-        {
-            arg_type = inferer_create_free_type_var(inferer);
-        }
-
-        inferer_decl_var_set_type(inferer, arg->decl, arg_type);
-
-        type_mem = (Type)
-        {
-            .kind = TYPE_FN,
-            .type.fn = { .left = arg_type, .right = curr_type }
-        };
-
-        curr_type = arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
-    }
-
-    return curr_type;
-}
-
 bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
 {
     assert(inferer != NULL);
 
-    bool is_successful = false;
-    Type* fn_type     = NULL;
     TypeEnv type_env;
+    Type* fn_type     = NULL;
+    Type* return_type = NULL;
 
     // What we need to do to infer the type of a function
     // We need it go inside, and resolve the individual arguments.
@@ -1807,11 +1752,14 @@ bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
     type_env = inferer_get_curr_type_env(inferer);
     inferer_decl_var_begin_inferrence(inferer, fn.decl);
 
-    fn_type = inferer_get_stmt_fn_type(inferer, fn);
+    return_type =
+        inferer_convert_return_kind_to_default_type
+            (inferer, fn.return_type, fn.decl->decl.var.return_kind);
+
+    fn_type = inferer_get_fn_type(inferer, fn.argc, fn.argv, return_type);
     inferer_decl_var_set_type(inferer, fn.decl, fn_type);
 
-    is_successful = inferer_infer_stmt(inferer, fn.body);
-    if (!is_successful)
+    if (!inferer_infer_stmt(inferer, fn.body))
     {
         return false;
     }
@@ -2327,6 +2275,83 @@ bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)
     }
 
     return false;
+}
+
+Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind)
+{
+    assert(inferer != NULL);
+
+    switch (return_kind)
+    {
+        case DECL_VAR_RETURN_NONE    :
+        case DECL_VAR_RETURN_NULL    :
+            return builtin_type_nil;
+
+        case DECL_VAR_RETURN_NOT_NULL:
+            if (type_expr == NULL)
+            {
+                return inferer_create_free_type_var(inferer);
+            }
+            else
+            {
+                Type* return_type = NULL;
+                inferer_convert_type_expr(inferer, type_expr, &return_type);
+                return return_type;
+            }
+    }
+
+    UNREACHABLE;
+}
+
+Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type)
+{
+    assert(inferer     != NULL);
+    assert(argv        != NULL);
+    assert(return_type != NULL);
+
+    Type  type_mem;
+    Type* curr_type = return_type;
+
+    // Special case if the function has no arguments - the left argument is NULL.
+    if (argc == 0)
+    {
+        type_mem = (Type)
+        {
+            .kind = TYPE_FN,
+            .type.fn = { .left = NULL, .right = curr_type }
+        };
+        curr_type = arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    }
+
+    for (int i = argc - 1; i >= 0; --i)
+    {
+        FnArg* arg   = argv[i];
+        Type*  arg_type = NULL;
+
+        // NOTE: We NEVER generalize each the declarations of the function arguments.
+        inferer_decl_var_begin_inferrence(inferer, arg->decl);
+
+        if (arg->type != NULL)
+        {
+            inferer_convert_type_expr(inferer, arg->type, &arg_type);
+        }
+        else
+        {
+            arg_type = inferer_create_free_type_var(inferer);
+        }
+
+        inferer_decl_var_set_type(inferer, arg->decl, arg_type);
+
+        type_mem = (Type)
+        {
+            .kind = TYPE_FN,
+            .type.fn = { .left = arg_type, .right = curr_type }
+        };
+
+        curr_type = arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    }
+
+    return curr_type;
 }
 
 Span inferer_get_expr_span(Inferer* inferer, Expr* expr)

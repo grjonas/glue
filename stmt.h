@@ -2,9 +2,8 @@
 #define STMT_H
 
 #include "expr.h"
-#include "decl_definition.h"
-
-typedef struct Stmt                Stmt               ;
+#include "ast_definitions.h"
+#include "fn_arg.h"
 
 typedef enum   StmtKind            StmtKind           ;
 typedef struct StmtBlock           StmtBlock          ;
@@ -12,7 +11,6 @@ typedef struct StmtLet             StmtLet            ;
 typedef struct StmtIf              StmtIf             ;
 typedef struct StmtElif            StmtElif           ;
 typedef struct StmtWhile           StmtWhile          ;
-typedef struct StmtFnArg           StmtFnArg          ;
 typedef struct StmtFn              StmtFn             ;
 typedef struct StmtReturn          StmtReturn         ;
 typedef struct StmtAlias           StmtAlias          ;
@@ -71,15 +69,8 @@ struct StmtFn
     Decl      * decl       ;
     TypeExpr  * return_type;
     Stmt      * body       ;
-    StmtFnArg** argv       ;
+    FnArg    ** argv       ;
     int         argc       ;
-};
-
-struct StmtFnArg
-{
-    char    * identifier;
-    Decl    * decl      ;
-    TypeExpr* type      ;
 };
 
 struct StmtReturn

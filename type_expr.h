@@ -1,11 +1,11 @@
 #ifndef TYPE_EXPR_H
 #define TYPE_EXPR_H
 
-#include "decl_definition.h"
+#include "ast_definitions.h"
 
-// 'type expression' - the type as written in a function signature, and contains positional, and other relevant information,
+// 'type expression' - the type as written in a function signature,
+// and contains positional, and other relevant information;
 // 'type proper' - contains the actual type information.
-typedef struct TypeExpr            TypeExpr           ;
 typedef enum   TypeExprKind        TypeExprKind       ;
 
 typedef struct TypeExprVariable    TypeExprVariable   ;

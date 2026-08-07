@@ -51,6 +51,7 @@ void resolver_free(Resolver* resolver);
 bool resolver_resolve_stmt     (Resolver* resolver);
 bool resolver_resolve_expr     (Resolver* resolver, Expr* expr);
 bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
+bool resolver_resolve_fn_args  (Resolver* resolver, int argc, FnArg** argv, TypeExpr* return_type);
 
 ResolverSnapshot resolver_get_context_snapshot    (Resolver* resolver);
 void     resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot);

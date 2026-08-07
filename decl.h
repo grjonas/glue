@@ -2,7 +2,7 @@
 #define DECL_H
 
 #include "dependencies.h"
-#include "decl_definition.h"
+#include "ast_definitions.h"
 #include "type_expr.h"
 #include "type.h"
 

@@ -13,9 +13,10 @@ all:
 		print.c \
 		scanner.c \
 		parser.c \
-		parser_stmt.c \
+		parser_definitions.c \
 		parser_type_expr.c \
 		parser_expr.c \
+		parser_stmt.c \
 		resolver.c \
 		inferer.c \
 	-o main -g \

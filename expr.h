@@ -2,12 +2,14 @@
 #define EXPR_H
 
 #include "type_expr.h"
+#include "token.h"
 #include "decl.h"
+#include "stmt.h"
+#include "fn_arg.h"
 
 // TODO: Refactor 'expr.h' and 'expr.c' to make it cleaner.
 // Also, replace the 'parser_throw_err_generic' functions as part of a larger rewrite.
 
-typedef struct Expr            Expr           ;
 typedef struct ExprPrimary     ExprPrimary    ;
 typedef struct ExprUnary       ExprUnary      ;
 typedef struct ExprBinary      ExprBinary     ;
@@ -21,7 +23,8 @@ typedef enum   ExprBinaryKind  ExprBinaryKind ;
 typedef struct ExprPrimaryList        ExprPrimaryList       ;
 typedef struct ExprPrimaryStructField ExprPrimaryStructField;
 typedef struct ExprPrimaryStruct      ExprPrimaryStruct     ;
-// typedef enum   ExprFnKind      ExprFnKind     ;
+typedef struct ExprPrimaryLambda      ExprPrimaryLambda     ;
+
 enum ExprKind
 {
     EXPR_PRIMARY,
@@ -100,6 +103,15 @@ struct ExprPrimaryStruct
     ExprPrimaryStructField** argv;
 };
 
+struct ExprPrimaryLambda
+{
+    Decl      * decl       ;
+    TypeExpr  * return_type;
+    Stmt      * body       ;
+    FnArg    ** argv       ;
+    int         argc       ;
+};
+
 struct ExprPrimary
 {
     ExprPrimaryKind kind;
@@ -115,6 +127,7 @@ struct ExprPrimary
         char* real               ; // These will have to be changed later i think.
         ExprPrimaryList   list   ;
         ExprPrimaryStruct structt;
+        ExprPrimaryLambda lambda ;
         char* obj                ; // Some kind of other object.
         Decl* decl               ;
     }
@@ -158,11 +171,17 @@ struct Expr
     expr;
 };
 
-// typedef enum
-// {
-//     LHS_OP_TYPE_ATOM  ,
-//     LHS_OP_TYPE_PREFIX,
-//     LHS_OP_TYPE_PARENS,
-// }
-// LhsOpType;
+ExprUnaryKind  get_prefix_operator(TokenType type, int* right_bp               );
+ExprBinaryKind get_infix_operator (TokenType type, int* left_bp , int* right_bp);
+ExprUnaryKind get_postfix_operator(TokenType type, int* right_bp               );
+
+bool is_infix(TokenType type);
+bool is_postfix(TokenType type, int* left_bp);
+
+Expr** create_new_argument_list(Arena* arena, int old_argc, Expr** expr, Expr* lhs);
+
+Expr* construct_assign_expr(Arena* arena, char* identifier, Expr* expr);
+
+void print_expr_op(Expr* op);
+
 #endif

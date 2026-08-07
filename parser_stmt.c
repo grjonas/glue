@@ -498,11 +498,11 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
 
-    char*       identifier  = NULL;
+    char      * identifier  = NULL;
     int         argc        = 0   ;
-    StmtFnArg** argv        = NULL;
-    TypeExpr*   return_type = NULL;
-    Stmt     *  body        = NULL;
+    FnArg    ** argv        = NULL;
+    TypeExpr  * return_type = NULL;
+    Stmt      * body        = NULL;
 
     Token token;
 
@@ -546,8 +546,8 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     // We check to see if the function is a prcedure or not.
     if (token.type != TOKEN_RIGHT_PAREN)
     {
-        StmtFnArg*  curr_arg = NULL;
-        StmtFnArg** tmp_ptr;
+        FnArg*  curr_arg = NULL;
+        FnArg** tmp_ptr;
 
         // If it's not, then we parse an argument.
         // Then, we check to see if the token after the parameter is a TOKEN_COMMA or TOKEN_LEFT_PAREN.
@@ -556,7 +556,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
         while (true)
         {
             // TODO: Make is so that arguments cannot have the same identifier as the function name.
-            curr_arg = parser_parse_stmt_fn_arg(parser);
+            curr_arg = parser_parse_fn_arg(parser);
             if (curr_arg == NULL)
             {
                 return NULL;
@@ -588,7 +588,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
 
         tmp_ptr = argv;
         argc = arrlen(tmp_ptr);
-        argv = (StmtFnArg**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(StmtFnArg*));
+        argv = (FnArg**) arena_push(&parser->arena, tmp_ptr, argc * sizeof(FnArg*));
         arrfree(tmp_ptr);
     }
     else
@@ -633,46 +633,6 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
 
     stmt_ptr = (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
     return stmt_ptr;
-}
-
-StmtFnArg* parser_parse_stmt_fn_arg(Parser* parser)
-{
-    StmtFnArg  stmt_fn_arg       ;
-    StmtFnArg* return_stmt = NULL;
-
-    Token token;
-    char* identifier       = NULL;
-    TypeExpr* type             = NULL;
-
-    stmt_fn_arg = (StmtFnArg)
-    {
-        .identifier = NULL,
-        .decl       = NULL,
-        .type       = NULL,
-    };
-
-    identifier = parser_parse_identifier(parser);
-    if (identifier == NULL)
-    {
-        return NULL;
-    }
-    stmt_fn_arg.identifier = identifier;
-
-    token = parser_peek(parser);
-    if (token.type == TOKEN_COLON)
-    {
-        parser_next(parser);
-
-        type = parser_parse_type_expr(parser);
-        if (type == NULL)
-        {
-            return NULL;
-        }
-        stmt_fn_arg.type = type;
-    }
-
-    return_stmt = (StmtFnArg*) arena_push(&parser->arena, &stmt_fn_arg, sizeof(StmtFnArg));
-    return return_stmt;
 }
 
 Stmt* parser_parse_stmt_expr(Parser* parser)
