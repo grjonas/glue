@@ -1,0 +1,36 @@
+type PieceKind
+| PAWN
+| ROOK
+| KNIGHT
+| BISHOP
+| KING
+| QUEEN
+end
+
+type PlayerKind
+| BLACK
+| WHITE
+end
+
+alias Board
+{
+	curr_player : PlayerKind
+	pieces      : 
+}
+
+fn chess()
+{
+	let board
+	let move
+
+	board = init_board()
+
+	while board:game_is_over() != true
+	do
+    	move = board:get_move()
+    	board:make_move()
+    end
+	
+	// Vicotry
+}
+

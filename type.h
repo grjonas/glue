@@ -25,7 +25,6 @@ enum TypeKind
     // Primitive types
     TYPE_NIL        ,
     TYPE_BOOL       ,
-    TYPE_NUMERIC    , // Abstract, represents the other numeric types.
     TYPE_NAT        ,
     TYPE_INT        ,
     TYPE_REAL       ,
@@ -126,6 +125,7 @@ struct Type
 };
 
 TypeStructField* type_struct_find_key(TypeStruct structt, char* key);
-bool type_kind_is_numeric(TypeKind kind);
+bool type_kind_is_numeric (TypeKind kind);
+bool type_kind_is_equality(TypeKind kind);
 
 #endif

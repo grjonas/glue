@@ -21,10 +21,24 @@ bool type_kind_is_numeric(TypeKind kind)
 {
     switch (kind)
     {
-        case TYPE_NUMERIC: return true;
         case TYPE_NAT : return true;
         case TYPE_INT : return true;
         case TYPE_REAL: return true;
+        default:
+            return false;
+    }
+}
+
+bool type_kind_is_equality(TypeKind kind)
+{
+    switch (kind)
+    {
+        case TYPE_NIL   : return true;
+        case TYPE_BOOL  : return true;
+        case TYPE_NAT   : return true;
+        case TYPE_INT   : return true;
+        case TYPE_REAL  : return true;
+        case TYPE_STRING: return true;
         default:
             return false;
     }

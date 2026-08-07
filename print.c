@@ -556,11 +556,6 @@ void type_print(FILE* file, Type* type)
             fprintf(file, "]");
             return;
 
-        case TYPE_NUMERIC    :
-            fprintf(file, "[NUMERIC]");
-            fprintf(file, "]");
-            return;
-
         case TYPE_NAT        :
             fprintf(file, "Nat");
             fprintf(file, "]");

@@ -134,6 +134,8 @@ void diagnostic_err_print(DiagnosticErr err)
         case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT         : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT\n"); return;
         case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD: printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD\n"); return;
         case DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS                             : printf(" DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS\n"); return;
+        case DIAGNOSTIC_TYPE_ISNT_NUMERIC                                      : printf(" DIAGNOSTIC_TYPE_ISNT_NUMERIC\n"); return;
+        case DIAGNOSTIC_TYPE_ISNT_EQUALITY                                     : printf(" DIAGNOSTIC_TYPE_ISNT_EQUALITY\n"); return;
     }
     UNREACHABLE;
 }

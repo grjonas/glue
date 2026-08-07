@@ -2,7 +2,6 @@
 
 static Type private_builtin_type_nil     = (Type) { .kind = TYPE_NIL     };
 static Type private_builtin_type_bool    = (Type) { .kind = TYPE_BOOL    };
-static Type private_builtin_type_numeric = (Type) { .kind = TYPE_NUMERIC };
 static Type private_builtin_type_nat     = (Type) { .kind = TYPE_NAT     };
 static Type private_builtin_type_int     = (Type) { .kind = TYPE_INT     };
 static Type private_builtin_type_real    = (Type) { .kind = TYPE_REAL    };
@@ -10,7 +9,6 @@ static Type private_builtin_type_string  = (Type) { .kind = TYPE_STRING  };
 
 static Type* builtin_type_nil     = &private_builtin_type_nil    ;
 static Type* builtin_type_bool    = &private_builtin_type_bool   ;
-static Type* builtin_type_numeric = &private_builtin_type_numeric;
 static Type* builtin_type_nat     = &private_builtin_type_nat    ;
 static Type* builtin_type_int     = &private_builtin_type_int    ;
 static Type* builtin_type_real    = &private_builtin_type_real   ;
@@ -88,81 +86,24 @@ void inferer_free(Inferer* inferer)
     };
 }
 
-// TODO: Think about repurposing Binds for unification of numerics.
-bool inferer_unify_inner_left_type_numeric_helper(Inferer* inferer, TypeKind left_kind, Type** right_ref)
-{
-    assert(inferer    != NULL);
-    assert(type_kind_is_numeric(left_kind));
-    assert(right_ref  != NULL);
-    assert(*right_ref != NULL);
-
-    Type* right = *right_ref;
-
-    if (right->kind == left_kind)
-    {
-        return true;
-    }
-    else if (right->kind == TYPE_NUMERIC)
-    {
-        // This is not very good..
-        switch (left_kind)
-        {
-            case TYPE_NAT : *right_ref = builtin_type_nat ; break;
-            case TYPE_INT : *right_ref = builtin_type_int ; break;
-            case TYPE_REAL: *right_ref = builtin_type_real; break;
-            default: UNREACHABLE;
-        }
-        // right->kind = left_kind;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-bool inferer_unify_inner_left_type_numeric(Inferer* inferer, Type** left_ref, Type** right_ref)
+bool inferer_unify_left_type_numeric(Inferer* inferer, Type** left_ref, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(left_ref   != NULL);
-    assert(right_ref  != NULL);
     assert(*left_ref  != NULL);
+    assert(right_ref  != NULL);
     assert(*right_ref != NULL);
+    assert(type_kind_is_numeric((*left_ref)->kind));
 
     Type* left  = *left_ref ;
     Type* right = *right_ref;
 
-    assert(type_kind_is_numeric(left->kind));
-
-    if (!type_kind_is_numeric(right->kind))
+    if (left->kind != right->kind)
     {
         return false;
     }
 
-    if (left->kind == right->kind)
-    {
-        return true;
-    }
-
-    switch (left->kind)
-    {
-        case TYPE_NAT    :
-        case TYPE_INT    :
-        case TYPE_REAL   :
-             return inferer_unify_inner_left_type_numeric_helper(inferer, left->kind, right_ref);
-
-        // Swap
-        case TYPE_NUMERIC:
-            if ((*right_ref)->kind != TYPE_NUMERIC)
-            {
-                return inferer_unify_inner_left_type_numeric(inferer, right_ref, left_ref);
-            }
-            else
-            {
-                return true;
-            }
-        default: UNREACHABLE;
-    }
+    return true;
 }
 
 bool inferer_unify_inner_left_type_list(Inferer* inferer, TypeList left_list, Type** right_ref)
@@ -370,7 +311,6 @@ bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
     assert(*left_ref  != NULL);
     assert(*right_ref != NULL);
 
-    bool is_successful = false;
     Type* left  = *left_ref ;
     Type* right = *right_ref;
 
@@ -382,36 +322,35 @@ bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
     // TODO: Rewrite this switch-case to account for attempt_unifying numerics properly.
     switch (left->kind)
     {
-        case TYPE_NUMERIC    :
         case TYPE_NAT        :
         case TYPE_INT        :
         case TYPE_REAL       :
-            is_successful = inferer_unify_inner_left_type_numeric(inferer, left_ref, right_ref); break;
+            return inferer_unify_left_type_numeric(inferer, left_ref, right_ref);
 
-        case TYPE_NIL        : is_successful = right->kind == TYPE_NIL        ; break;
-        case TYPE_BOOL       : is_successful = right->kind == TYPE_BOOL       ; break;
-        case TYPE_STRING     : is_successful = right->kind == TYPE_STRING     ; break;
-        case TYPE_LIST       : is_successful = inferer_unify_inner_left_type_list   (inferer, left->type.list   , right_ref); break;
-        case TYPE_STRUCT     : is_successful = inferer_unify_inner_left_type_struct (inferer, left->type.structt, right_ref); break;
-        case TYPE_FN         : is_successful = inferer_unify_inner_left_type_fn     (inferer, left->type.fn     , right_ref); break;
+        case TYPE_NIL        : return right->kind == TYPE_NIL        ;
+        case TYPE_BOOL       : return right->kind == TYPE_BOOL       ;
+        case TYPE_STRING     : return right->kind == TYPE_STRING     ;
+        case TYPE_LIST       : return inferer_unify_inner_left_type_list   (inferer, left->type.list   , right_ref);
+        case TYPE_STRUCT     : return inferer_unify_inner_left_type_struct (inferer, left->type.structt, right_ref);
+        case TYPE_FN         : return inferer_unify_inner_left_type_fn     (inferer, left->type.fn     , right_ref);
 
-        case TYPE_FREE_VAR   : is_successful = inferer_bind_variable_to_type(inferer, left_ref, right); break;
+        case TYPE_FREE_VAR   : return inferer_bind_variable_to_type(inferer, left_ref, right);
         case TYPE_BOUNDED_VAR: UNREACHABLE; // Should be instantiated before this point.
 
         case TYPE_APPLICATION:
-            is_successful = inferer_unify_inner_left_type_application
-                (inferer, left->type.application, right_ref); break;
+            return inferer_unify_inner_left_type_application
+                (inferer, left->type.application, right_ref);
 
         case TYPE_CONSTRUCTOR:
-            is_successful = inferer_unify_inner_left_type_constructor
-                (inferer, left->type.constructor, right_ref); break;
+            return inferer_unify_inner_left_type_constructor
+                (inferer, left->type.constructor, right_ref);
 
         case TYPE_ALIAS      :
-            is_successful = inferer_unify_inner_left_type_alias
-                (inferer, left->type.alias      , right_ref); break;
+            return inferer_unify_inner_left_type_alias
+                (inferer, left->type.alias      , right_ref);
     }
 
-    return is_successful;
+    return false;
 }
 
 bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, Span span)
@@ -500,7 +439,6 @@ Type* inferer_instantiate_type(Inferer* inferer, Type* type, DYNAMIC_ARRAY(Type*
 
     switch (type->kind)
     {
-        case TYPE_NUMERIC:
         case TYPE_NIL:
         case TYPE_BOOL:
         case TYPE_NAT:
@@ -624,6 +562,40 @@ void inferer_instantiate(Inferer* inferer, TypeScheme* scheme, Type** type)
     arrfree(quantified);
 }
 
+bool inferer_constrain_numeric(Inferer* inferer, Type** type_ref, Span span)
+{
+    assert(inferer   != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+
+    if (!type_kind_is_numeric(type->kind))
+    {
+        inferer_throw_err_type_isnt_numeric(inferer, span);
+        return false;
+    }
+
+    return true;
+}
+
+bool inferer_constrain_equality(Inferer* inferer, Type** type_ref, Span span)
+{
+    assert(inferer   != NULL);
+    assert(type_ref  != NULL);
+    assert(*type_ref != NULL);
+
+    Type* type = *type_ref;
+
+    if (!type_kind_is_equality(type->kind))
+    {
+        inferer_throw_err_type_isnt_equality(inferer, span);
+        return false;
+    }
+
+    return true;
+}
+
 void inferer_get_free_var_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* substs)
 {
     assert(inferer != NULL);
@@ -636,7 +608,6 @@ void inferer_get_free_var_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* 
     {
         case TYPE_NIL        :
         case TYPE_BOOL       :
-        case TYPE_NUMERIC    :
         case TYPE_NAT        :
         case TYPE_INT        :
         case TYPE_REAL       :
@@ -703,7 +674,6 @@ void inferer_apply_subst(Inferer* inferer, Type** type_ref, Subst subst)
     {
         case TYPE_NIL        :
         case TYPE_BOOL       :
-        case TYPE_NUMERIC    :
         case TYPE_NAT        :
         case TYPE_INT        :
         case TYPE_REAL       :
@@ -775,162 +745,6 @@ void inferer_decl_apply_subst(Inferer* inferer, Decl* decl, Subst subst)
         case DECL_ALIAS           : return;
         case DECL_TYPE            : return;
         case DECL_TYPE_CONSTRUCTOR: return;
-    }
-    UNREACHABLE;
-}
-
-void inferer_constrain_numeric_inner(Inferer* inferer, TypeConstraint* constraint, Type** type)
-{
-    assert(inferer    != NULL);
-    assert(constraint != NULL);
-    assert(type       != NULL);
-
-    switch ((*type)->kind)
-    {
-        case TYPE_NUMERIC:
-            *constraint = TYPE_CONSTRAINT_NUMERIC;
-            *type       = builtin_type_numeric   ;
-            return;
-
-        case TYPE_NAT    :
-            *constraint = TYPE_CONSTRAINT_NUMERIC;
-            *type       = builtin_type_numeric   ;
-            return;
-
-        case TYPE_INT    :
-            *constraint = TYPE_CONSTRAINT_NUMERIC;
-            *type       = builtin_type_numeric   ;
-            return;
-
-        case TYPE_REAL   :
-            *constraint = TYPE_CONSTRAINT_NUMERIC;
-            *type       = builtin_type_numeric   ;
-            return;
-
-        default: UNREACHABLE;
-    }
-}
-
-bool inferer_constrain_numeric(Inferer* inferer, TypeConstraint* constraint, Span span, Type** type)
-{
-    assert(inferer    != NULL);
-    assert(constraint != NULL);
-    assert(type       != NULL);
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_numeric))
-    {
-        inferer_constrain_numeric_inner(inferer, constraint, type);
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_nat))
-    {
-        *constraint = TYPE_CONSTRAINT_NAT;
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_int))
-    {
-        *constraint = TYPE_CONSTRAINT_INT;
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_real))
-    {
-        *constraint = TYPE_CONSTRAINT_REAL;
-        return true;
-    }
-
-    inferer_throw_err_type_failed_constraint_numeric(inferer, span);
-    return false;
-}
-
-bool inferer_constrain_equality(Inferer* inferer, TypeConstraint* constraint, Span span, Type** type)
-{
-    assert(inferer    != NULL);
-    assert(constraint != NULL);
-    assert(type       != NULL);
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_numeric))
-    {
-        inferer_constrain_numeric_inner(inferer, constraint, type);
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_nat))
-    {
-        *constraint = TYPE_CONSTRAINT_NAT;
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_int))
-    {
-        *constraint = TYPE_CONSTRAINT_INT;
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_real))
-    {
-        *constraint = TYPE_CONSTRAINT_REAL;
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_nil))
-    {
-        *constraint = TYPE_CONSTRAINT_NIL ;
-        return true;
-    }
-
-    if (inferer_attempt_unify(inferer, type, &builtin_type_bool))
-    {
-        *constraint = TYPE_CONSTRAINT_BOOL;
-        return true;
-    }
-
-    inferer_throw_err_type_failed_constraint_equality(inferer, span);
-    return false;
-}
-
-// This function takes a unary argument, and infers it's type.
-// Then, it attempts to constrain the type (which can faile, in which case returns false)
-// Furthermore, the return type is always a pointer to a builtin type.
-bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type)
-{
-    assert(inferer    != NULL);
-    assert(expr       != NULL);
-    assert(constraint != NULL);
-    assert(type       != NULL);
-    assert(*type      == NULL);
-
-    Type* new_type = NULL;
-
-    if (!inferer_infer_expr(inferer, expr, type))
-    {
-        return false;
-    }
-
-    switch (*constraint)
-    {
-        // These are special cases:
-        // Instead of unifying with a specific type, we go down the tree, and attempt to figure out which
-        // of a list of types is the correct one.
-        case TYPE_CONSTRAINT_NUMERIC    : return inferer_constrain_numeric (inferer, constraint, inferer_get_expr_span(inferer, expr), type);
-        case TYPE_CONSTRAINT_EQUALITY   : return inferer_constrain_equality(inferer, constraint, inferer_get_expr_span(inferer, expr), type);
-
-        case TYPE_CONSTRAINT_NIL        : return inferer_unify(inferer, type, &builtin_type_nil   , inferer_get_expr_span(inferer, expr));
-        case TYPE_CONSTRAINT_BOOL       : return inferer_unify(inferer, type, &builtin_type_bool  , inferer_get_expr_span(inferer, expr));
-        case TYPE_CONSTRAINT_NAT        : return inferer_unify(inferer, type, &builtin_type_nat   , inferer_get_expr_span(inferer, expr));
-        case TYPE_CONSTRAINT_INT        : return inferer_unify(inferer, type, &builtin_type_int   , inferer_get_expr_span(inferer, expr));
-        case TYPE_CONSTRAINT_REAL       : return inferer_unify(inferer, type, &builtin_type_real  , inferer_get_expr_span(inferer, expr));
-        case TYPE_CONSTRAINT_STRING     : return inferer_unify(inferer, type, &builtin_type_string, inferer_get_expr_span(inferer, expr));
-
-        case TYPE_CONSTRAINT_LIST       :
-            new_type = inferer_create_free_list_type(inferer);
-            return inferer_unify(inferer, type, &new_type, inferer_get_expr_span(inferer, expr));
-
-        case TYPE_CONSTRAINT_VAR        :
-            new_type = inferer_create_free_type_var(inferer);
-            return inferer_unify(inferer, type, &new_type, inferer_get_expr_span(inferer, expr));
     }
     UNREACHABLE;
 }
@@ -1145,14 +959,18 @@ bool inferer_infer_expr_unary_logical_operator(Inferer* inferer, Expr* expr, Typ
     assert(type        != NULL);
     assert(*type       == NULL);
 
-    ExprUnary unary = expr->expr.unary;
-    bool is_successful = false;
-    TypeConstraint unary_constraint = TYPE_CONSTRAINT_BOOL;
+    ExprUnary unary  = expr->expr.unary;
+    Type* unary_type = NULL;
 
-    is_successful = inferer_infer_expr_and_constrain
-        (inferer, unary.unary, &unary_constraint, type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, unary.unary, &unary_type))
+    {
         return false;
+    }
+
+    if (!inferer_unify(inferer, &unary_type, &builtin_type_bool, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
 
     return true;
 }
@@ -1165,14 +983,18 @@ bool inferer_infer_expr_unary_arithmetic_operator(Inferer* inferer, Expr* expr, 
     assert(type        != NULL);
     assert(*type       == NULL);
 
-    ExprUnary unary = expr->expr.unary;
-    bool is_successful = false;
-    TypeConstraint unary_constraint = TYPE_CONSTRAINT_NUMERIC;
+    ExprUnary unary  = expr->expr.unary;
+    Type* unary_type = NULL;
 
-    is_successful = inferer_infer_expr_and_constrain
-        (inferer, unary.unary, &unary_constraint, type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, unary.unary, &unary_type))
+    {
         return false;
+    }
+
+    if (!inferer_constrain_numeric(inferer, &unary_type, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
 
     return true;
 }
@@ -1204,34 +1026,31 @@ bool inferer_infer_expr_binary_arithmetic_operator(Inferer* inferer, Expr* expr,
     assert(type         != NULL);
     assert(*type        == NULL);
 
-    ExprBinary binary = expr->expr.binary;
-    bool is_successful = false;
-    Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
-    TypeConstraint left_constraint  = TYPE_CONSTRAINT_NUMERIC;
-    TypeConstraint right_constraint = TYPE_CONSTRAINT_NUMERIC;
+    Type* left  = NULL;
+    Type* right = NULL;
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.left , &left ))
+    {
         return false;
+    }
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.right, &right))
+    {
         return false;
+    }
 
-    // Now we need to make sure that types on both sides are the same type.
-    // This is to make sure that operators like (for example) 'Int -> Real -> Real' are not possible.
-    is_successful = inferer_unify
-        (inferer, &left_return_type, &right_return_type, inferer_get_expr_span(inferer, expr));
-    if (!is_successful)
+    if (!inferer_unify(inferer, &left, &right, inferer_get_expr_span(inferer, expr)))
+    {
         return false;
-    // if (left_constraint != right_constraint)
-    // {
-    //     inferer_throw_err_expr_binary_arithmetic_constraint_failed(inferer, expr);
-    //     return false;
-    // }
+    }
 
-    *type = left_return_type;
+    // If unification is successful, then left ~ right.
+    if (!inferer_constrain_numeric(inferer, &left, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
+
+    *type = left;
     return true;
 }
 
@@ -1243,27 +1062,29 @@ bool inferer_infer_expr_binary_comparison_operator(Inferer* inferer, Expr* expr,
     assert(type         != NULL);
     assert(*type        == NULL);
 
-    ExprBinary binary = expr->expr.binary;
-    bool is_successful = false;
-    Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
-    TypeConstraint left_constraint  = TYPE_CONSTRAINT_NUMERIC;
-    TypeConstraint right_constraint = TYPE_CONSTRAINT_NUMERIC;
+    Type* left  = NULL;
+    Type* right = NULL;
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.left , &left ))
+    {
         return false;
+    }
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.right, &right))
+    {
         return false;
+    }
 
-    // Now we need to make sure that types on both sides are the same type.
-    // This is to make sure that operators like (for example) 'Int -> Real -> Real' are not possible.
-    is_successful = inferer_unify
-        (inferer, &left_return_type, &right_return_type, inferer_get_expr_span(inferer, expr));
-    if (!is_successful)
+    if (!inferer_unify(inferer, &left, &right, inferer_get_expr_span(inferer, expr)))
+    {
         return false;
+    }
+
+    // If unification is successful, then left ~ right.
+    if (!inferer_constrain_numeric(inferer, &left, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
 
     *type = builtin_type_bool;
     return true;
@@ -1277,22 +1098,30 @@ bool inferer_infer_expr_binary_logical_operator(Inferer* inferer, Expr* expr, Ty
     assert(type         != NULL);
     assert(*type        == NULL);
 
-    ExprBinary binary = expr->expr.binary;
-    bool is_successful = false;
-    Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
-    TypeConstraint left_constraint  = TYPE_CONSTRAINT_BOOL;
-    TypeConstraint right_constraint = TYPE_CONSTRAINT_BOOL;
+    Type* left  = NULL;
+    Type* right = NULL;
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.left , &left ))
+    {
         return false;
+    }
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.right, &right))
+    {
         return false;
+    }
 
-    *type = builtin_type_bool;
+    if (!inferer_unify(inferer, &left, &right, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
+
+    // If unification is successful, then left ~ right.
+    if (!inferer_unify(inferer, &left, &builtin_type_bool, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
+
     return true;
 }
 
@@ -1304,26 +1133,27 @@ bool inferer_infer_expr_binary_equality_operator(Inferer* inferer, Expr* expr, T
     assert(type         != NULL);
     assert(*type        == NULL);
 
-    ExprBinary binary = expr->expr.binary;
-    bool is_successful = false;
-    Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
-    TypeConstraint left_constraint  = TYPE_CONSTRAINT_EQUALITY;
-    TypeConstraint right_constraint = TYPE_CONSTRAINT_EQUALITY;
+    Type* left  = NULL;
+    Type* right = NULL;
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
-    if (!is_successful)
-        return false;
-
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type );
-    if (!is_successful)
-        return false;
-
-    // Now we need to make sure that types on both sides are the same type.
-    // This is to make sure that operators like (for example) 'Int -> Real -> Real' are not possible.
-    if (left_constraint != right_constraint)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.left , &left ))
     {
-        inferer_throw_err_expr_binary_equality_constraint_failed(inferer, expr);
+        return false;
+    }
+
+    if (!inferer_infer_expr(inferer, expr->expr.binary.right, &right))
+    {
+        return false;
+    }
+
+    if (!inferer_unify(inferer, &left, &right, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
+
+    // If unification is successful, then left ~ right.
+    if (!inferer_constrain_equality(inferer, &left, inferer_get_expr_span(inferer, expr)))
+    {
         return false;
     }
 
@@ -1374,58 +1204,69 @@ bool inferer_infer_expr_binary_assign_operator(Inferer* inferer, Expr* expr, Typ
     assert(inferer != NULL);
     assert(expr    != NULL);
     assert(expr->kind == EXPR_BINARY);
-    assert(type    != NULL);
-    assert(*type   == NULL);
+    assert(type         != NULL);
+    assert(*type        == NULL);
 
-    ExprBinary binary = expr->expr.binary;
+    Type* left  = NULL;
+    Type* right = NULL;
 
-    bool is_successful = false;
-    Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
-    TypeConstraint left_constraint  = TYPE_CONSTRAINT_VAR;
-    TypeConstraint right_constraint = TYPE_CONSTRAINT_VAR;
-
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
-    if (!is_successful)
+    // TODO: Currently, we just infer both sides, and then try to unify them.
+    // This does not seem entirely correct to me, though I haven't though about it enough to know why.
+    // Therefore, this should probably be looked into.
+    if (!inferer_infer_expr(inferer, expr->expr.binary.left , &left ))
+    {
         return false;
+    }
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type );
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.right, &right))
+    {
         return false;
+    }
 
-    is_successful = inferer_unify(inferer, &left_return_type, &right_return_type, inferer_get_expr_span(inferer, expr));
-    if (!is_successful)
+    if (!inferer_unify(inferer, &left, &right, inferer_get_expr_span(inferer, expr)))
+    {
         return false;
+    }
 
-    *type = left_return_type;
+    *type = left;
     return true;
 }
 
-bool inferer_infer_expr_binary_index_operator(Inferer* inferer, Expr* expr, Type** type)
+bool inferer_infer_expr_binary_index_operator(Inferer* inferer, Expr* expr, Type** type) 
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
     assert(expr->kind == EXPR_BINARY);
-    assert(type    != NULL);
-    assert(*type   == NULL);
+    assert(type         != NULL);
+    assert(*type        == NULL);
 
-    ExprBinary binary = expr->expr.binary;
+    Type* left  = NULL;
+    Type* right = NULL;
+    Type* list  = NULL;
 
-    bool is_successful = false;
-    Type* left_return_type  = NULL;
-    Type* right_return_type = NULL;
-    TypeConstraint left_constraint  = TYPE_CONSTRAINT_LIST;
-    TypeConstraint right_constraint = TYPE_CONSTRAINT_NAT ;
-
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.left , &left_constraint , &left_return_type );
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.left , &left ))
+    {
         return false;
+    }
 
-    is_successful = inferer_infer_expr_and_constrain(inferer, binary.right, &right_constraint, &right_return_type );
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, expr->expr.binary.right, &right))
+    {
         return false;
+    }
 
-    *type = left_return_type;
+    list = inferer_create_free_list_type(inferer);
+    if (!inferer_unify(inferer, &left, &list, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
+    assert(list->kind == TYPE_LIST);
+
+    if (!inferer_unify(inferer, &right, &builtin_type_int, inferer_get_expr_span(inferer, expr)))
+    {
+        return false;
+    }
+
+    *type = list->type.list.type;
     return true;
 }
 
@@ -1473,52 +1314,6 @@ bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type)
     UNREACHABLE;
 }
 
-bool OLD__inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
-{
-    assert(inferer != NULL);
-    assert(expr    != NULL);
-    assert(expr->kind == EXPR_FN);
-    assert(type    != NULL);
-    assert(*type   == NULL);
-
-    ExprFn fn = expr->expr.fn;
-
-    bool is_successful   = false;
-    Type* caller_type   = NULL ;
-    Type* fn_type       = NULL ;
-    Type* curr_fn_ptr   = NULL ;
-    Type* curr_arg_type = NULL ;
-
-    if (!inferer_infer_expr(inferer, fn.caller, &caller_type))
-    {
-        return false;
-    }
-
-    fn_type = inferer_create_free_function_type(inferer, fn.argc);
-    curr_fn_ptr = fn_type;
-
-    for (int i = 0; i < fn.argc; ++i)
-    {
-        curr_arg_type = NULL;
-        if (!inferer_infer_expr(inferer, fn.argv[i], &curr_arg_type))
-        {
-            return false;
-        }
-
-        if (!inferer_unify
-            (inferer, &curr_fn_ptr->type.fn.left, &curr_arg_type,
-                inferer_get_expr_span(inferer, expr)))
-        {
-            return false;
-        }
-
-        curr_fn_ptr = fn_type->type.fn.right;
-    }
-
-    *type = curr_fn_ptr;
-    return true;
-}
-
 bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
@@ -1538,9 +1333,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
     }
     curr_caller_branch_type = caller_type;
 
-    for (int i = 0;
-         i < fn.argc;
-         ++i)
+    for (int i = 0; i < fn.argc; ++i)
     {
         assert(curr_caller_branch_type != NULL);
         if (curr_caller_branch_type->kind != TYPE_FN)
@@ -2403,7 +2196,6 @@ bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
     {
         case TYPE_NIL        : return true;
         case TYPE_BOOL       : return true;
-        case TYPE_NUMERIC    : return true;
         case TYPE_NAT        : return true;
         case TYPE_INT        : return true;
         case TYPE_REAL       : return true;
@@ -2643,5 +2435,27 @@ void inferer_throw_err_expr_fn_excessive_args(Inferer* inferer, Expr* expr)
     {
         .kind = DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS,
         .span = inferer_get_expr_span(inferer, expr),
+    });
+}
+
+void inferer_throw_err_type_isnt_numeric(Inferer* inferer, Span span)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_TYPE_ISNT_NUMERIC,
+        .span = span,
+    });
+}
+
+void inferer_throw_err_type_isnt_equality(Inferer* inferer, Span span)
+{
+    assert(inferer != NULL);
+
+    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_TYPE_ISNT_EQUALITY,
+        .span = span,
     });
 }

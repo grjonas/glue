@@ -82,6 +82,9 @@ bool  inferer_unify               (Inferer* inferer, Type** left_ref, Type** rig
 bool  inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ;
 void  inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
 void  inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
+bool  inferer_constrain_numeric   (Inferer* inferer, Type** type_ref, Span span)         ;
+bool  inferer_constrain_equality  (Inferer* inferer, Type** type_ref, Span span)         ;
+
 void  inferer_get_free_var_substs (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
 void  inferer_apply_subst         (Inferer* inferer, Type** type_ref, Subst subst)       ;
 void  inferer_decl_apply_subst    (Inferer* inferer, Decl* decl, Subst subst)            ;
@@ -136,5 +139,7 @@ void inferer_throw_err_expr_binary_equality_constraint_failed              (Infe
 void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);
 void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field (Inferer* inferer, Expr* expr);
 void inferer_throw_err_expr_fn_excessive_args                              (Inferer* inferer, Expr* expr);
+void inferer_throw_err_type_isnt_numeric                                   (Inferer* inferer, Span span);
+void inferer_throw_err_type_isnt_equality                                  (Inferer* inferer, Span span);
 
 #endif

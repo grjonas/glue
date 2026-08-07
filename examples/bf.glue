@@ -1,0 +1,132 @@
+# Brainf*** interpreter
+
+type Code
+| CodeIncrement
+| CodeDecrement
+| DataIncrement
+| DataDecrement
+| OutputByte
+| AcceptByte
+| JumpForward
+| JumpBackward
+end
+
+alias Data UInt8
+
+type InterpreterState
+| RUNNING
+| ERROR
+| STOPPED
+end
+
+alias Interpreter
+{
+    state : InterpreterState,
+    code  : { list : Code, ptr : Nat },
+    data  : { list : Data, ptr : Int },
+}
+
+fn string_to_code(str)
+do
+	let list = []
+	for c in str
+	do
+		let instruction = match c
+            | '>': CodeIncrement
+            | '<': CodeDecrement
+            | '+': DataIncrement
+            | '-': DataDecrement
+            | '.': OutputByte   
+            | ',': AcceptByte   
+            | '[': JumpForward  
+            | ']': JumpBackward 
+            | otherwise: return nothing
+        	end
+        list = list:push(instruction)
+    end
+
+    return list:just()
+end
+
+fn interpreter_init(code) : Interpreter
+do
+	return
+	{
+		code =
+		{
+    		list = code,
+    		ptr  = 0,
+		},
+		data =
+		{
+    		list = [],
+    		ptr  = 0,
+		},
+	}
+end
+
+fn is_running(interpreter)
+	return interpreter.state == RUNNING
+
+fn exec(interpreter)
+	if interpreter:is_running()
+		return interpreter
+
+
+	if interpreter.code.list:length() <= interpreter.code.ptr
+		return interpreter.state = STOPPED
+
+	# Not finished
+	return match interpreter.code.list[interpreter.code.ptr]
+        | CodeIncrement: interpreter.code.ptr += 1
+        | CodeDecrement:
+        	do
+            	if interpreter.code.ptr == 0
+            		return interpreter.state = ERROR
+
+            	interpreter.code.ptr -= 1
+        	end
+        | DataIncrement:
+        | DataDecrement:
+        | OutputByte   :
+        | AcceptByte   :
+        | JumpForward  :
+        | JumpBackward :
+        end
+do
+
+end
+
+fn main(argc, argv)
+do
+	let filename
+	let file
+	let code
+	let interpreter
+
+    if argc < 2
+    	exit(1)
+
+    filename = argv[1]
+    file =  match filename:open()
+        | nothing: exit(1)
+        | just(f): f
+        end
+    code = match file:read():string_to_code()
+    	| nothing: exit(1)
+    	| just(l): l
+		end
+
+	interpreter = code:interpreter_init()
+
+	while interpreter:is_running()
+		interpreter = interpreter:exec()
+end
+
+main(argc, argv)
+
+# push   : fn ([a], a) : [a]
+# pop    : fn ([a]) : [a]
+# map    : fn (fn (a) : b, [a]) : [b]
+# filter : fn (fn (a) : Bool, [a]) : [a]
+# append : fn ([a], [a]) : [a]

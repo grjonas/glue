@@ -52,6 +52,8 @@ enum DiagnosticErrKind
     DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT         ,
     DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD,
     DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS                             ,
+    DIAGNOSTIC_TYPE_ISNT_NUMERIC                                      ,
+    DIAGNOSTIC_TYPE_ISNT_EQUALITY                                     ,
 };
 
 struct DiagnosticErr
