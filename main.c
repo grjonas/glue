@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < arrlen(scanner.token_list); ++i)
     {
         Token t = scanner.token_list[i];
-
+        
         printf(
             "[%d:%d:%d]: %-20s '%.*s'\n",
             t.line,
@@ -45,9 +45,15 @@ int main(int argc, char** argv)
         );
     }
 
+    if (!diagnostic_component_is_empty(scanner.diagnostic_component))
+    {
+        diagnostic_component_print(scanner.diagnostic_component);
+        exit(1);
+    }
+
     Parser parser;
 
-    parser = init_parser(scanner);
+    parser = init_parser(&scanner);
 
     Stmt* stmt = parser_parse_stmts(&parser);
 

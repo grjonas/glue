@@ -53,9 +53,9 @@ struct Token
 {
     TokenType type;
     const char* start;
-    int32_t line;
-    int32_t column;
-    int32_t length;
+    int line;
+    int column;
+    int length;
 };
 
 #endif

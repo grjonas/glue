@@ -9,7 +9,6 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
     *parser = (Parser)
     {
         .filename = NULL                 ,
-        .state    = PARSER_STATE_FREED   ,
         .txt      = NULL                 ,
         .tokens   = NULL                 ,
         .start    = -1                   ,

@@ -2,17 +2,16 @@
 
 #define arrfree_and_set_null(op) do { arrfree(op); op = NULL; } while(0)
 
-Parser init_parser(Scanner scanner)
+Parser init_parser(Scanner* scanner)
 {
     Parser parser =
     {
-        .filename     = scanner.filename          ,
-        .state        = PARSER_STATE_UNPARSED     ,
-        .txt          = scanner.init              ,
-        .tokens       = scanner.token_list        ,
-        .start        = 0                         ,
-        .end          = arrlen(scanner.token_list),
-        .current      = 0                         ,
+        .filename     = scanner->filename          ,
+        .txt          = scanner->init              ,
+        .tokens       = scanner->token_list        ,
+        .start        = 0                          ,
+        .end          = arrlen(scanner->token_list),
+        .current      = 0                          ,
         .diagnostic_component = diagnostic_component_init(),
     };
 
@@ -30,7 +29,6 @@ void parser_free(Parser* parser)
     *parser = (Parser)
     {
         .filename = NULL              ,
-        .state    = PARSER_STATE_FREED,
         .txt      = NULL              ,
         .tokens   = NULL              ,
         .start    = -1                ,
@@ -63,29 +61,6 @@ Token parser_next(Parser* parser)
     if (token.type != TOKEN_ERROR)
         parser->current++;
     return token;
-}
-
-Token parser_jump(Parser* parser, int new_state)
-{
-    if (new_state < parser->start || parser->state < new_state)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Cannot jump out of bounds.\n", __FILE__, __LINE__);
-        exit(1);
-    }
-
-    parser->current = new_state;
-    return parser_peek(parser);
-}
-
-Token parser_restore(Parser* parser, int old_state)
-{
-    if (parser->current < old_state)
-    {
-        fprintf(stderr, "[%s:%d] Statement parsing: Cannot restore state to new state.\n", __FILE__, __LINE__);
-        exit(1);
-    }
-
-    return parser_jump(parser, old_state);
 }
 
 bool parser_skip(Parser* parser, bool (*predicate)(TokenType))
@@ -198,6 +173,16 @@ Span parser_get_token_span(Parser* parser, Token token)
         .length   = token.length    ,
     };
 }
+
+bool is_newline(TokenType type)
+{
+    switch (type)
+    {
+        case TOKEN_SEMICOLON: return true;
+        case TOKEN_NEWLINE  : return true;
+        default: return false;
+    }
+}   
 
 void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line)
 {

@@ -5,7 +5,6 @@
 #include "stmt.h"
 #include "type_expr.h"
 #include "expr.h"
-#include "diagnostic.h"
 
 typedef struct Parser       Parser      ;
 typedef enum   ParserState  ParserState ;
@@ -26,7 +25,6 @@ struct Parser
     DYNAMIC_ARRAY(Token* tokens);
 
     // State
-    ParserState state ;
     int start  ;
     int end    ;
     int current;
@@ -36,14 +34,12 @@ struct Parser
     DiagnosticComponent* diagnostic_component;
 };
 
-Parser init_parser(Scanner scanner);
+Parser init_parser(Scanner* scanner);
 void parser_free(Parser* parser);
 
 Token parser_peek(Parser* parser);
 Token parser_next(Parser* parser);
 
-Token parser_jump(Parser* parser, int new_state);
-Token parser_restore(Parser* parser, int old_state);
 bool  parser_skip(Parser* parser, bool (*predicate)(TokenType));
 
 char* copy_string_to_arena(Arena* arena, const char* str, int length);
@@ -53,6 +49,7 @@ bool  parser_expect_token(Parser* parser, TokenType type);
 bool  parser_dont_except_token(Parser* parser, TokenType type);
 
 Span  parser_get_token_span(Parser* parser, Token token);
+bool  is_newline(TokenType type);
 
 void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line);
 void parser_throw_err_unexpected_token(Parser* parser, Token token, TokenType expected[], int expected_count);

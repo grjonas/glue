@@ -135,10 +135,11 @@ Scanner init_scanner(const char* filename)
     {
         .filename = filename,
         .init = (char*)txt,
-        .start = txt,
         .current = txt,
-        .token_list = NULL
-    };
+        .token_list = NULL,
+        .diagnostic_component = diagnostic_component_init(),
+    }; 
+
     return scanner;
 }
 
@@ -147,351 +148,206 @@ void free_scanner(Scanner* scanner)
     arrfree(scanner->token_list);
     free(scanner->init);
     scanner->init = NULL;
-    scanner->start = NULL;
     scanner->current = NULL;
+    diagnostic_component_free(&scanner->diagnostic_component);
+    scanner->diagnostic_component = NULL;
 }
 
-bool scanner_is_at_end(Scanner scanner)
+bool scanner_is_at_end(Scanner* scanner)
 {
-    return scanner.current[0] == '\0';
+    assert(scanner != NULL);
+
+    return scanner->current[0] == '\0';
 }
 
-
-char scanner_peek(Scanner scanner)
+bool scanner_peek_char(Scanner* scanner, char* char_ref)
 {
-    return scanner.current[0];
-}
+    assert(scanner  != NULL);
 
-char scanner_consume(Scanner* scanner)
-{
-    char c = scanner_peek(*scanner);
-    scanner->current++;
-    return c;
-}
+    char charr;
 
-bool scanner_match(Scanner* scanner, char to_match)
-{
-    if (scanner_is_at_end(*scanner)) return false;
-    char peeked = scanner_peek(*scanner);
-    if (peeked != to_match) return false;
-    scanner->current++;
+    if (scanner_is_at_end(scanner))
+    {
+        return false;
+    }
+
+    charr = scanner->current[0];
+    if (char_ref != NULL)
+    {
+        *char_ref = charr;
+    }
     return true;
 }
 
-void scanner_skip_whitespace(Scanner* scanner)
+bool scanner_consume_char(Scanner* scanner, char* char_ref)
 {
-    while (true)
+    assert(scanner  != NULL);
+
+    char charr;
+
+    if (!scanner_peek_char(scanner, &charr))
     {
-        char c = scanner_peek(*scanner);
-        switch (c)
+        scanner_throw_err_reached_eof(scanner);
+        return false;
+    }
+
+    if (is_char_newline(charr))
+    {
+        scanner->line++;
+        scanner->column = 0;
+    }
+    else
+    {
+        scanner->column++;
+    }
+    scanner->current++;
+
+    if (char_ref != NULL)
+    {
+        *char_ref = charr;
+    }
+    return true;
+}
+
+bool scanner_accept_char(Scanner* scanner, char charr)
+{
+    assert(scanner  != NULL);
+
+    char recv_char;
+
+    if (!scanner_peek_char(scanner, &recv_char) || recv_char != charr)
+    {
+        return false;
+    }
+
+    assert(scanner_consume_char(scanner, NULL));
+    return true;
+}
+
+bool scanner_expect_char(Scanner* scanner, char charr)
+{
+    assert(scanner != NULL);
+
+    if (!scanner_accept_char(scanner, charr))
+    {
+        scanner_throw_err_unexpected_char(scanner, charr);
+        return false;
+    }
+
+    return true;
+}
+
+bool scanner_peek_str(Scanner* scanner, int length, const char** str_ref)
+{
+    assert(scanner != NULL);
+
+    const char* str = scanner->current;
+
+    for (int i = 0; i < length; ++i)
+    {
+        char recv_char;
+
+        if (!scanner_peek_char(scanner, &recv_char))
         {
-            case ' ':
-            case '\t':
-            case '\r':
-                scanner_consume(scanner);
-                scanner->column++;
-                break;
-            default:
-                return;
+            return false;
+        }
+    }
+
+    if (str_ref != NULL)
+    {
+        *str_ref = str;
+    }
+    return true;
+}
+
+bool scanner_consume_str(Scanner* scanner, int length, const char** str_ref)
+{
+    assert(scanner != NULL);
+
+    if (!scanner_peek_str(scanner, length, str_ref))
+    {
+        scanner_throw_err_reached_eof(scanner);
+        return false;
+    }
+
+    for (int i = 0; i < length; ++i)
+    {
+        assert(scanner_consume_char(scanner, NULL));
+    }
+    return true;
+}
+
+bool scanner_accept_str(Scanner* scanner, int length, const char* str)
+{
+    assert(scanner  != NULL);
+    assert(str      != NULL);
+
+    const char* recv_str = NULL;
+
+    if (!scanner_peek_str(scanner, length, &recv_str))
+    {
+        return false;
+    }
+
+    // We see whether the received string actually matches what we want
+    for (int i = 0; i < length; ++i)
+    {
+        if (recv_str[i] != str[i])
+        {
+            return false;
+        }
+    }
+
+    assert(scanner_consume_str(scanner, length, NULL));
+    return true;
+}
+
+bool scanner_expect_str(Scanner* scanner, int length, const char* str)
+{
+    assert(scanner  != NULL);
+    assert(str      != NULL);
+
+    if (!scanner_accept_str(scanner, length, str))
+    {
+        scanner_throw_err_unexpected_str(scanner, length, str);
+        return false;
+    }
+
+    return true;
+}
+
+void scanner_consume_until_inclusive(Scanner* scanner, bool (*predicate)(char))
+{
+    assert(scanner   != NULL);
+    assert(predicate != NULL);
+
+    char charr;
+
+    while (scanner_peek_char(scanner, &charr))
+    {
+        scanner_consume_char(scanner, NULL);
+        if (predicate(charr))
+        {
+            break;
         }
     }
 }
 
-Token scanner_scan_token(Scanner* scanner)
+void scanner_consume_until_exclusive(Scanner* scanner, bool (*predicate)(char))
 {
-    scanner_skip_whitespace(scanner);
-    scanner->start = scanner->current;
+    assert(scanner   != NULL);
+    assert(predicate != NULL);
 
-    if (scanner_is_at_end(*scanner)) return scanner_make_token(scanner, TOKEN_EOF, 0, 1);
+    char charr;
 
-#define increment_column(col) scanner->column+=(col)
-    Token rt;     // return_token
-    char c = scanner_consume(scanner);
-    switch (c)
+    while (scanner_peek_char(scanner, &charr))
     {
-        // Newline
-        case '\n':
-            rt =  scanner_make_token(scanner, TOKEN_NEWLINE     , 1, 0);
-            scanner->column = 0;
-            return rt;
-
-        //TOKEN_BANG      , TOKEN_BANG_EQUAL   ,
-        //TOKEN_EQUAL     , TOKEN_EQUAL_EQUAL  , TOKEN_EQUAL_GREATER,
-        //TOKEN_LESS      , TOKEN_LESS_EQUAL   ,
-        //TOKEN_GREATER   , TOKEN_GREATER_EQUAL,
-        //TOKEN_DOT       , TOKEN_DOT_DOT      ,
-        //TOKEN_COLON     , TOKEN_COLON_COLON  ,
-        //TOKEN_PLUS      , TOKEN_PLUS_EQUAL   ,
-        //TOKEN_MINUS     , TOKEN_MINUS_EQUAL  ,
-        //TOKEN_STAR      , TOKEN_STAR_EQUAL   ,
-        //TOKEN_SLASH     , TOKEN_SLASH_EQUAL  ,
-        //TOKEN_PERCENT   , TOKEN_PERCENT_EQUAL,
-
-        // One character tokens
-        case '(': return scanner_make_token(scanner, TOKEN_LEFT_PAREN  , 0, 1);
-        case ')': return scanner_make_token(scanner, TOKEN_RIGHT_PAREN , 0, 1);
-        case '{': return scanner_make_token(scanner, TOKEN_LEFT_BRACE  , 0, 1);
-        case '}': return scanner_make_token(scanner, TOKEN_RIGHT_BRACE , 0, 1);
-        case '[': return scanner_make_token(scanner, TOKEN_LEFT_SQUARE , 0, 1);
-        case ']': return scanner_make_token(scanner, TOKEN_RIGHT_SQUARE, 0, 1);
-        case '|': return scanner_make_token(scanner, TOKEN_PIPE        , 0, 1);
-        case ',': return scanner_make_token(scanner, TOKEN_COMMA       , 0, 1);
-        case ';': return scanner_make_token(scanner, TOKEN_SEMICOLON   , 0, 1);
-
-        // One or more character tokens
-        case '!':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_BANG_EQUAL   , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_BANG         , 0, 1);
-        case '=':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_EQUAL_EQUAL  , 0, 2);
-            else if (scanner_match(scanner, '>'))
-                return scanner_make_token(scanner, TOKEN_EQUAL_GREATER, 0, 1);
-            else
-                return scanner_make_token(scanner, TOKEN_EQUAL        , 0, 1);
-        case '+':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_PLUS_EQUAL  , 0, 2);
-            else if (scanner_match(scanner, '+'))
-                return scanner_make_token(scanner, TOKEN_PLUS_PLUS   , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_PLUS        , 0, 1);
-        case '-':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_MINUS_EQUAL  , 0, 2);
-            else if (scanner_match(scanner, '-'))
-                return scanner_make_token(scanner, TOKEN_MINUS_MINUS  , 0, 2);
-            else if (scanner_match(scanner, '>'))
-                return scanner_make_token(scanner, TOKEN_MINUS_GREATER, 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_MINUS        , 0, 1);
-        case '*':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_STAR_EQUAL  , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_STAR        , 0, 1);
-        case '/':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_SLASH_EQUAL  , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_SLASH        , 0, 1);
-        case '%':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_PERCENT_EQUAL, 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_PERCENT      , 0, 1);
-        case '<':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_LESS_EQUAL   , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_LESS         , 0, 1);
-        case '>':
-            if (scanner_match(scanner, '='))
-                return scanner_make_token(scanner, TOKEN_GREATER_EQUAL, 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_GREATER      , 0, 1);
-        case '.':
-            if (scanner_match(scanner, '.'))
-                return scanner_make_token(scanner, TOKEN_DOT_DOT      , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_DOT          , 0, 1);
-        case ':':
-            if (scanner_match(scanner, ':'))
-                return scanner_make_token(scanner, TOKEN_COLON_COLON  , 0, 2);
-            else
-                return scanner_make_token(scanner, TOKEN_COLON        , 0, 1);
-
-        // Literals
-        case '#': return scanner_scan_line_comment(scanner);
-        case '"': return scanner_scan_string(scanner);
-        default:
-            if (is_digit(c))
-                    return scanner_scan_number(scanner);
-            else if (is_alpha(c))
-            {
-                switch (c)
-                {
-                    case 'N': // Nil
-                        if (scanner_match_string(scanner, "il", 1))
-                            rt = scanner_make_token(scanner, TOKEN_NIL_T, 0, 2);
-                        else if (scanner_match_string(scanner, "at", 1))
-                            rt = scanner_make_token(scanner, TOKEN_NAT, 0, 2);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'B': // Bool
-                        if (scanner_match_string(scanner, "ool", 1))
-                            rt = scanner_make_token(scanner, TOKEN_BOOL, 0, 3);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'I': // Int
-                        if (scanner_match_string(scanner, "nt", 1))
-                            rt = scanner_make_token(scanner, TOKEN_INT, 0, 2);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'R': // Real
-                        if (scanner_match_string(scanner, "eal", 1))
-                            rt = scanner_make_token(scanner, TOKEN_REAL, 0, 3);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'l': // let, loop
-                        if (scanner_match_string(scanner, "et", 1))
-                            rt = scanner_make_token(scanner, TOKEN_LET, 0, 2);
-                        else if (scanner_match_string(scanner, "oop", 1))
-                            rt = scanner_make_token(scanner, TOKEN_LOOP, 0, 3);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 't': // type, true
-                        if (scanner_match_string(scanner, "ype", 1))
-                            rt = scanner_make_token(scanner, TOKEN_TYPE, 0, 3);
-                        else if (scanner_match_string(scanner, "rue", 1))
-                            rt = scanner_make_token(scanner, TOKEN_TRUE, 0, 3);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'e': // effect, end, elif, else
-                        if (scanner_match_string(scanner, "nd", 1))
-                            rt = scanner_make_token(scanner, TOKEN_END, 0, 2);
-                        else if (scanner_match_string(scanner, "lif", 1))
-                            rt = scanner_make_token(scanner, TOKEN_ELIF, 0, 3);
-                        else if (scanner_match_string(scanner, "lse", 1))
-                            rt = scanner_make_token(scanner, TOKEN_ELSE, 0, 3);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'n': // nil
-                        if (scanner_match_string(scanner, "il", 1))
-                            rt = scanner_make_token(scanner, TOKEN_NIL_V, 0, 2);
-                        else if (scanner_match_string(scanner, "ot", 1))
-                            rt = scanner_make_token(scanner, TOKEN_NOT, 0, 2);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'f': // false, for, fn
-                        if (scanner_match_string(scanner, "alse", 1))
-                            rt = scanner_make_token(scanner, TOKEN_FALSE, 0, 4);
-                        else if (scanner_match_string(scanner, "or", 1))
-                            rt = scanner_make_token(scanner, TOKEN_FOR, 0, 2);
-                        else if (scanner_match_string(scanner, "n", 1))
-                            rt = scanner_make_token(scanner, TOKEN_FN, 0, 1);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'a': // and, alias
-                        if (scanner_match_string(scanner, "nd", 1))
-                            rt = scanner_make_token(scanner, TOKEN_AND, 0, 2);
-                        else if (scanner_match_string(scanner, "lias", 1))
-                            rt = scanner_make_token(scanner, TOKEN_ALIAS, 0, 4);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'o': // or
-                        if (scanner_match_string(scanner, "r", 1))
-                            rt = scanner_make_token(scanner, TOKEN_OR, 0, 1);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'd': // do
-                        if (scanner_match_string(scanner, "o", 1))
-                            rt = scanner_make_token(scanner, TOKEN_DO, 0, 1);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'i': // if, in
-                        if (scanner_match_string(scanner, "f", 1))
-                            rt = scanner_make_token(scanner, TOKEN_IF, 0, 1);
-                        else if (scanner_match_string(scanner, "n", 1))
-                            rt = scanner_make_token(scanner, TOKEN_IN, 0, 1);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'w': // while
-                        if (scanner_match_string(scanner, "hile", 1))
-                            rt = scanner_make_token(scanner, TOKEN_WHILE, 0, 4);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'b': // break
-                        if (scanner_match_string(scanner, "reak", 1))
-                            rt = scanner_make_token(scanner, TOKEN_BREAK, 0, 4);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'c': // ctl, continue
-                        if (scanner_match_string(scanner, "ontinue", 1))
-                            rt = scanner_make_token(scanner, TOKEN_CONTINUE, 0, 7);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'r': // return
-                        if (scanner_match_string(scanner, "eturn", 1))
-                            rt = scanner_make_token(scanner, TOKEN_RETURN, 0, 5);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    case 'm': // match
-                        if (scanner_match_string(scanner, "atch", 1))
-                            rt = scanner_make_token(scanner, TOKEN_MATCH, 0, 4);
-                        else
-                            rt = scanner_scan_identifier(scanner);
-                        break;
-
-                    // case 'p': // print
-                    //     if (scanner_match_string(scanner, "rint", 1))
-                    //         rt = scanner_make_token(scanner, TOKEN_PRINT, 0, 4);
-                    //     else
-                    //         rt = scanner_scan_identifier(scanner);
-                    //     break;
-
-                    default:
-                        rt = scanner_scan_identifier(scanner);
-                        break;
-                }
-
-                scanner->column++;
-                return rt;
-            }
-            // I can already tell that this is going to cause some issues later down the road...
-            // But today is not tomorrow, so that'll be the problem of future me :D
-            else if (c == '_')
-            {
-                char c = scanner_peek(*scanner);
-                if (is_identifier_middle(c) || is_identifier_end(c))
-                {
-                    rt = scanner_scan_identifier(scanner);
-                    scanner->column++;
-                    return rt;
-                }
-                else
-                    return scanner_make_token(scanner, TOKEN_UNDERSCORE, 0, 1);
-            }
+        if (predicate(charr))
+        {
+            break;
+        }
+        scanner_consume_char(scanner, NULL);
     }
-#undef increment_column
-
-    return scanner_make_error_token(*scanner, "Encountered unexpected character");
 }
 
 void scanner_add_token(Scanner* scanner, Token token)
@@ -499,129 +355,465 @@ void scanner_add_token(Scanner* scanner, Token token)
     arrput(scanner->token_list, token);
 }
 
-Token scanner_make_token(Scanner* scanner, TokenType token_type, int32_t lines_to_skip, int32_t columns_to_skip)
+Token scanner_create_init_token(Scanner* scanner, TokenType token_type)
 {
-    Token token =
+    return (Token)
     {
-        .type = token_type,
-        .start = scanner->start,
-        .line = scanner->line,
-        .column = scanner->column,
-        .length = scanner->current - scanner->start
+        .type   = token_type      ,
+        .start  = scanner->current,
+        .line   = scanner->line   ,
+        .column = scanner->column ,
+        .length = 0               ,
     };
-    scanner->line   += lines_to_skip;
-    scanner->column += columns_to_skip;
-    //fprintf(stderr, "scanner_make_token [%d:%d]: %s - %s\n", token.line, token.column, token_type_name(token.type), token.start);
-    return token;
 }
 
-Token scanner_make_error_token(Scanner scanner, const char* err_msg)
+ScannerResult scanner_scan_comment(Scanner* scanner, Token* token_ref)
 {
-    Token token =
-    {
-        .type = TOKEN_ERROR,
-        .start = err_msg,
-        .line = scanner.line,
-        .column = scanner.column,
-        .length = strlen(err_msg)
-    };
-    return token;
-}
+    assert(scanner != NULL);
 
-void scanner_scan_tokens(Scanner* scanner)
-{
-    while (!scanner_is_at_end(*scanner))
+    Token token;
+    const char* start = scanner->current;
+
+    token = scanner_create_init_token(scanner, TOKEN_COMMENT);
+
+    if (!scanner_accept_char(scanner, '#'))
     {
-        Token token = scanner_scan_token(scanner);
-        if (token.type == TOKEN_ERROR)
-        {
-            fprintf(stderr, "[%d:%d]: %s\n", token.line, token.column, token.start);
-            exit(1);
-        }
-        scanner_add_token(scanner, token);
+        return SCANNER_RESULT_RECOVERABLE_ERROR;
     }
 
-    for (int i = 0; i < arrlen(scanner->token_list); ++i)
+    scanner_consume_until_inclusive(scanner, is_char_newline);
+    token.length = scanner->current - start;
+
+    if (token_ref != NULL)
     {
-        Token t = scanner->token_list[i];
-        if (t.type == TOKEN_COMMENT)
-        {
-            arrdel(scanner->token_list, i);
-            i--;
-        }
+        *token_ref = token;
     }
+    return SCANNER_RESULT_SUCCESS;
 }
 
-Token scanner_scan_string(Scanner* scanner)
+ScannerResult scanner_scan_str(Scanner* scanner, Token* token_ref)
 {
-    Token token =
-    {
-        .type   = TOKEN_STRING,
-        .start  = scanner->start,
-        .line   = scanner->line,
-        .column = scanner->column,
-        .length = 0
-    };
+    assert(scanner != NULL);
+
+    Token token;
+    char charr;
+    const char* start = scanner->current;
     bool is_escaping = false;
 
-    scanner->column++;
+    token = scanner_create_init_token(scanner, TOKEN_STRING);
+
+    if (!scanner_accept_char(scanner, '"'))
+    {
+        return SCANNER_RESULT_RECOVERABLE_ERROR;
+    }
+
     do
     {
-        char c;
-
-        if (scanner_is_at_end(*scanner))
+        if (!scanner_peek_char(scanner, &charr))
         {
-            fprintf(stderr, "Failed to find end of string.\n");
-            exit(1);
+            scanner_throw_err_str_non_terminating(scanner);
+            return SCANNER_RESULT_IRRECOVERABLE_ERROR;
         }
+        assert(scanner_consume_char(scanner, NULL));
 
-        c = scanner_consume(scanner);
-        scanner->column++;
-        switch (c)
+        if (charr == '\\')
         {
-            case '\\':
-                is_escaping = is_escaping ? false : true;
-                break;
-            case '\n':
-                scanner->line++;
-                scanner->column=0;
-                break;
-            case '"':
-                if (!is_escaping)
-                {
-                    token.length = scanner->current - scanner->start;
-                    return token;
-                }
-                break;
+            is_escaping = is_escaping ? false : true;
         }
+    }
+    while (charr != '"' || is_escaping);
 
-    } while(true);
-}
+    token.length = scanner->current - start;
 
-Token scanner_scan_line_comment(Scanner* scanner)
-{
-    Token token =
+    if (token_ref != NULL)
     {
-        .type   = TOKEN_COMMENT,
-        .start  = scanner->start,
-        .line   = scanner->line,
-        .column = scanner->column,
-        .length = 0
-    };
-    char c;
-
-    scanner->column++;
-    while (!scanner_is_at_end(*scanner) && (c = scanner_consume(scanner)) != '\n');
-
-    scanner->column = 0;
-    scanner->line++;
-    token.length = scanner->current - scanner->start;
-    return token;
+        *token_ref = token;
+    }
+    return SCANNER_RESULT_SUCCESS;
 }
 
-bool is_digit(char c)
+ScannerResult scanner_scan_number(Scanner* scanner, Token* token_ref)
 {
-    switch(c)
+    assert(scanner != NULL);
+
+    Token token;
+    char charr;
+    const char* start = scanner->current;
+
+    token = scanner_create_init_token(scanner, TOKEN_INTEGER);
+    if (!scanner_peek_char(scanner, &charr) || not_digit(charr))
+    {
+        return SCANNER_RESULT_RECOVERABLE_ERROR;
+    }
+    scanner_consume_until_exclusive(scanner, not_digit);
+    scanner_peek_char(scanner, &charr);
+
+    if (charr == '.')
+    {
+        assert(scanner_consume_char(scanner, NULL));
+        token.type = TOKEN_NUMBER;
+
+        if (!scanner_consume_char(scanner, &charr))
+        {
+            return SCANNER_RESULT_IRRECOVERABLE_ERROR;
+        }
+
+        if (not_digit(charr))
+        {
+            scanner_throw_err_expected_digit(scanner);
+            return SCANNER_RESULT_IRRECOVERABLE_ERROR;
+        }
+
+        scanner_consume_until_exclusive(scanner, not_digit);
+    }
+
+    token.length = scanner->current - start;
+
+    if (token_ref != NULL)
+    {
+        *token_ref = token;
+    }
+    return SCANNER_RESULT_SUCCESS;
+}
+
+ScannerResult scanner_scan_identifier(Scanner* scanner, Token* token_ref)
+{
+    assert(scanner != NULL);
+
+    Token token;
+    char charr;
+    const char* start = scanner->current;
+
+    token = scanner_create_init_token(scanner, TOKEN_IDENTIFIER);
+
+    if (!scanner_peek_char(scanner, &charr) || !is_identifier_start(charr))
+    {
+        return SCANNER_RESULT_RECOVERABLE_ERROR;
+    }
+    assert(scanner_consume_char(scanner, NULL));
+
+    scanner_consume_until_exclusive(scanner, not_identifier_middle);
+
+    if (scanner_peek_char(scanner, &charr) && is_identifier_end(charr))
+    {
+        assert(scanner_consume_char(scanner, NULL));
+    }
+
+    token.length = scanner->current - start;
+
+    if (token_ref != NULL)
+    {
+        *token_ref = token;
+    }
+    return SCANNER_RESULT_SUCCESS;
+}
+
+ScannerResult scanner_scan_keyword(Scanner* scanner, const char* keyword, TokenType token_type, Token* token_ref)
+{
+    assert(scanner != NULL);
+    assert(keyword != NULL);
+
+    Token token;
+    const char* start = scanner->current;
+
+    token = scanner_create_init_token(scanner, token_type);
+
+    // bool scanner_accept_str(Scanner* scanner, int length, char* str)
+    if (!scanner_accept_str(scanner, strlen(keyword), keyword))
+    {
+        return SCANNER_RESULT_RECOVERABLE_ERROR;
+    }
+
+    token.length = scanner->current - start;
+    if (token_ref != NULL)
+    {
+        *token_ref = token;
+    }
+    return SCANNER_RESULT_SUCCESS;
+}
+
+ScannerResult scanner_scan_keywords(Scanner* scanner, Token* token_ref)
+{
+#define SCAN_KEYWORD(str, token_type) \
+    HANDLE_SCANNER_RESULT_BASE_CASE \
+        (scanner_scan_keyword(scanner, (str), (token_type) , token_ref))
+
+    assert(scanner != NULL);
+
+    // One character tokens
+    SCAN_KEYWORD("(" , TOKEN_LEFT_PAREN  );
+    SCAN_KEYWORD(")" , TOKEN_RIGHT_PAREN );
+    SCAN_KEYWORD("{" , TOKEN_LEFT_BRACE  );
+    SCAN_KEYWORD("}" , TOKEN_RIGHT_BRACE );
+    SCAN_KEYWORD("[" , TOKEN_LEFT_SQUARE );
+    SCAN_KEYWORD("]" , TOKEN_RIGHT_SQUARE);
+    SCAN_KEYWORD("|" , TOKEN_PIPE        );
+    SCAN_KEYWORD("," , TOKEN_COMMA       );
+    SCAN_KEYWORD(";" , TOKEN_SEMICOLON   );
+    SCAN_KEYWORD("_" , TOKEN_UNDERSCORE  );
+    SCAN_KEYWORD("\n", TOKEN_NEWLINE     );
+
+    // One or more character tokens
+    SCAN_KEYWORD("!=", TOKEN_BANG_EQUAL   );
+    SCAN_KEYWORD("!" , TOKEN_BANG         );
+    SCAN_KEYWORD("==", TOKEN_EQUAL_EQUAL  );
+    SCAN_KEYWORD("=>", TOKEN_EQUAL_GREATER);
+    SCAN_KEYWORD("=" , TOKEN_EQUAL        );
+    SCAN_KEYWORD("+=", TOKEN_PLUS_EQUAL   );
+    SCAN_KEYWORD("++", TOKEN_PLUS_PLUS    );
+    SCAN_KEYWORD("+" , TOKEN_PLUS         );
+    SCAN_KEYWORD("-=", TOKEN_MINUS_EQUAL  );
+    SCAN_KEYWORD("--", TOKEN_MINUS_MINUS  );
+    SCAN_KEYWORD("->", TOKEN_MINUS_GREATER);
+    SCAN_KEYWORD("-" , TOKEN_MINUS        );
+    SCAN_KEYWORD("*=", TOKEN_STAR_EQUAL   );
+    SCAN_KEYWORD("*" , TOKEN_STAR         );
+    SCAN_KEYWORD("/=", TOKEN_SLASH_EQUAL  );
+    SCAN_KEYWORD("/" , TOKEN_SLASH        );
+    SCAN_KEYWORD("%=", TOKEN_PERCENT_EQUAL);
+    SCAN_KEYWORD("%" , TOKEN_PERCENT      );
+    SCAN_KEYWORD("<=", TOKEN_LESS_EQUAL   );
+    SCAN_KEYWORD("<" , TOKEN_LESS         );
+    SCAN_KEYWORD(">=", TOKEN_GREATER_EQUAL);
+    SCAN_KEYWORD(">" , TOKEN_GREATER      );
+    SCAN_KEYWORD("..", TOKEN_DOT_DOT      );
+    SCAN_KEYWORD("." , TOKEN_DOT          );
+    SCAN_KEYWORD("::", TOKEN_COLON_COLON  );
+    SCAN_KEYWORD(":" , TOKEN_COLON        );
+
+    // Text-based keywords
+    SCAN_KEYWORD("Nil"     , TOKEN_NIL_T   );
+    SCAN_KEYWORD("Nat"     , TOKEN_NAT     );
+    SCAN_KEYWORD("Bool"    , TOKEN_BOOL    );
+    SCAN_KEYWORD("Int"     , TOKEN_INT     );
+    SCAN_KEYWORD("Real"    , TOKEN_REAL    );
+    SCAN_KEYWORD("let"     , TOKEN_LET     );
+    SCAN_KEYWORD("loop"    , TOKEN_LOOP    );
+    SCAN_KEYWORD("type"    , TOKEN_TYPE    );
+    SCAN_KEYWORD("true"    , TOKEN_TRUE    );
+    SCAN_KEYWORD("end"     , TOKEN_END     );
+    SCAN_KEYWORD("elif"    , TOKEN_ELIF    );
+    SCAN_KEYWORD("else"    , TOKEN_ELSE    );
+    SCAN_KEYWORD("nil"     , TOKEN_NIL_V   );
+    SCAN_KEYWORD("not"     , TOKEN_NOT     );
+    SCAN_KEYWORD("false"   , TOKEN_FALSE   );
+    SCAN_KEYWORD("for"     , TOKEN_FOR     );
+    SCAN_KEYWORD("fn"      , TOKEN_FN      );
+    SCAN_KEYWORD("and"     , TOKEN_AND     );
+    SCAN_KEYWORD("alias"   , TOKEN_ALIAS   );
+    SCAN_KEYWORD("or"      , TOKEN_OR      );
+    SCAN_KEYWORD("do"      , TOKEN_DO      );
+    SCAN_KEYWORD("if"      , TOKEN_IF      );
+    SCAN_KEYWORD("in"      , TOKEN_IN      );
+    SCAN_KEYWORD("while"   , TOKEN_WHILE   );
+    SCAN_KEYWORD("break"   , TOKEN_BREAK   );
+    SCAN_KEYWORD("continue", TOKEN_CONTINUE);
+    SCAN_KEYWORD("return"  , TOKEN_RETURN  );
+    SCAN_KEYWORD("match"   , TOKEN_MATCH   );
+
+    return SCANNER_RESULT_RECOVERABLE_ERROR;
+
+#undef SCAN_KEYWORD
+}
+
+bool scanner_convert_identifier_to_keyword(Scanner* scanner, const char* keyword, TokenType token_type, Token* token_ref)
+{
+    assert(scanner   != NULL);
+    assert(keyword   != NULL);
+    assert(token_ref != NULL);
+    assert(token_ref->type == TOKEN_IDENTIFIER);
+
+    Token token;
+    int length_keyword = strlen(keyword);
+    int length_token   = token_ref->length;
+
+    if (length_keyword != length_token)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < length_keyword; ++i)
+    {
+        char charr_keyword = keyword[i];
+        char charr_token   = token_ref->start[i];
+
+        if (charr_keyword != charr_token)
+        {
+            return false;
+        }
+    }
+
+    token_ref->type = token_type;
+    return true;
+}
+
+bool scanner_convert_identifier_to_keywords(Scanner* scanner, Token* token_ref)
+{
+#define CONVERT(str, token_type) \
+    if (scanner_convert_identifier_to_keyword(scanner, (str), (token_type), token_ref)) return true
+
+    assert(scanner   != NULL);
+    assert(token_ref != NULL);
+    assert(token_ref->type == TOKEN_IDENTIFIER);
+
+    // One character tokens
+    CONVERT("(" , TOKEN_LEFT_PAREN  );
+    CONVERT(")" , TOKEN_RIGHT_PAREN );
+    CONVERT("{" , TOKEN_LEFT_BRACE  );
+    CONVERT("}" , TOKEN_RIGHT_BRACE );
+    CONVERT("[" , TOKEN_LEFT_SQUARE );
+    CONVERT("]" , TOKEN_RIGHT_SQUARE);
+    CONVERT("|" , TOKEN_PIPE        );
+    CONVERT("," , TOKEN_COMMA       );
+    CONVERT(";" , TOKEN_SEMICOLON   );
+    CONVERT("_" , TOKEN_UNDERSCORE  );
+    CONVERT("\n", TOKEN_NEWLINE     );
+
+    // One or more character tokens
+    CONVERT("!=", TOKEN_BANG_EQUAL   );
+    CONVERT("!" , TOKEN_BANG         );
+    CONVERT("==", TOKEN_EQUAL_EQUAL  );
+    CONVERT("=>", TOKEN_EQUAL_GREATER);
+    CONVERT("=" , TOKEN_EQUAL        );
+    CONVERT("+=", TOKEN_PLUS_EQUAL   );
+    CONVERT("++", TOKEN_PLUS_PLUS    );
+    CONVERT("+" , TOKEN_PLUS         );
+    CONVERT("-=", TOKEN_MINUS_EQUAL  );
+    CONVERT("--", TOKEN_MINUS_MINUS  );
+    CONVERT("->", TOKEN_MINUS_GREATER);
+    CONVERT("-" , TOKEN_MINUS        );
+    CONVERT("*=", TOKEN_STAR_EQUAL   );
+    CONVERT("*" , TOKEN_STAR         );
+    CONVERT("/=", TOKEN_SLASH_EQUAL  );
+    CONVERT("/" , TOKEN_SLASH        );
+    CONVERT("%=", TOKEN_PERCENT_EQUAL);
+    CONVERT("%" , TOKEN_PERCENT      );
+    CONVERT("<=", TOKEN_LESS_EQUAL   );
+    CONVERT("<" , TOKEN_LESS         );
+    CONVERT(">=", TOKEN_GREATER_EQUAL);
+    CONVERT(">" , TOKEN_GREATER      );
+    CONVERT("..", TOKEN_DOT_DOT      );
+    CONVERT("." , TOKEN_DOT          );
+    CONVERT("::", TOKEN_COLON_COLON  );
+    CONVERT(":" , TOKEN_COLON        );
+
+    // Text-based keywords
+    CONVERT("Nil"     , TOKEN_NIL_T   );
+    CONVERT("Nat"     , TOKEN_NAT     );
+    CONVERT("Bool"    , TOKEN_BOOL    );
+    CONVERT("Int"     , TOKEN_INT     );
+    CONVERT("Real"    , TOKEN_REAL    );
+    CONVERT("let"     , TOKEN_LET     );
+    CONVERT("loop"    , TOKEN_LOOP    );
+    CONVERT("type"    , TOKEN_TYPE    );
+    CONVERT("true"    , TOKEN_TRUE    );
+    CONVERT("end"     , TOKEN_END     );
+    CONVERT("elif"    , TOKEN_ELIF    );
+    CONVERT("else"    , TOKEN_ELSE    );
+    CONVERT("nil"     , TOKEN_NIL_V   );
+    CONVERT("not"     , TOKEN_NOT     );
+    CONVERT("false"   , TOKEN_FALSE   );
+    CONVERT("for"     , TOKEN_FOR     );
+    CONVERT("fn"      , TOKEN_FN      );
+    CONVERT("and"     , TOKEN_AND     );
+    CONVERT("alias"   , TOKEN_ALIAS   );
+    CONVERT("or"      , TOKEN_OR      );
+    CONVERT("do"      , TOKEN_DO      );
+    CONVERT("if"      , TOKEN_IF      );
+    CONVERT("in"      , TOKEN_IN      );
+    CONVERT("while"   , TOKEN_WHILE   );
+    CONVERT("break"   , TOKEN_BREAK   );
+    CONVERT("continue", TOKEN_CONTINUE);
+    CONVERT("return"  , TOKEN_RETURN  );
+    CONVERT("match"   , TOKEN_MATCH   );
+
+    return true;
+
+#undef CONVERT
+}
+
+ScannerResult scanner_scan_token(Scanner* scanner, Token* token_ref)
+{
+    assert(scanner != NULL);
+
+    ScannerResult result;
+
+    scanner_consume_until_exclusive(scanner, not_whitespace);
+
+    HANDLE_SCANNER_RESULT_BASE_CASE(scanner_scan_comment    (scanner, token_ref));
+    HANDLE_SCANNER_RESULT_BASE_CASE(scanner_scan_str        (scanner, token_ref));
+    HANDLE_SCANNER_RESULT_BASE_CASE(scanner_scan_number     (scanner, token_ref));
+    // HANDLE_SCANNER_RESULT_BASE_CASE(scanner_scan_identifier (scanner, token_ref));
+    // HANDLE_SCANNER_RESULT_BASE_CASE(scanner_scan_keywords   (scanner, token_ref));
+
+    switch (scanner_scan_identifier(scanner, token_ref))
+    {
+        case SCANNER_RESULT_SUCCESS            :
+        {
+            scanner_convert_identifier_to_keywords(scanner, token_ref);
+            return SCANNER_RESULT_SUCCESS;
+        }
+
+        case SCANNER_RESULT_RECOVERABLE_ERROR  :
+        {
+            HANDLE_SCANNER_RESULT_BASE_CASE(scanner_scan_keywords   (scanner, token_ref));
+            return SCANNER_RESULT_RECOVERABLE_ERROR;
+        }
+
+        case SCANNER_RESULT_IRRECOVERABLE_ERROR:
+        {
+            return SCANNER_RESULT_RECOVERABLE_ERROR;
+        }
+    }
+
+    UNREACHABLE;
+}
+
+bool scanner_scan_tokens(Scanner* scanner)
+{
+    assert(scanner != NULL);
+
+    Token token;
+    bool tokens_left = true;
+
+    do
+    {
+        switch (scanner_scan_token(scanner, &token))
+        {
+            case SCANNER_RESULT_SUCCESS            : scanner_add_token(scanner, token); break;
+            case SCANNER_RESULT_RECOVERABLE_ERROR  :
+            {
+                char charr;
+
+                if (!scanner_peek_char(scanner, &charr))
+                {
+                    tokens_left = false;
+                    break;
+                }
+
+                scanner_throw_err_unexpected_char(scanner, charr);
+                return false;
+            }
+            case SCANNER_RESULT_IRRECOVERABLE_ERROR: return false;
+        }
+    }
+    while (tokens_left);
+
+    // For some reason, our parser doesn't use TOKEN_EOF, and appending it actually breaks things.
+    // token = scanner_create_init_token(scanner, TOKEN_EOF);
+    // scanner_add_token(scanner, token);
+
+    return true;
+}
+
+bool is_char_newline(char charr)
+{
+    return charr == '\n';
+}
+
+bool is_digit(char charr)
+{
+    switch (charr)
     {
         case '0':
         case '1':
@@ -634,201 +826,132 @@ bool is_digit(char c)
         case '8':
         case '9':
             return true;
-    }
-    return false;
-}
-
-bool is_alpha(char c)
-{
-  return (c >= 'a' && c <= 'z') ||
-         (c >= 'A' && c <= 'Z') ||
-          c == '_';
-}
-
-Token scanner_scan_number(Scanner* scanner)
-{
-    Token token =
-    {
-        .type   = TOKEN_INTEGER,
-        .start  = scanner->start,
-        .line   = scanner->line,
-        .column = scanner->column,
-        .length = 0
-    };
-    char c;
-
-    scanner->column++;
-    while (!scanner_is_at_end(*scanner) && is_digit(c = scanner_peek(*scanner)))
-    {
-        scanner_consume(scanner);
-        scanner->column++;
-    }
-
-    if (c == '.' && is_digit(scanner_peek(*scanner)))
-    {
-        token.type = TOKEN_NUMBER;
-        scanner->column++;
-        scanner_consume(scanner);
-        while (!scanner_is_at_end(*scanner) && is_digit(c = scanner_peek(*scanner)))
-        {
-            scanner_consume(scanner);
-            scanner->column++;
-        }
-    }
-
-    token.length = scanner->current - scanner->start;
-    return token;
-}
-
-bool scanner_match_string(Scanner* scanner, const char* str, int32_t already_scanned)
-{
-    int32_t len = strlen(str);
-    if (len == 0) return false;
-
-    for (size_t i = 0; i < strlen(str); ++i)
-    {
-        char c = str[i];
-        if (c == scanner_peek(*scanner))
-            scanner_consume(scanner);
-        else
-        {
-            scanner->current = scanner->start + already_scanned;
-            return false;
-        }
-    }
-
-    scanner->column += len;
-    return true;
-}
-
-bool is_identifier_middle(char c)
-{
-    if (is_alpha(c) || c == '_' || c == '-' || is_digit(c))
-        return true;
-    return false;
-}
-
-bool is_identifier_end(char c)
-{
-    // if (is_alpha(c) || c == '_' || c == '?')
-    if (is_alpha(c) || c == '_')
-        return true;
-    return false;
-}
-
-Token scanner_scan_identifier(Scanner* scanner)
-{
-    Token token =
-    {
-        .type   = TOKEN_IDENTIFIER,
-        .start  = scanner->start,
-        .line   = scanner->line,
-        .column = scanner->column,
-        .length = 0
-    };
-
-    // Perfectly valid identifier name.
-    //_------1212121212-?
-    while (true)
-    {
-        if (is_identifier_middle(scanner_peek(*scanner)))
-        {
-            scanner_consume(scanner);
-            scanner->column++;
-        }
-        else if (is_identifier_end(scanner_peek(*scanner)))
-        {
-            scanner_consume(scanner);
-            scanner->column++;
-            break;
-        }
-        else break;
-    }
-
-    token.length = scanner->current - scanner->start;
-    return token;
-}
-
-//Token scanner_scan_keyword(Scanner* scanner, const char* keyword, Token* result_token)
-//{
-//    size_t len = strlen(keyword);
-//    if (len == 0)
-//    {
-//        fprintf(stderr, "Can't scan an empty keyword.");
-//        exit(1);
-//    }
-//
-//    for (size_t i = 0; i < 0; ++i)
-//    {
-//    }
-//}
-//
-//Token scanner_scan_identifier(Scanner* scanner) {
-//  while (is_alpha(scanner_peek(*scanner)) || is_digit(scanner_peek(*scanner)) scanner_consume(scanner);
-//  return scanner_make_token(scanner_scan_identifier_type(scanner));
-//}
-//
-//TokenType scanner_scan_identifier_type(Scanner* scanner) {
-//    switch (scanner.start[0]) {
-//        case 'a': return scanner_check_keyword(scanner, 1, 2, "nd"   , TOKEN_AND   );
-//        case 'c': return scanner_check_keyword(scanner, 1, 4, "lass" , TOKEN_CLASS );
-//        case 'i': return scanner_check_keyword(scanner, 1, 1, "f"    , TOKEN_IF    );
-//        case 'n': return scanner_check_keyword(scanner, 1, 2, "il"   , TOKEN_NIL   );
-//        case 'o': return scanner_check_keyword(scanner, 1, 1, "r"    , TOKEN_OR    );
-//        case 'p': return scanner_check_keyword(scanner, 1, 4, "rint" , TOKEN_PRINT );
-//        case 'r': return scanner_check_keyword(scanner, 1, 5, "eturn", TOKEN_RETURN);
-//        case 'w': return scanner_check_keyword(scanner, 1, 4, "hile" , TOKEN_WHILE );
-//        case 't': return scanner_check_keyword(scanner, 1, 4, "rue"  , TOKEN_TRUE );
-//        case 'l': return scanner_check_keyword(scanner, 1, 4, "oop"  , TOKEN_LOOP );
-//        case 'f':
-//            if (scanner.current - scanner.start > 1)
-//            {
-//                switch (scanner.start[1])
-//                {
-//                  case 'a': return scanner_check_keyword(scanner, 2, 3, "lse", TOKEN_FALSE);
-//                  case 'o': return scanner_check_keyword(scanner, 2, 1, "r", TOKEN_FOR);
-//                  case 'n': return TOKEN_FN;
-//                }
-//            }
-//    }
-//    // else and elif are unhandled
-//    //if (scanner.start[0] == 'e' and scanner.start[1] == 'l')
-//    //{
-//    //}
-//
-//    return TOKEN_IDENTIFIER;
-//}
-//
-//TokenType scanner_check_keyword(Scanner* scanner, int start, int length, const char* rest, TokenType type) {
-//  if (scanner.current - scanner.start == start + length
-//     && memcmp(scanner.start + start, rest, length) == 0)
-//  {
-//      scanner->column += 1 + strlen(rest);
-//      return type;
-//  }
-//
-//  scanner->column += 1 + strlen(rest);
-//  return TOKEN_IDENTIFIER;
-//}
-
-//Token scanner_scan_identifier(Scanner* scanner)
-//{
-//    Token token =
-//    {
-//        .type   = TOKEN_IDENTIFIER,
-//        .start  = scanner->start,
-//        .line   = scanner->line,
-//        .column = scanner->column,
-//        .length = 0
-//    };
-//}
-
-bool is_newline(TokenType type)
-{
-    switch (type)
-    {
-        case TOKEN_SEMICOLON: return true;
-        case TOKEN_NEWLINE  : return true;
         default: return false;
     }
+}
+
+bool not_digit(char charr)
+{
+    return !is_digit(charr);
+}
+
+bool is_alpha(char charr)
+{
+    return (charr >= 'a' && charr <= 'z') ||
+           (charr >= 'A' && charr <= 'Z');
+}
+
+bool is_whitespace(char charr)
+{
+    switch (charr)
+    {
+        case ' ':
+        case '\t':
+        case '\r':
+            return true;
+        default: return false;
+    }
+}
+
+bool not_whitespace(char charr)
+{
+    return !is_whitespace(charr);
+}
+
+bool is_identifier_start(char charr)
+{
+    return is_alpha(charr)
+        || (charr == '_');
+}
+
+bool is_identifier_middle(char charr)
+{
+    return is_identifier_start(charr)
+        || is_digit(charr);
+}
+
+bool not_identifier_middle(char charr)
+{
+    return !is_identifier_middle(charr);
+}
+
+bool is_identifier_end(char charr)
+{
+    return is_identifier_middle(charr);
+}
+
+Span scanner_get_scanner_span(Scanner* scanner)
+{
+    return (Span)
+    {
+        .line   = scanner->line  ,
+        .column = scanner->column,
+        .length = 1              ,
+    };
+}
+
+void scanner_throw_err_reached_eof(Scanner* scanner)
+{
+    assert(scanner != NULL);
+
+    diagnostic_component_push_err(scanner->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_REACHED_EOF,
+        .span = scanner_get_scanner_span(scanner),
+    });
+}
+
+void scanner_throw_err_unexpected_char(Scanner* scanner, char charr)
+{
+    assert(scanner != NULL);
+
+    diagnostic_component_push_err(scanner->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_UNEXPECTED_CHAR,
+        .span = scanner_get_scanner_span(scanner),
+        .err.unexpected_char =
+        {
+            .charr = charr,
+        },
+    });
+}
+
+void scanner_throw_err_unexpected_str(Scanner* scanner, int length, const char* str)
+{
+    assert(scanner != NULL);
+
+    diagnostic_component_push_err(scanner->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_UNEXPECTED_STR,
+        .span = scanner_get_scanner_span(scanner),
+        .err.unexpected_str =
+        {
+            .length = length,
+            .str = (const char*) arena_push
+                (&scanner->diagnostic_component->arena, (void*) str, sizeof(char) * length),
+        }
+    });
+}
+
+// TODO: Make it so that it shows the string in question
+void scanner_throw_err_str_non_terminating(Scanner* scanner)
+{
+    assert(scanner != NULL);
+
+    diagnostic_component_push_err(scanner->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_STR_NON_TERMINATING,
+        .span = scanner_get_scanner_span(scanner),
+    });
+}
+
+void scanner_throw_err_expected_digit(Scanner* scanner)
+{
+    assert(scanner != NULL);
+
+    diagnostic_component_push_err(scanner->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_EXPECTED_DIGIT,
+        .span = scanner_get_scanner_span(scanner),
+    });
 }

@@ -27,6 +27,13 @@ struct Span
 
 enum DiagnosticErrKind
 {
+    // Scanner
+    DIAGNOSTIC_ERR_REACHED_EOF                 ,
+    DIAGNOSTIC_ERR_UNEXPECTED_CHAR             ,
+    DIAGNOSTIC_ERR_UNEXPECTED_STR              ,
+    DIAGNOSTIC_ERR_STR_NON_TERMINATING         ,
+    DIAGNOSTIC_ERR_EXPECTED_DIGIT              ,
+
     // Parser
     DIAGNOSTIC_ERR_GENERIC                     ,
     DIAGNOSTIC_ERR_UNEXPECTED_TOKEN            ,
@@ -63,6 +70,19 @@ struct DiagnosticErr
 
     union
     {
+        struct
+        {
+            char charr;
+        }
+        unexpected_char;
+
+        struct
+        {
+            int length;
+            const char* str;
+        }
+        unexpected_str;
+
         struct
         {
             const char* file;
