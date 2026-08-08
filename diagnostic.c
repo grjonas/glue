@@ -63,7 +63,8 @@ void diagnostic_component_print(DiagnosticComponent* diagnostic_component)
 
 bool diagnostic_component_is_empty(DiagnosticComponent* diagnostic_component)
 {
-    return arrlen(diagnostic_component->diagnostics) == 0;
+    int length = arrlen(diagnostic_component->diagnostics);
+    return length == 0;
 }
 
 int diagnostic_component_get_msg_num(DiagnosticComponent* diagnostic_component)

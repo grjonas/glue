@@ -647,6 +647,10 @@ bool scanner_convert_identifier_to_keyword(Scanner* scanner, const char* keyword
     return true;
 }
 
+// The size of the function is excessive, since text keywords, such as 'let', 'while',
+// are capable of being identifiers.
+// Whereas keywords such as '+=' are not, there for they cannot be converted.
+// I'm keeping all of these keywords for simplicity.
 bool scanner_convert_identifier_to_keywords(Scanner* scanner, Token* token_ref)
 {
 #define CONVERT(str, token_type) \
@@ -775,6 +779,7 @@ bool scanner_scan_tokens(Scanner* scanner)
 
     Token token;
     bool tokens_left = true;
+    bool error_found = false;
 
     do
     {
@@ -790,11 +795,18 @@ bool scanner_scan_tokens(Scanner* scanner)
                     tokens_left = false;
                     break;
                 }
-
                 scanner_throw_err_unexpected_char(scanner, charr);
-                return false;
+
+                error_found = true;
+                scanner_consume_until_inclusive(scanner, is_char_newline);
+                break;
             }
-            case SCANNER_RESULT_IRRECOVERABLE_ERROR: return false;
+            case SCANNER_RESULT_IRRECOVERABLE_ERROR:
+            {
+                error_found = true;
+                scanner_consume_until_inclusive(scanner, is_char_newline);
+                break;
+            }
         }
     }
     while (tokens_left);
@@ -803,7 +815,7 @@ bool scanner_scan_tokens(Scanner* scanner)
     // token = scanner_create_init_token(scanner, TOKEN_EOF);
     // scanner_add_token(scanner, token);
 
-    return true;
+    return !error_found;
 }
 
 bool is_char_newline(char charr)
