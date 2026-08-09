@@ -912,10 +912,40 @@ Stmt* parser_parse_stmt_type(Parser* parser)
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
+StmtCase* parser_parse_stmt_match_case(Parser* parser)
+{
+    StmtCase casee;
+    Pattern* pattern = NULL;
+    Stmt* stmt = NULL;
+
+    if (!parser_parse_pattern(parser, &pattern))
+    {
+        return NULL;
+    }
+
+    if (!parser_expect_token(parser, TOKEN_COLON))
+    {
+        return NULL;
+    }
+
+    stmt = parser_parse_stmt(parser);
+    if (stmt == NULL)
+    {
+        return NULL;
+    }
+
+    casee = (StmtCase)
+    {
+        .pattern = pattern,
+        .stmt    = stmt   ,
+    };
+    return (StmtCase*) arena_push(&parser->arena, &casee, sizeof(StmtCase));
+}
+
 /*
     match ls
-    | Cons(x, xs); 5 
-    | Empty do
+    | cons(x, xs); 5 
+    | empty do
         2 + 2
     end
     end
@@ -923,21 +953,92 @@ Stmt* parser_parse_stmt_type(Parser* parser)
 Stmt* parser_parse_stmt_match(Parser* parser)
 {
     Stmt stmt;
-
-    // IMPLEMENT:
-    UNREACHABLE;
-
     Token token;
-    Expr* expr = NULL;
+    StmtMatch match = (StmtMatch)
+    {
+        .scrutinee = NULL,
+        .cases     = NULL,
+        .case_num  =    0,
+    };
 
+
+    token = parser_peek(parser);
     if (!parser_expect_token(parser, TOKEN_MATCH))
         return NULL;
 
-    expr = parser_parse_expr(parser);
-    if (expr == NULL)
+    stmt = (Stmt)
+    {
+        .kind = STMT_MATCH,
+        .line   = token.line  ,
+        .column = token.column,
+        .length = token.length,
+    };
+
+    match.scrutinee = parser_parse_expr(parser);
+    if (match.scrutinee == NULL)
     {
         return NULL;
     }
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_PIPE)
+    {
+        DYNAMIC_ARRAY(StmtCase**) cases = NULL;
+        int case_num = 0;
+
+        do
+        {
+            StmtCase* casee = NULL;
+
+            token = parser_next(parser);
+            if (token.type == TOKEN_PIPE)
+            {
+                casee = parser_parse_stmt_match_case(parser);
+                if (casee == NULL)
+                {
+                    return NULL;
+                }
+                arrput(cases, casee);
+            }
+            else if (token.type == TOKEN_END)
+            {
+                break;
+            }
+            else
+            {
+                TokenType expected[] =
+                {
+                    TOKEN_PIPE,
+                    TOKEN_END ,
+                };
+                parser_throw_err_unexpected_token(parser, token, expected, 2);
+                return NULL;
+            }
+        }
+        while (true);
+
+        if (cases != NULL)
+        {
+            DYNAMIC_ARRAY(StmtCase**) tmp_cases = cases;
+            case_num = arrlen(cases);
+            cases = (StmtCase**) arena_push(&parser->arena, tmp_cases, case_num * sizeof(StmtCase*));
+            arrfree(tmp_cases);
+        }
+
+        match = (StmtMatch)
+        {
+            .scrutinee = match.scrutinee,
+            .cases     = cases   ,
+            .case_num  = case_num,
+        };
+    }
+    else if (token.type == TOKEN_END)
+    {
+        parser_next(parser);
+    }
+
+    stmt.stmt.match = match;
+    return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
 bool parser_attempt_peek_stmt_end(Parser* parser)
