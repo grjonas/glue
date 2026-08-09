@@ -24,6 +24,7 @@ const char* stmt_kind_name(StmtKind kind)
         case STMT_RETURN:            return "return";
         case STMT_ALIAS:             return "alias";
         case STMT_TYPE:              return "type";
+        case STMT_MATCH:             return "match";
     }
 
     return "UNKNOWN";
@@ -55,6 +56,20 @@ void stmt_type_constructor_print(FILE* file, StmtTypeConstructor* constructor)
     fprintf(file, ")\n");
 }
 
+void stmt_case_print(FILE* file, StmtCase* casee, int depth)
+{
+    assert(casee != NULL);
+
+    Pattern* pattern = casee->pattern;
+    Stmt   * stmt    = casee->stmt   ;
+
+    fprintf(file, "| ");
+    pattern_print(file, pattern);
+    fprintf(file, ":\n");
+    stmt_print_inner(file, stmt, depth + 1);
+}
+
+
 void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
 {
     assert(depth >= 0);
@@ -81,6 +96,8 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
     int       argc       = 0   ;
     StmtTypeConstructor** constructors = NULL;
     int constructor_num                = 0   ;
+    StmtCase** cases = NULL;
+    int case_num = 0;
 
     stmt_print_indent(file, indent * depth);
     fprintf(file, "%s", stmt_kind_name(show_stmt->kind));
@@ -233,6 +250,24 @@ void stmt_print_inner(FILE* file, Stmt* show_stmt, int depth)
             {
                 stmt_print_indent(file, indent * depth);
                 stmt_type_constructor_print(file, constructors[i]);
+            }
+            stmt_print_indent(file, indent * depth);
+            fprintf(file, "end\n");
+            break;
+
+        case STMT_MATCH:
+            expr     = show_stmt->stmt.match.scrutinee;
+            cases    = show_stmt->stmt.match.cases    ;
+            case_num = show_stmt->stmt.match.case_num ;
+
+            fprintf(file, " ");
+            expr_print(file, expr);
+            fprintf(file, "\n");
+
+            for (int i = 0; i < case_num; ++i)
+            {
+                stmt_print_indent(file, indent * depth);
+                stmt_case_print(file, cases[i], depth);
             }
             stmt_print_indent(file, indent * depth);
             fprintf(file, "end\n");
@@ -778,3 +813,89 @@ void decl_print(FILE* file, Decl* decl)
     fprintf(file, ">");
 }
 
+void pattern_literal_print(FILE* file, PatternLiteral literal)
+{
+    fprintf(file, "P_LIT-");
+    switch (literal.kind)
+    {
+        case PATTERN_LITERAL_NIL    : fprintf(file, "nil"  ); return;
+        case PATTERN_LITERAL_TRUE   : fprintf(file, "true" ); return;
+        case PATTERN_LITERAL_FALSE  : fprintf(file, "false"); return;
+
+        case PATTERN_LITERAL_INTEGER:
+            fprintf(file, "%s", literal.literal.integer);
+            return;
+
+        case PATTERN_LITERAL_NUMBER :
+            fprintf(file, "%s", literal.literal.number);
+            return;
+
+        case PATTERN_LITERAL_STRING :
+            fprintf(file, "\"%s\"", literal.literal.string);
+            return;
+    }
+}
+
+void pattern_print(FILE* file, Pattern* pattern)
+{
+    if (pattern == NULL)
+    {
+        fprintf(file, "[P_NULL]");
+        return;
+    }
+
+    fprintf(file, "[PATTERN:");
+    switch(pattern->kind)
+    {
+        case PATTERN_WILDCARD    :
+            fprintf(file, "_");
+            break;
+
+        case PATTERN_LITERAL     :
+            pattern_literal_print(file, pattern->pattern.literal);
+            break;
+
+        case PATTERN_VAR         :
+            fprintf(file, "%s", pattern->pattern.var.var);
+            break;
+
+        case PATTERN_RESOLVED_VAR:
+            decl_print(file, pattern->pattern.resolved_var.decl);
+            break;
+
+        case PATTERN_CONSTRUCTOR :
+            fprintf(file, "%s", pattern->pattern.constructor.identifier);
+            fprintf(file, "(");
+            for (int i = 0; i < pattern->pattern.constructor.argc; ++i)
+            {
+                Pattern* p = pattern->pattern.constructor.argv[i];
+
+                pattern_print(file, p);
+
+                if (i + 1 < pattern->pattern.constructor.argc)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, ")");
+            break;
+
+        case PATTERN_APPLICATION :
+            decl_print(file, pattern->pattern.application.decl);
+            fprintf(file, "(");
+            for (int i = 0; i < pattern->pattern.application.argc; ++i)
+            {
+                Pattern* p = pattern->pattern.application.argv[i];
+
+                pattern_print(file, p);
+
+                if (i + 1 < pattern->pattern.application.argc)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, ")");
+            break;
+    }
+    fprintf(file, "]");
+}

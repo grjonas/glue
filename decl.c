@@ -1,5 +1,10 @@
 #include "decl.h"
 
+bool decl_is_variable(Decl decl)
+{
+    return decl.kind == DECL_VAR;
+}
+
 bool decl_is_type_variable(Decl decl)
 {
     return decl.kind == DECL_TYPE_VAR;
@@ -19,6 +24,17 @@ int  decl_get_new_type_parameter_num(Decl decl)
 {
     assert(decl.kind == DECL_TYPE);
 
-    fprintf(stderr, "[%s:%d] Declarations: Not implemented yet.\n", __FILE__, __LINE__);
-    exit(1);
+    return decl.decl.type.type_var_num;
+}
+
+bool decl_is_type_constructor(Decl decl)
+{
+    return decl.kind == DECL_TYPE_CONSTRUCTOR;
+}
+
+int decl_get_type_constructor_parameter_num(Decl decl)
+{
+    assert(decl.kind == DECL_TYPE_CONSTRUCTOR);
+
+    return decl.decl.constructor.type_num;
 }

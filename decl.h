@@ -80,9 +80,12 @@ struct Decl
     decl;
 };
 
+bool decl_is_variable(Decl decl);
 bool decl_is_type_variable(Decl decl);
 bool decl_is_alias(Decl decl);
 bool decl_is_new_type(Decl decl);
 int  decl_get_new_type_parameter_num(Decl decl);
+bool decl_is_type_constructor(Decl decl);
+int decl_get_type_constructor_parameter_num(Decl decl);
 
 #endif

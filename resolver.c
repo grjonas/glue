@@ -480,11 +480,50 @@ bool resolver_resolve_stmt_type(Resolver* resolver)
     return true;
 }
 
+bool resolver_resolve_stmt_match(Resolver* resolver)
+{
+    Stmt* curr_stmt = resolver->stmts;
+
+    assert(curr_stmt != NULL);
+    assert(curr_stmt->kind == STMT_MATCH);
+
+    Expr*  scrutinee = curr_stmt->stmt.match.scrutinee;
+    StmtCase** cases = curr_stmt->stmt.match.cases    ;
+    int     case_num = curr_stmt->stmt.match.case_num ;
+
+    ResolverSnapshot snapshot;
+
+    if (!resolver_resolve_expr(resolver, scrutinee))
+    {
+        return false;
+    }
+
+    for (int i = 0; i < case_num; ++i)
+    {
+        StmtCase* casee = cases[i];
+
+        if (!resolver_resolve_pattern(resolver, casee->pattern))
+        {
+            return false;
+        }
+
+        snapshot = resolver_get_context_snapshot(resolver);
+        resolver->stmts = casee->stmt;
+        if (!resolver_resolve_stmt(resolver))
+        {
+            return false;
+        }
+        resolver_restore_context_snapshot(resolver, snapshot);
+    }
+
+    resolver->stmts = curr_stmt;
+    return true;
+}
+
 // On error - stmts is set to NULL.
 bool resolver_resolve_stmt(Resolver* resolver)
 {
     Stmt* curr_stmt  = NULL;
-    bool result = false; // Assume failure
 
     curr_stmt = resolver->stmts;
     if (curr_stmt == NULL)
@@ -495,18 +534,18 @@ bool resolver_resolve_stmt(Resolver* resolver)
 
     switch (curr_stmt->kind)
     {
-        case STMT_BLOCK   : result = resolver_resolve_stmt_block   (resolver); break;
-        case STMT_LET     : result = resolver_resolve_stmt_let     (resolver); break;
-        case STMT_EXPR    : result = resolver_resolve_stmt_expr    (resolver); break;
-        case STMT_IF      : result = resolver_resolve_stmt_if      (resolver); break;
-        case STMT_WHILE   : result = resolver_resolve_stmt_while   (resolver); break;
-        case STMT_BREAK   : result = resolver_resolve_stmt_break   (resolver); break;
-        case STMT_CONTINUE: result = resolver_resolve_stmt_continue(resolver); break;
-        case STMT_FN      : result = resolver_resolve_stmt_fn      (resolver); break;
-        case STMT_RETURN  : result = resolver_resolve_stmt_return  (resolver); break;
-        case STMT_ALIAS   : result = resolver_resolve_stmt_alias   (resolver); break;
-        case STMT_TYPE    : result = resolver_resolve_stmt_type    (resolver); break;
-        //case STMT_TYPE    : break;
+        case STMT_BLOCK   : return resolver_resolve_stmt_block   (resolver);
+        case STMT_LET     : return resolver_resolve_stmt_let     (resolver);
+        case STMT_EXPR    : return resolver_resolve_stmt_expr    (resolver);
+        case STMT_IF      : return resolver_resolve_stmt_if      (resolver);
+        case STMT_WHILE   : return resolver_resolve_stmt_while   (resolver);
+        case STMT_BREAK   : return resolver_resolve_stmt_break   (resolver);
+        case STMT_CONTINUE: return resolver_resolve_stmt_continue(resolver);
+        case STMT_FN      : return resolver_resolve_stmt_fn      (resolver);
+        case STMT_RETURN  : return resolver_resolve_stmt_return  (resolver);
+        case STMT_ALIAS   : return resolver_resolve_stmt_alias   (resolver);
+        case STMT_TYPE    : return resolver_resolve_stmt_type    (resolver);
+        case STMT_MATCH   : return resolver_resolve_stmt_match   (resolver);
 
         default:
             fprintf(stderr, "[%s:%d] Variable resolution: Found statement of unknown kind.\n", __FILE__, __LINE__);
@@ -515,7 +554,7 @@ bool resolver_resolve_stmt(Resolver* resolver)
 
     resolver->stmts = curr_stmt;
 
-    return result;
+    return true;
 }
 
 bool resolver_resolve_expr_primary_lambda(Resolver* resolver, Expr* expr)
@@ -753,7 +792,7 @@ bool resolver_resolve_type_expr_identifier(Resolver* resolver, TypeExpr* type_ex
     char* identifier = NULL;
     Decl* decl       = NULL;
 
-    identifier = type_expr->type_expr.identifier.identifier;; 
+    identifier = type_expr->type_expr.identifier.identifier; 
     decl       = resolver_get_decl_by_identifier(resolver, identifier);
     if (decl != NULL)
     {
@@ -915,6 +954,112 @@ bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr)
 
     fprintf(stderr, "[%s:%d] Type expression resolution: Failed to recognise type expression kind.\n", __FILE__, __LINE__);
     exit(1);
+} 
+
+bool resolver_resolve_pattern_var(Resolver* resolver, Pattern* pattern)
+{
+    assert(pattern != NULL);
+    assert(pattern->kind == PATTERN_VAR);
+
+    const char* identifier = NULL;
+    Decl      * decl       = NULL;
+
+    identifier = pattern->pattern.var.var; 
+    decl       = resolver_get_decl_by_identifier(resolver, (char*) identifier);
+    if (decl != NULL)
+    {
+        if (decl_is_variable(*decl))
+        {
+            *pattern = (Pattern)
+            {
+                .kind = PATTERN_RESOLVED_VAR,
+                .pattern.resolved_var = (PatternResolvedVar) { .decl = decl }
+            };
+        }
+        else
+        {
+            resolver_throw_err_pattern_failed_to_resolve_identifier(resolver, pattern, identifier);
+            return false;
+        }
+    }
+    else
+    {
+        decl = resolver_declare_variable(resolver, (char*) identifier);
+        resolver_push_decl_to_context(resolver, decl);
+
+        pattern->kind = PATTERN_RESOLVED_VAR;
+        pattern->pattern.resolved_var.decl = decl;
+    }
+    return true;
+}
+
+bool resolver_resolve_pattern_constructor(Resolver* resolver, Pattern* pattern)
+{
+    assert(pattern != NULL);
+    assert(pattern->kind == PATTERN_CONSTRUCTOR);
+
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    const char* identifier = NULL;
+    int         argc   = 0   ;
+    Pattern  ** argv   = NULL;
+    Decl      * decl   = NULL;
+
+    identifier = pattern->pattern.constructor.identifier;
+    argc       = pattern->pattern.constructor.argc      ;
+    argv       = pattern->pattern.constructor.argv      ;
+
+    decl = resolver_get_decl_by_identifier(resolver, (char*) identifier);
+    if
+        (
+            decl != NULL
+            && decl_is_type_constructor(*decl)
+            && decl_get_type_constructor_parameter_num(*decl) == argc
+        )
+    {
+        for (int i = 0; i < argc; ++i)
+        {
+            Pattern* p = argv[i];
+            bool result = resolver_resolve_pattern(resolver, p);
+            if (!result)
+            {
+                return false;
+            }
+        }
+
+        pattern->kind = PATTERN_APPLICATION;
+        pattern->pattern.application.decl = decl;
+        pattern->pattern.application.argv = argv;
+        pattern->pattern.application.argc = argc;
+
+        return true;
+    }
+    else
+    {
+        resolver_throw_err_pattern_failed_to_find_constructor(resolver, pattern, identifier);
+        return false;
+    }
+}
+
+bool resolver_resolve_pattern(Resolver* resolver, Pattern* pattern)
+{
+    assert(pattern != NULL);
+
+    switch (pattern->kind)
+    {
+        case PATTERN_WILDCARD    : return true;
+        case PATTERN_LITERAL     : return true;
+        case PATTERN_VAR         :
+            return resolver_resolve_pattern_var(resolver, pattern);
+        case PATTERN_CONSTRUCTOR:
+            return resolver_resolve_pattern_constructor(resolver, pattern);;
+
+        case PATTERN_RESOLVED_VAR: UNREACHABLE;
+        case PATTERN_APPLICATION : UNREACHABLE;
+    }
+
+    UNREACHABLE;
 }
 
 bool resolver_resolve_fn_args(Resolver* resolver, int argc, FnArg** argv, TypeExpr* return_type)
@@ -1171,6 +1316,20 @@ Span resolver_get_type_expr_span(Resolver* resolver, TypeExpr* type_expr)
     };
 }
 
+Span resolver_get_pattern_span(Resolver* resolver, Pattern* pattern)
+{
+    assert(resolver != NULL);
+    assert(pattern  != NULL);
+
+    return (Span)
+    {
+        .filename = resolver->filename,
+        .line     = pattern->line   ,
+        .column   = pattern->column ,
+        .length   = pattern->length ,
+    };
+}
+
 void resolver_throw_err_stmt_break_not_in_loop(Resolver* resolver, Stmt* stmt)
 {
     assert(resolver != NULL);
@@ -1223,6 +1382,7 @@ void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Ex
 {
     assert(resolver != NULL);
     assert(expr     != NULL);
+    assert(identifier != NULL);
 
     diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
     {
@@ -1238,8 +1398,9 @@ void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Ex
 
 void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolver, TypeExpr* type_expr, char* identifier)
 {
-    assert(resolver  != NULL);
-    assert(type_expr != NULL);
+    assert(resolver   != NULL);
+    assert(type_expr  != NULL);
+    assert(identifier != NULL);
 
     diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
     {
@@ -1269,12 +1430,49 @@ void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeEx
 {
     assert(resolver  != NULL);
     assert(type_expr != NULL);
+    assert(identifier != NULL);
 
     diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
     {
         .kind = DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE,
         .span = resolver_get_type_expr_span(resolver, type_expr),
         .err.type_expr_failed_to_find_type =
+        {
+            .identifier = diagnostic_component_add_identifier
+                (resolver->diagnostic_component, identifier, strlen(identifier))
+        }
+    });
+}
+
+void resolver_throw_err_pattern_failed_to_resolve_identifier(Resolver* resolver, Pattern* pattern, const char* identifier)
+{
+    assert(resolver   != NULL);
+    assert(pattern    != NULL);
+    assert(identifier != NULL);
+
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_PATTERN_FAILED_TO_RESOLVE_IDENTIFIER,
+        .span = resolver_get_pattern_span(resolver, pattern),
+        .err.pattern_failed_to_resolve_identifier =
+        {
+            .identifier = diagnostic_component_add_identifier
+                (resolver->diagnostic_component, identifier, strlen(identifier))
+        }
+    });
+}
+
+void resolver_throw_err_pattern_failed_to_find_constructor(Resolver* resolver, Pattern* pattern, const char* identifier)
+{
+    assert(resolver   != NULL);
+    assert(pattern    != NULL);
+    assert(identifier != NULL);
+
+    diagnostic_component_push_err(resolver->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_PATTERN_FAILED_TO_FIND_CONSTRUCTOR,
+        .span = resolver_get_pattern_span(resolver, pattern),
+        .err.pattern_failed_to_find_constructor =
         {
             .identifier = diagnostic_component_add_identifier
                 (resolver->diagnostic_component, identifier, strlen(identifier))

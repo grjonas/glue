@@ -119,14 +119,16 @@ void diagnostic_err_print(DiagnosticErr err)
         case DIAGNOSTIC_ERR_UNEXPECTED_PATTERN          : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PATTERN\n"); return;
 
         // Resolver
-        case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); return;
-        case DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP        : printf(" DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP\n"); return;
-        case DIAGNOSTIC_ERR_RETURN_NOT_IN_FN            : printf(" DIAGNOSTIC_ERR_RETURN_NOT_IN_FN\n"); return;
+        case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP                   : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); return;
+        case DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP                : printf(" DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP\n"); return;
+        case DIAGNOSTIC_ERR_RETURN_NOT_IN_FN                    : printf(" DIAGNOSTIC_ERR_RETURN_NOT_IN_FN\n"); return;
 
-        case DIAGNOSTIC_ERR_RETURNS_DONT_MATCH          : printf(" DIAGNOSTIC_ERR_RETURNS_DONT_MATCH\n"); return;
-        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER: printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER\n"); return;
-        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP\n"); return;
-        case DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE         : printf(" DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE\n"); return;
+        case DIAGNOSTIC_ERR_RETURNS_DONT_MATCH                  : printf(" DIAGNOSTIC_ERR_RETURNS_DONT_MATCH\n"); return;
+        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER        : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER\n"); return;
+        case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP         : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP\n"); return;
+        case DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE                 : printf(" DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE\n"); return;
+        case DIAGNOSTIC_ERR_PATTERN_FAILED_TO_RESOLVE_IDENTIFIER: printf(" DIAGNOSTIC_ERR_PATTERN_FAILED_TO_RESOLVE_IDENTIFIER\n"); return;
+        case DIAGNOSTIC_ERR_PATTERN_FAILED_TO_FIND_CONSTRUCTOR  : printf(" DIAGNOSTIC_ERR_PATTERN_FAILED_TO_FIND_CONSTRUCTOR\n"); return;
 
         // Inferer
         case DIAGNOSTIC_ERR_UNIFY_FAILED                                       :

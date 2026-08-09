@@ -43,13 +43,15 @@ enum DiagnosticErrKind
     DIAGNOSTIC_ERR_UNEXPECTED_PATTERN          ,
 
     // Resolver
-    DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           ,
-    DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP        ,
-    DIAGNOSTIC_ERR_RETURN_NOT_IN_FN            ,
-    DIAGNOSTIC_ERR_RETURNS_DONT_MATCH          ,
-    DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER,
-    DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP ,
-    DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE         ,
+    DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP                   ,
+    DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP                ,
+    DIAGNOSTIC_ERR_RETURN_NOT_IN_FN                    ,
+    DIAGNOSTIC_ERR_RETURNS_DONT_MATCH                  ,
+    DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER        ,
+    DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP         ,
+    DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE                 ,
+    DIAGNOSTIC_ERR_PATTERN_FAILED_TO_RESOLVE_IDENTIFIER,
+    DIAGNOSTIC_ERR_PATTERN_FAILED_TO_FIND_CONSTRUCTOR  ,
 
     // Inferer
     DIAGNOSTIC_ERR_UNIFY_FAILED                                       ,
@@ -113,19 +115,19 @@ struct DiagnosticErr
 
         struct
         {
-            char* identifier;
+            const char* identifier;
         }
         struct_duplicate_identifier;
 
         struct
         {
-            char* identifier;
+            const char* identifier;
         }
         failed_to_resolve_identifier;
 
         struct
         {
-            char* identifier;
+            const char* identifier;
         }
         type_expr_failed_to_find_type;
 
@@ -135,6 +137,18 @@ struct DiagnosticErr
             Type* right;
         }
         unify_failed;
+
+        struct
+        {
+            const char* identifier;
+        }
+        pattern_failed_to_resolve_identifier;
+
+        struct
+        {
+            const char* identifier;
+        }
+        pattern_failed_to_find_constructor;
     }
     err;
 };
