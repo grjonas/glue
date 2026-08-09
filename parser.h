@@ -50,11 +50,13 @@ bool  parser_dont_except_token(Parser* parser, TokenType type);
 
 Span  parser_get_token_span(Parser* parser, Token token);
 bool  is_newline(TokenType type);
+Span  parser_combine_spans(Parser* parser, Span start, Span end);
 
-void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line);
-void parser_throw_err_unexpected_token(Parser* parser, Token token, TokenType expected[], int expected_count);
-void parser_throw_err_expected_token(Parser* parser, Token token, TokenType expected[], int expected_count);
-void parser_throw_err_unexpected_prefix_operator(Parser* parser, Token token);
-void parser_throw_err_struct_duplicate_identifier(Parser* parser, Token identifier_token);
+void parser_throw_err_generic                     (Parser* parser, Token token, const char* file, int line);
+void parser_throw_err_unexpected_token            (Parser* parser, Token token, TokenType expected[], int expected_count);
+void parser_throw_err_expected_token              (Parser* parser, Token token, TokenType expected[], int expected_count);
+void parser_throw_err_unexpected_prefix_operator  (Parser* parser, Token token);
+void parser_throw_err_struct_duplicate_identifier (Parser* parser, Token identifier_token);
+void parser_throw_err_unexpected_pattern          (Parser* parser, Span span);
 
 #endif

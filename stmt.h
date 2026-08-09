@@ -4,6 +4,7 @@
 #include "expr.h"
 #include "ast_definitions.h"
 #include "fn_arg.h"
+#include "pattern.h"
 
 typedef enum   StmtKind            StmtKind           ;
 typedef struct StmtBlock           StmtBlock          ;
@@ -16,6 +17,8 @@ typedef struct StmtReturn          StmtReturn         ;
 typedef struct StmtAlias           StmtAlias          ;
 typedef struct StmtType            StmtType           ;
 typedef struct StmtTypeConstructor StmtTypeConstructor;
+typedef struct StmtCase            StmtCase           ;
+typedef struct StmtMatch           StmtMatch          ;
 
 // Stmt
 enum StmtKind
@@ -31,6 +34,7 @@ enum StmtKind
     STMT_RETURN           ,
     STMT_ALIAS            ,
     STMT_TYPE             ,
+    STMT_MATCH            ,
 };
 
 struct StmtBlock
@@ -103,6 +107,19 @@ struct StmtType
     Decl*                 decl           ;
 };
 
+struct StmtCase
+{
+    Pattern* pattern;
+    Stmt   * stmt   ;
+};
+
+struct StmtMatch
+{
+    Expr*  scrutinee;
+    StmtCase** cases;
+    int     case_num;
+};
+
 // Tagged Union
 struct Stmt
 {
@@ -123,6 +140,7 @@ struct Stmt
         StmtReturn returnn;
         StmtAlias  alias  ;
         StmtType   type   ;
+        StmtMatch  match  ;
         void*      none   ; // For statements that are just singular tokens such as 'break' or 'continue'.
     }
     stmt;

@@ -184,6 +184,12 @@ bool is_newline(TokenType type)
     }
 }   
 
+// TODO: Properly combine spans later
+Span parser_combine_spans(Parser* parser, Span start, Span end)
+{
+    return start;
+}
+
 void parser_throw_err_generic(Parser* parser, Token token, const char* file, int line)
 {
     assert(parser != NULL);
@@ -263,5 +269,16 @@ void parser_throw_err_struct_duplicate_identifier(Parser* parser, Token identifi
             .identifier = diagnostic_component_add_identifier
                 (parser->diagnostic_component, identifier_token.start, identifier_token.length)
         }
+    });
+}
+
+void parser_throw_err_unexpected_pattern(Parser* parser, Span span)
+{
+    assert(parser != NULL);
+
+    diagnostic_component_push_err(parser->diagnostic_component, (DiagnosticErr)
+    {
+        .kind = DIAGNOSTIC_ERR_UNEXPECTED_PATTERN,
+        .span = span,
     });
 }

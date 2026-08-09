@@ -320,6 +320,11 @@ Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
         stmt.stmt.iff.condition = condition;
     }
 
+    if (!parser_attempt_peek_stmt_end(parser))
+    {
+        return NULL;
+    }
+
     body = parser_parse_stmt(parser);
     if (body == NULL)
     {
@@ -393,6 +398,11 @@ Stmt* parser_parse_stmt_while(Parser* parser)
         return NULL;
     }
     stmt.stmt.whilee.condition = condition;
+
+    if (!parser_attempt_peek_stmt_end(parser))
+    {
+        return NULL;
+    }
 
     body = parser_parse_stmt(parser);
     if (body == NULL)
@@ -900,4 +910,58 @@ Stmt* parser_parse_stmt_type(Parser* parser)
     };
 
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
+}
+
+/*
+    match ls
+    | Cons(x, xs); 5 
+    | Empty do
+        2 + 2
+    end
+    end
+ */
+Stmt* parser_parse_stmt_match(Parser* parser)
+{
+    Stmt stmt;
+
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    Token token;
+    Expr* expr = NULL;
+
+    if (!parser_expect_token(parser, TOKEN_MATCH))
+        return NULL;
+
+    expr = parser_parse_expr(parser);
+    if (expr == NULL)
+    {
+        return NULL;
+    }
+}
+
+bool parser_attempt_peek_stmt_end(Parser* parser)
+{
+    Token token;
+
+    token = parser_peek(parser);
+    if (is_newline(token.type))
+    {
+        parser_next(parser);
+    }
+    else if (token.type != TOKEN_DO)
+    {
+        // TODO: The way we ask for specific tokens is a little fragile, and should probably
+        // be changed by passing a function token or something like that.
+        TokenType expected[] =
+        {
+            TOKEN_NEWLINE  ,
+            TOKEN_SEMICOLON,
+            TOKEN_DO       ,
+        };
+        parser_throw_err_unexpected_token(parser, token, expected, 3);
+        return false;
+    }
+
+    return true;
 }

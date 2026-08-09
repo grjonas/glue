@@ -4,9 +4,10 @@ all:
 		main.c \
 		arena.c \
 		dependencies.c \
-		stmt.c \
+		pattern.c \
 		type_expr.c \
 		expr.c \
+		stmt.c \
 		decl.c \
 		type.c \
 		diagnostic.c \
@@ -14,6 +15,7 @@ all:
 		scanner.c \
 		parser.c \
 		parser_definitions.c \
+		parser_pattern.c \
 		parser_type_expr.c \
 		parser_expr.c \
 		parser_stmt.c \

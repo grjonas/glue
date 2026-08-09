@@ -116,6 +116,7 @@ void diagnostic_err_print(DiagnosticErr err)
         case DIAGNOSTIC_ERR_EXPECTED_TOKEN              : printf(" DIAGNOSTIC_ERR_EXPECTED_TOKEN\n"); return;
         case DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP        : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP\n"); return;
         case DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER : printf(" DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER\n"); return;
+        case DIAGNOSTIC_ERR_UNEXPECTED_PATTERN          : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PATTERN\n"); return;
 
         // Resolver
         case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); return;

@@ -19,5 +19,8 @@ Stmt               * parser_parse_stmt_return          (Parser* parser);
 Stmt               * parser_parse_stmt_alias           (Parser* parser);
 StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser);
 Stmt               * parser_parse_stmt_type            (Parser* parser);
+Stmt               * parser_parse_stmt_match           (Parser* parser);
+
+bool parser_attempt_peek_stmt_end (Parser* parser);
 
 #endif

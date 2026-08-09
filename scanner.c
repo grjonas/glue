@@ -623,7 +623,6 @@ bool scanner_convert_identifier_to_keyword(Scanner* scanner, const char* keyword
     assert(token_ref != NULL);
     assert(token_ref->type == TOKEN_IDENTIFIER);
 
-    Token token;
     int length_keyword = strlen(keyword);
     int length_token   = token_ref->length;
 
@@ -739,8 +738,6 @@ bool scanner_convert_identifier_to_keywords(Scanner* scanner, Token* token_ref)
 ScannerResult scanner_scan_token(Scanner* scanner, Token* token_ref)
 {
     assert(scanner != NULL);
-
-    ScannerResult result;
 
     scanner_consume_until_exclusive(scanner, not_whitespace);
 
