@@ -1615,8 +1615,7 @@ bool inferer_infer_stmt_block(Inferer* inferer, StmtBlock block)
     for (int i = 0; i < block.size; ++i)
     {
         Stmt* inner_stmt = block.body[i];
-        bool is_successful = inferer_infer_stmt(inferer, inner_stmt);
-        if (!is_successful)
+        if (!inferer_infer_stmt(inferer, inner_stmt))
         {
             return false;
         }
@@ -1629,17 +1628,14 @@ bool inferer_infer_stmt_while(Inferer* inferer, StmtWhile whilee)
 {
     assert(inferer    != NULL);
 
-    bool is_successful = false;
     Type* type = NULL;
 
-    is_successful = inferer_infer_expr(inferer, whilee.condition, &type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, whilee.condition, &type))
     {
         return false;
     }
 
-    is_successful = inferer_infer_stmt(inferer, whilee.body);
-    if (!is_successful)
+    if (!inferer_infer_stmt(inferer, whilee.body))
     {
         return false;
     }
@@ -1651,17 +1647,14 @@ bool inferer_infer_stmt_if(Inferer* inferer, StmtIf iff)
 {
     assert(inferer    != NULL);
 
-    bool is_successful = false;
     Type* type = NULL;
 
-    is_successful = inferer_infer_expr(inferer, iff.condition, &type);
-    if (!is_successful)
+    if (!inferer_infer_expr(inferer, iff.condition, &type))
     {
         return false;
     }
 
-    is_successful = inferer_infer_stmt(inferer, iff.body);
-    if (!is_successful)
+    if (!inferer_infer_stmt(inferer, iff.body))
     {
         return false;
     }
@@ -1673,7 +1666,6 @@ bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
 {
     assert(inferer    != NULL);
 
-    bool is_successful = false;
     Type* expr_type    = NULL ;
     Type* return_type  = NULL ;
 
@@ -1688,8 +1680,8 @@ bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
 
     return_type = inferer_decl_var_get_return_type(inferer, returnn.decl);
 
-    is_successful = inferer_unify(inferer, &return_type, &expr_type, inferer_get_expr_span(inferer, returnn.expr));
-    if (!is_successful)
+    if (!inferer_unify
+        (inferer, &return_type, &expr_type, inferer_get_expr_span(inferer, returnn.expr)))
     {
         return false;
     }
@@ -1782,7 +1774,44 @@ bool inferer_infer_stmt_alias(Inferer* inferer, StmtAlias alias)
     return true;
 }
 
-bool inferer_infer_stmt_type(Inferer* inferer, StmtType type)
+bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
+{
+    assert(inferer != NULL);
+
+    // IMPLEMENT:
+    UNREACHABLE;
+
+    // struct TypeApplication
+    // {
+    //     TypeAbstraction* abstraction;
+    //     Type** argv;
+    //     int    argc;
+    //     // should be the same as the lenght of abstraction->type.abstraction.argc
+    // };
+
+    // struct DeclType
+    // {
+    //     TypeAbstraction* abstraction;
+    //     Decl** type_vars;
+    //     Decl** constructors;
+    //     int type_var_num;
+    //     int constructor_num;
+    // };
+
+    // struct DeclTypeConstructor
+    // {
+    //     TypeExpr** types;
+    //     int type_num;
+    // };
+
+    Type* type = NULL;
+    TypeAbstraction* abstraction = NULL;
+
+    abstraction = inferer_create_type_abstraction(inferer, stmt_type.decl);
+    inferer_decl_type_set_abstraction(inferer, stmt_type.decl, abstraction);
+}
+
+bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
 {
     assert(inferer != NULL);
 
@@ -1794,14 +1823,11 @@ bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
 {
     assert(inferer != NULL);
     assert(stmt    != NULL);
-    // assert(type    != NULL);
-    // assert(*type   == NULL);
 
     Type* type = NULL;
 
     switch (stmt->kind)
     {
-
         case STMT_BLOCK   : return inferer_infer_stmt_block (inferer, stmt->stmt.block  );
         case STMT_LET     : return inferer_infer_stmt_let   (inferer, stmt->stmt.let    ); 
         case STMT_EXPR    : return inferer_infer_expr       (inferer, stmt->stmt.expr, &type);
@@ -1813,6 +1839,7 @@ bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
         case STMT_RETURN  : return inferer_infer_stmt_return(inferer, stmt->stmt.returnn);
         case STMT_ALIAS   : return inferer_infer_stmt_alias (inferer, stmt->stmt.alias  );
         case STMT_TYPE    : return inferer_infer_stmt_type  (inferer, stmt->stmt.type   );
+        case STMT_MATCH   : return inferer_infer_stmt_match (inferer, stmt->stmt.match  );
     }
     UNREACHABLE;
 }

@@ -1,7 +1,5 @@
-
-all:
+build:
 	gcc \
-		main.c \
 		arena.c \
 		dependencies.c \
 		pattern.c \
@@ -22,9 +20,40 @@ all:
 		parser_stmt.c \
 		resolver.c \
 		inferer.c \
+		main.c \
 	-o main -g \
 		-Wall \
     	-Wextra \
-    	-Wno-sign-compare \
-	# Hashmaps don't work with c99
-	# gcc main.c dependencies.c scanner.c parser.c arena.c stmt.c type_expr.c decl.c type.c expr.c resolver.c inferer.c print.c -o main -g -std=c99 -Wall -Wextra -Wno-sign-compare
+    	-Wno-sign-compare
+# Hashmaps don't work with c99
+
+test:
+	gcc \
+		arena.c \
+		dependencies.c \
+		pattern.c \
+		token.c \
+		type_expr.c \
+		expr.c \
+		stmt.c \
+		decl.c \
+		type.c \
+		diagnostic.c \
+		print.c \
+		scanner.c \
+		parser.c \
+		parser_definitions.c \
+		parser_pattern.c \
+		parser_type_expr.c \
+		parser_expr.c \
+		parser_stmt.c \
+		resolver.c \
+		inferer.c \
+		test_dependencies.c \
+		test.c \
+		main_test.c \
+	-o main_test -g \
+		-Wall \
+    	-Wextra \
+    	-Wno-sign-compare
+	./main_test

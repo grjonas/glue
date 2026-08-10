@@ -53,3 +53,24 @@ char* find_string_in_string_list(DYNAMIC_ARRAY(char** strs), char* str)
 
     return NULL;
 }
+
+bool are_strs_equal(const char* str_a, int length_a, const char* str_b, int length_b)
+{
+    if (length_a != length_b)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < length_a; ++i)
+    {
+        char ca = str_a[i];
+        char cb = str_b[i];
+
+        if (ca != cb)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}

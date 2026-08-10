@@ -65,4 +65,6 @@ char* find_string_in_string_list(DYNAMIC_ARRAY(char** strs), char* str);
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+bool are_strs_equal(const char* str_a, int length_a, const char* str_b, int length_b);
+
 #endif

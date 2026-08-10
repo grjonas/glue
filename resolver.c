@@ -470,6 +470,7 @@ bool resolver_resolve_stmt_type(Resolver* resolver)
 
     decl->decl.type = (DeclType)
     {
+        .abstraction     = NULL             ,
         .type_vars       = type_vars        ,
         .constructors    = type_constructors,
         .type_var_num    = argc             ,
