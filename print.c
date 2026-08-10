@@ -864,7 +864,7 @@ void pattern_print(FILE* file, Pattern* pattern)
             break;
 
         case PATTERN_CONSTRUCTOR :
-            fprintf(file, "%s", pattern->pattern.constructor.identifier);
+            fprintf(file, "[id:%s]", pattern->pattern.constructor.identifier);
             fprintf(file, "(");
             for (int i = 0; i < pattern->pattern.constructor.argc; ++i)
             {

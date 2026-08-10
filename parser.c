@@ -38,10 +38,10 @@ void parser_free(Parser* parser)
     };
 }
 
-Token parser_peek(Parser* parser)
+Token parser_peek_offset(Parser* parser, int offset)
 {
     const char* err = "No more tokens left.";
-    if (parser->current >= parser->end)
+    if (parser->current + offset >= parser->end)
     {
         return (Token)
         {
@@ -52,7 +52,12 @@ Token parser_peek(Parser* parser)
             .length = strlen(err)
         };
     }
-    return parser->tokens[parser->current];
+    return parser->tokens[parser->current + offset];
+}
+
+Token parser_peek(Parser* parser)
+{
+    return parser_peek_offset(parser, 0);
 }
 
 Token parser_next(Parser* parser)

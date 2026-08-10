@@ -47,7 +47,6 @@ struct Scanner
     DiagnosticComponent* diagnostic_component;
 };
 
-const char* token_type_name(TokenType type);
 char* read_file(const char* filename);
 
 Scanner init_scanner(const char* filename);

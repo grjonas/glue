@@ -48,7 +48,6 @@ enum TokenType
     TOKEN_WHITESPACE, TOKEN_ERROR, TOKEN_EOF
 };
 
-    //Given T is a structure type: struct { TK key; TV value; }. Note that some
 struct Token
 {
     TokenType type;
@@ -57,5 +56,7 @@ struct Token
     int column;
     int length;
 };
+
+const char* show_token_type(TokenType type);
 
 #endif

@@ -25,6 +25,8 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    FILE* file = stdout;
+
     Scanner scanner = init_scanner(argv[argc - 1]);
     scanner_scan_tokens(&scanner);
 
@@ -39,7 +41,7 @@ int main(int argc, char** argv)
             t.line,
             t.column,
             t.length,
-            token_type_name(t.type),
+            show_token_type(t.type),
             t.length,
             t.start
         );
@@ -50,6 +52,8 @@ int main(int argc, char** argv)
         diagnostic_component_print(scanner.diagnostic_component);
         exit(1);
     }
+
+    printf("================================================================================\n");
 
     Parser parser;
 
@@ -63,6 +67,10 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    stmt_print(file, stmt);
+
+    printf("================================================================================\n");
+
     Resolver resolver = resolver_init(&parser, stmt);
 
     resolver_resolve_stmt(&resolver);
@@ -75,7 +83,6 @@ int main(int argc, char** argv)
 
     arena_print_memory_usage(&resolver.arena);
 
-    FILE* file = stdout;
     fprintf(file, "Declarations:\n");
     for (int i = 0; i < arrlen(resolver.declarations); ++i)
     {
@@ -85,6 +92,8 @@ int main(int argc, char** argv)
         fprintf(file, "\n");
     }
     stmt_print(file, resolver.stmts);
+
+    printf("================================================================================\n");
 
     Inferer inferer = inferer_init(&resolver);
 
@@ -121,6 +130,8 @@ int main(int argc, char** argv)
         fprintf(file, "\n");
     }
     stmt_print(file, inferer.stmts);
+
+    printf("================================================================================\n");
 
     arena_print_memory_usage(&inferer.arena);
     arena_print_memory_usage(&inferer.type_arena);

@@ -112,7 +112,20 @@ void diagnostic_err_print(DiagnosticErr err)
 
         // Parser
         case DIAGNOSTIC_ERR_GENERIC                     : printf(" DIAGNOSTIC_ERR_GENERIC\n"); return;
-        case DIAGNOSTIC_ERR_UNEXPECTED_TOKEN            : printf(" DIAGNOSTIC_ERR_UNEXPECTED_TOKEN\n"); return;
+        case DIAGNOSTIC_ERR_UNEXPECTED_TOKEN            :
+        {
+            TokenType* expected = err.err.unexpected_token.expected      ;
+            int  expected_count = err.err.unexpected_token.expected_count;
+
+            printf(" DIAGNOSTIC_ERR_UNEXPECTED_TOKEN\n");
+
+            for (int i = 0; i < expected_count; ++i)
+            {
+                printf("    %s\n", show_token_type(expected[i]));
+            }
+            return;
+        }
+
         case DIAGNOSTIC_ERR_EXPECTED_TOKEN              : printf(" DIAGNOSTIC_ERR_EXPECTED_TOKEN\n"); return;
         case DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP        : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP\n"); return;
         case DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER : printf(" DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER\n"); return;
@@ -153,53 +166,3 @@ void diagnostic_err_print(DiagnosticErr err)
 
 #undef GENERIC_PRINT
 }
-
-//  diagnostic_err_print(DiagnosticErr err)
-// {
-// #define GENERIC_PRINT(error) case (error) : printf(
-//     span_print(err.span);
-//     switch (err.kind)
-//     {
-//         DIAGNOSTIC_ERR_REACHED_EOF
-//         DIAGNOSTIC_ERR_UNEXPECTED_CHAR
-//         DIAGNOSTIC_ERR_UNEXPECTED_STR
-//         DIAGNOSTIC_ERR_STR_NON_TERMINATING
-//         DIAGNOSTIC_ERR_EXPECTED_DIGIT
-//         // Parser
-//         case DIAGNOSTIC_ERR_GENERIC                     : printf(" DIAGNOSTIC_ERR_GENERIC\n"); return;
-//         case DIAGNOSTIC_ERR_UNEXPECTED_TOKEN            : printf(" DIAGNOSTIC_ERR_UNEXPECTED_TOKEN\n"); return;
-//         case DIAGNOSTIC_ERR_EXPECTED_TOKEN              : printf(" DIAGNOSTIC_ERR_EXPECTED_TOKEN\n"); return;
-//         case DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP        : printf(" DIAGNOSTIC_ERR_UNEXPECTED_PREFIX_OP\n"); return;
-//         case DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER : printf(" DIAGNOSTIC_ERR_STRUCT_DUPLICATE_IDENTIFIER\n"); return;
-// 
-//         // Resolver
-//         case DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP           : printf(" DIAGNOSTIC_ERR_BREAK_NOT_IN_LOOP\n"); return;
-//         case DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP        : printf(" DIAGNOSTIC_ERR_CONTINUE_NOT_IN_LOOP\n"); return;
-//         case DIAGNOSTIC_ERR_RETURN_NOT_IN_FN            : printf(" DIAGNOSTIC_ERR_RETURN_NOT_IN_FN\n"); return;
-// 
-//         case DIAGNOSTIC_ERR_RETURNS_DONT_MATCH          : printf(" DIAGNOSTIC_ERR_RETURNS_DONT_MATCH\n"); return;
-//         case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER: printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_IDENTIFIER\n"); return;
-//         case DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP : printf(" DIAGNOSTIC_ERR_FAILED_TO_RESOLVE_ACCESS_OP\n"); return;
-//         case DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE         : printf(" DIAGNOSTIC_ERR_FAILED_TO_FIND_TYPE\n"); return;
-// 
-//         // Inferer
-//         case DIAGNOSTIC_ERR_UNIFY_FAILED                                       :
-//             printf(" DIAGNOSTIC_ERR_UNIFY_FAILED\n");
-//             type_print(stdout, err.err.unify_failed.left );
-//             printf("\n    with\n");
-//             type_print(stdout, err.err.unify_failed.right);
-//             printf("\n");
-//             return;
-// 
-//         case DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC                     : printf(" DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC\n"); return;
-//         case DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY                    : printf(" DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY\n"); return;
-//         case DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED           : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED\n"); return;
-//         case DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED             : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED\n"); return;
-//         case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT         : printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_LEFT_KIND_NOT_STRUCT\n"); return;
-//         case DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD: printf(" DIAGNOSTIC_ERR_EXPR_BINARY_ACCESS_OP_STRUCT_DOES_NOT_CONTAIN_FIELD\n"); return;
-//         case DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS                             : printf(" DIAGNOSTIC_ERR_EXPR_FN_EXCESSIVE_ARGS\n"); return;
-//         case DIAGNOSTIC_TYPE_ISNT_NUMERIC                                      : printf(" DIAGNOSTIC_TYPE_ISNT_NUMERIC\n"); return;
-//         case DIAGNOSTIC_TYPE_ISNT_EQUALITY                                     : printf(" DIAGNOSTIC_TYPE_ISNT_EQUALITY\n"); return;
-//     }
-//     UNREACHABLE;
-// }

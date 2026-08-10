@@ -103,6 +103,9 @@ Stmt* parser_parse_stmt(Parser* parser)
         case TOKEN_TYPE:
             return parser_parse_stmt_type(parser);
 
+        case TOKEN_MATCH:
+            return parser_parse_stmt_match(parser);
+
         default:
             return parser_parse_stmt_expr(parser);
     }
@@ -980,6 +983,8 @@ Stmt* parser_parse_stmt_match(Parser* parser)
         return NULL;
     }
 
+    parser_skip(parser, is_newline);
+
     token = parser_peek(parser);
     if (token.type == TOKEN_PIPE)
     {
@@ -989,6 +994,8 @@ Stmt* parser_parse_stmt_match(Parser* parser)
         do
         {
             StmtCase* casee = NULL;
+
+            parser_skip(parser, is_newline);
 
             token = parser_next(parser);
             if (token.type == TOKEN_PIPE)

@@ -86,7 +86,7 @@ void parser_attempt_parse_pattern_var(Parser* parser, Pattern** pattern_ref)
     *pattern_ref = create_pattern(&parser->arena);
     **pattern_ref = (Pattern)
     {
-        .kind   = PATTERN_LITERAL,
+        .kind   = PATTERN_VAR    ,
         .line   = token.line     ,
         .column = token.column   ,
         .length = token.length   ,
@@ -114,6 +114,8 @@ bool parser_attempt_parse_pattern_constructor(Parser* parser, Span* span_ref, Pa
     token = parser_next(parser);
     assert(token.type == TOKEN_IDENTIFIER);
     start = parser_get_token_span(parser, token);
+    identifier = token.start;
+    identifier_length = token.length;
 
     token = parser_peek(parser);
     if (!parser_accept_token(parser, TOKEN_LEFT_PAREN))
@@ -121,8 +123,6 @@ bool parser_attempt_parse_pattern_constructor(Parser* parser, Span* span_ref, Pa
         *span_ref = parser_get_token_span(parser, token);
         return false;
     }
-    identifier = token.start;
-    identifier_length = token.length;
 
     token = parser_peek(parser);
     if (!parser_accept_token(parser, TOKEN_RIGHT_PAREN))
@@ -132,6 +132,8 @@ bool parser_attempt_parse_pattern_constructor(Parser* parser, Span* span_ref, Pa
 
         do
         {
+            pattern = NULL;
+
             if (!parser_attempt_parse_pattern(parser, &fail_span, &pattern))
             {
                 *span_ref = fail_span;
@@ -148,7 +150,7 @@ bool parser_attempt_parse_pattern_constructor(Parser* parser, Span* span_ref, Pa
 
             arrput(argv, pattern);
         }
-        while (token.type == TOKEN_RIGHT_PAREN);
+        while (token.type != TOKEN_RIGHT_PAREN);
 
         end = parser_get_token_span(parser, token);
 
@@ -213,7 +215,7 @@ bool parser_attempt_parse_pattern(Parser* parser, Span* span_ref, Pattern** patt
             parser_attempt_parse_pattern_literal(parser, pattern_ref); return true;
 
         case TOKEN_IDENTIFIER:
-            token = parser_peek(parser);
+            token = parser_peek_offset(parser, 1);
             if (token.type == TOKEN_LEFT_PAREN)
             {
                 if (!parser_attempt_parse_pattern_constructor(parser, span_ref, pattern_ref))

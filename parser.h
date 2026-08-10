@@ -37,6 +37,7 @@ struct Parser
 Parser init_parser(Scanner* scanner);
 void parser_free(Parser* parser);
 
+Token parser_peek_offset(Parser* parser, int offset);
 Token parser_peek(Parser* parser);
 Token parser_next(Parser* parser);
 

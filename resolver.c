@@ -998,9 +998,6 @@ bool resolver_resolve_pattern_constructor(Resolver* resolver, Pattern* pattern)
     assert(pattern != NULL);
     assert(pattern->kind == PATTERN_CONSTRUCTOR);
 
-    // IMPLEMENT:
-    UNREACHABLE;
-
     const char* identifier = NULL;
     int         argc   = 0   ;
     Pattern  ** argv   = NULL;

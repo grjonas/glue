@@ -5,6 +5,7 @@ all:
 		arena.c \
 		dependencies.c \
 		pattern.c \
+		token.c \
 		type_expr.c \
 		expr.c \
 		stmt.c \
