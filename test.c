@@ -153,3 +153,39 @@ void scanner_tests()
 
     test_env_print_msgs(stdout, &test_env);
 }
+
+TEST(inferer_unify___assign_var_to_var___vars_share_type)
+{
+}
+
+TEST(inferer_unify___assign_int_to_var___var_type_is_int)
+{
+}
+
+TEST(inferer_unify___assign_int_to_var_then_var_to_var___all_var_types_are_int)
+{
+}
+
+TEST(inferer_unify___assign_struct_field_to_var___var_type_is_field_type)
+{
+}
+
+TEST(inferer_unify___assign_id_fn_result_to_var___var_type_equal_to_fn_arg_type)
+{
+}
+
+TEST(inferer_unify___assign_type_identical_to_alias_to_var_of_type_alias___no_unification_err)
+{
+}
+
+void inferer_tests()
+{
+    TestEnv test_env;
+    test_env_init(&test_env);
+
+    printf("Inferer test results:\n");
+
+    ;
+
+    test_env_print_msgs(stdout, &test_env);
+}

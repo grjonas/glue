@@ -7,14 +7,66 @@ static Type private_builtin_type_int     = (Type) { .kind = TYPE_INT     };
 static Type private_builtin_type_real    = (Type) { .kind = TYPE_REAL    };
 static Type private_builtin_type_string  = (Type) { .kind = TYPE_STRING  };
 
-static Type* builtin_type_nil     = &private_builtin_type_nil    ;
-static Type* builtin_type_bool    = &private_builtin_type_bool   ;
-static Type* builtin_type_nat     = &private_builtin_type_nat    ;
-static Type* builtin_type_int     = &private_builtin_type_int    ;
-static Type* builtin_type_real    = &private_builtin_type_real   ;
-static Type* builtin_type_string  = &private_builtin_type_string ;
+static bool  inferer_constrain_numeric   (Inferer* inferer, Type** type_ref, Span span)         ;
+static bool  inferer_constrain_equality  (Inferer* inferer, Type** type_ref, Span span)         ;
 
-Inferer inferer_init(Resolver* resolver)
+static void  inferer_get_free_var_substs (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
+static void  inferer_apply_subst         (Inferer* inferer, Type** type_ref, Subst subst)       ;
+static void  inferer_decl_apply_subst    (Inferer* inferer, Decl* decl, Subst subst)            ;
+
+static Type* inferer_create_free_type_var      (Inferer* inferer);
+static Type* inferer_create_free_list_type     (Inferer* inferer);
+static Type* inferer_create_free_function_type (Inferer* inferer, int arity);
+static Type* inferer_create_list_type          (Inferer* inferer, Type* inferred_type);
+
+static void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl);
+static Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
+static void  inferer_decl_var_set_type            (Inferer* inferer, Decl* decl, Type* type);
+static Type* inferer_decl_var_get_return_type     (Inferer* inferer, Decl* decl);
+static void  inferer_decl_var_set_return_type     (Inferer* inferer, Decl* decl, Type* type);
+static Type* inferer_decl_type_var_get_type       (Inferer* inferer, Decl* decl);
+static void  inferer_decl_type_var_set_type       (Inferer* inferer, Decl* decl, Type* type);
+static Type* inferer_decl_alias_get_type          (Inferer* inferer, Decl* decl);
+static void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl, Type* type);
+static void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
+static TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
+static void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
+static TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
+static TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
+static TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl);
+static void             inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction);
+
+static void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
+static void  inferer_pop_type_variable (Inferer* inferer);
+static bool  inferer_occurs_check(Inferer* inferer, Type* var, Type* type);
+static bool  inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type);
+static void  inferer_unify_apply_binds(Inferer* inferer);
+static void  inferer_unify_free_binds (Inferer* inferer);
+
+static TypeEnv inferer_get_curr_type_env(Inferer* inferer);
+static void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
+static bool  inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
+static bool  inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst);
+static Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind);
+static Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type);
+
+static Span inferer_get_expr_span(Inferer* inferer, Expr* expr);
+
+static void inferer_throw_err_unify_failed                                        (Inferer* inferer, Span span, Type* left, Type* right);
+static void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);
+static void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field (Inferer* inferer, Expr* expr);
+static void inferer_throw_err_expr_fn_excessive_args                              (Inferer* inferer, Expr* expr);
+static void inferer_throw_err_type_isnt_numeric                                   (Inferer* inferer, Span span);
+static void inferer_throw_err_type_isnt_equality                                  (Inferer* inferer, Span span);
+
+Type* builtin_type_nil     = &private_builtin_type_nil    ;
+Type* builtin_type_bool    = &private_builtin_type_bool   ;
+Type* builtin_type_nat     = &private_builtin_type_nat    ;
+Type* builtin_type_int     = &private_builtin_type_int    ;
+Type* builtin_type_real    = &private_builtin_type_real   ;
+Type* builtin_type_string  = &private_builtin_type_string ;
+
+extern Inferer inferer_init(Resolver* resolver)
 {
     assert(resolver != NULL);
 
@@ -57,7 +109,7 @@ Inferer inferer_init(Resolver* resolver)
     return inferer;
 }
 
-void inferer_free(Inferer* inferer)
+extern void inferer_free(Inferer* inferer)
 {
     assert(inferer != NULL);
 
@@ -86,7 +138,7 @@ void inferer_free(Inferer* inferer)
     };
 }
 
-bool inferer_unify_left_type_numeric(Inferer* inferer, Type** left_ref, Type** right_ref)
+static bool inferer_unify_left_type_numeric(Inferer* inferer, Type** left_ref, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(left_ref   != NULL);
@@ -106,7 +158,7 @@ bool inferer_unify_left_type_numeric(Inferer* inferer, Type** left_ref, Type** r
     return true;
 }
 
-bool inferer_unify_inner_left_type_list(Inferer* inferer, TypeList left_list, Type** right_ref)
+static bool inferer_unify_inner_left_type_list(Inferer* inferer, TypeList left_list, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(right_ref  != NULL);
@@ -131,7 +183,7 @@ bool inferer_unify_inner_left_type_list(Inferer* inferer, TypeList left_list, Ty
     return true;
 }
 
-bool inferer_unify_inner_left_type_struct(Inferer* inferer, TypeStruct left_struct, Type** right_ref)
+static bool inferer_unify_inner_left_type_struct(Inferer* inferer, TypeStruct left_struct, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(right_ref  != NULL);
@@ -180,7 +232,7 @@ bool inferer_unify_inner_left_type_struct(Inferer* inferer, TypeStruct left_stru
     return true;
 }
 
-bool inferer_unify_inner_left_type_fn(Inferer* inferer, TypeFn left_fn, Type** right_ref)
+static bool inferer_unify_inner_left_type_fn(Inferer* inferer, TypeFn left_fn, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(right_ref  != NULL);
@@ -211,7 +263,7 @@ bool inferer_unify_inner_left_type_fn(Inferer* inferer, TypeFn left_fn, Type** r
     return true;
 }
 
-bool inferer_unify_inner_left_type_application(Inferer* inferer, TypeApplication left_application, Type** right_ref)
+static bool inferer_unify_inner_left_type_application(Inferer* inferer, TypeApplication left_application, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(right_ref  != NULL);
@@ -243,7 +295,7 @@ bool inferer_unify_inner_left_type_application(Inferer* inferer, TypeApplication
     return true;
 }
 
-bool inferer_unify_inner_left_type_constructor(Inferer* inferer, TypeConstructor left_constructor, Type** right_ref)
+static bool inferer_unify_inner_left_type_constructor(Inferer* inferer, TypeConstructor left_constructor, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(right_ref  != NULL);
@@ -274,7 +326,7 @@ bool inferer_unify_inner_left_type_constructor(Inferer* inferer, TypeConstructor
     return true;
 }
 
-bool inferer_unify_inner_left_type_alias(Inferer* inferer, TypeAlias left_alias, Type** right_ref)
+static bool inferer_unify_inner_left_type_alias(Inferer* inferer, TypeAlias left_alias, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(right_ref  != NULL);
@@ -354,7 +406,7 @@ bool inferer_unify_inner(Inferer* inferer, Type** left_ref, Type** right_ref)
     return false;
 }
 
-bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, Span span)
+extern bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, Span span)
 {
     assert(inferer    != NULL);
     assert(left_ref   != NULL);
@@ -374,7 +426,7 @@ bool inferer_unify(Inferer* inferer, Type** left_ref, Type** right_ref, Span spa
     return true;
 }
 
-bool inferer_attempt_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
+extern bool inferer_attempt_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
 {
     assert(inferer    != NULL);
     assert(left_ref   != NULL);
@@ -394,7 +446,7 @@ bool inferer_attempt_unify(Inferer* inferer, Type** left_ref, Type** right_ref)
 
 // The function 'inferer_generalize' abstracts a type over all type variables
 // which are free in the type but not free in the given type environment.
-void inferer_generalize(Inferer* inferer, Type* type, TypeScheme** scheme)
+extern void inferer_generalize(Inferer* inferer, Type* type, TypeScheme** scheme)
 {
     assert(inferer != NULL);
     assert(type    != NULL);
@@ -431,7 +483,7 @@ void inferer_generalize(Inferer* inferer, Type* type, TypeScheme** scheme)
     *scheme = (TypeScheme*) arena_push(&inferer->type_arena, &scheme_mem, sizeof(TypeScheme));
 }
 
-Type* inferer_instantiate_type(Inferer* inferer, Type* type, DYNAMIC_ARRAY(Type**) quantified)
+static Type* inferer_instantiate_type(Inferer* inferer, Type* type, DYNAMIC_ARRAY(Type**) quantified)
 {
     assert(inferer != NULL);
     assert(type != NULL);
@@ -543,7 +595,7 @@ Type* inferer_instantiate_type(Inferer* inferer, Type* type, DYNAMIC_ARRAY(Type*
         (&inferer->type_arena, &copy, sizeof(Type));
 }
 
-void inferer_instantiate(Inferer* inferer, TypeScheme* scheme, Type** type)
+extern void inferer_instantiate(Inferer* inferer, TypeScheme* scheme, Type** type)
 {
     assert(inferer != NULL);
     assert(scheme != NULL);
@@ -563,7 +615,7 @@ void inferer_instantiate(Inferer* inferer, TypeScheme* scheme, Type** type)
     arrfree(quantified);
 }
 
-bool inferer_constrain_numeric(Inferer* inferer, Type** type_ref, Span span)
+static bool inferer_constrain_numeric(Inferer* inferer, Type** type_ref, Span span)
 {
     assert(inferer   != NULL);
     assert(type_ref  != NULL);
@@ -580,7 +632,7 @@ bool inferer_constrain_numeric(Inferer* inferer, Type** type_ref, Span span)
     return true;
 }
 
-bool inferer_constrain_equality(Inferer* inferer, Type** type_ref, Span span)
+static bool inferer_constrain_equality(Inferer* inferer, Type** type_ref, Span span)
 {
     assert(inferer   != NULL);
     assert(type_ref  != NULL);
@@ -597,7 +649,7 @@ bool inferer_constrain_equality(Inferer* inferer, Type** type_ref, Span span)
     return true;
 }
 
-void inferer_get_free_var_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* substs)
+static void inferer_get_free_var_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* substs)
 {
     assert(inferer != NULL);
     assert(type    != NULL);
@@ -663,7 +715,7 @@ void inferer_get_free_var_substs(Inferer* inferer, Type* type, HASHMAP(Subst*)* 
 }
 
 // TODO: Simplify this and reverse subst functions.
-void inferer_apply_subst(Inferer* inferer, Type** type_ref, Subst subst)
+static void inferer_apply_subst(Inferer* inferer, Type** type_ref, Subst subst)
 {
     assert(inferer   != NULL);
     assert(type_ref  != NULL);
@@ -720,7 +772,7 @@ void inferer_apply_subst(Inferer* inferer, Type** type_ref, Subst subst)
     UNREACHABLE;
 }
 
-void inferer_decl_apply_subst(Inferer* inferer, Decl* decl, Subst subst)
+static void inferer_decl_apply_subst(Inferer* inferer, Decl* decl, Subst subst)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -750,7 +802,7 @@ void inferer_decl_apply_subst(Inferer* inferer, Decl* decl, Subst subst)
     UNREACHABLE;
 }
 
-bool inferer_infer_expr_primary_list(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_primary_list(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr != NULL);
@@ -792,7 +844,7 @@ bool inferer_infer_expr_primary_list(Inferer* inferer, Expr* expr, Type** type)
 }
 
 // TODO: Check if this is fully correct.
-bool inferer_infer_expr_primary_struct(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_primary_struct(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr != NULL);
@@ -853,7 +905,7 @@ bool inferer_infer_expr_primary_struct(Inferer* inferer, Expr* expr, Type** type
 } 
 
 // Lambda functions are not yet implemented in this language.
-bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr != NULL);
@@ -894,7 +946,7 @@ bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type** type
     return true;
 }
 
-void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
+static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -921,7 +973,7 @@ void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type)
     UNREACHABLE;
 }
 
-void inferer_infer_expr_primary_identifier(Inferer* inferer, char* identifier, Type** type)
+static void inferer_infer_expr_primary_identifier(Inferer* inferer, char* identifier, Type** type)
 {
     assert(inferer    != NULL);
     assert(type       != NULL);
@@ -933,7 +985,7 @@ void inferer_infer_expr_primary_identifier(Inferer* inferer, char* identifier, T
     UNREACHABLE;
 }
 
-bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -967,7 +1019,7 @@ bool inferer_infer_expr_primary(Inferer* inferer, Expr* expr, Type** type)
     UNREACHABLE;
 }
 
-bool inferer_infer_expr_unary_logical_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_unary_logical_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer     != NULL);
     assert(expr    != NULL);
@@ -991,7 +1043,7 @@ bool inferer_infer_expr_unary_logical_operator(Inferer* inferer, Expr* expr, Typ
     return true;
 }
 
-bool inferer_infer_expr_unary_arithmetic_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_unary_arithmetic_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer     != NULL);
     assert(expr    != NULL);
@@ -1015,7 +1067,7 @@ bool inferer_infer_expr_unary_arithmetic_operator(Inferer* inferer, Expr* expr, 
     return true;
 }
 
-bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1034,7 +1086,7 @@ bool inferer_infer_expr_unary(Inferer* inferer, Expr* expr, Type** type)
     UNREACHABLE;
 }
 
-bool inferer_infer_expr_binary_arithmetic_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary_arithmetic_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1070,7 +1122,7 @@ bool inferer_infer_expr_binary_arithmetic_operator(Inferer* inferer, Expr* expr,
     return true;
 }
 
-bool inferer_infer_expr_binary_comparison_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary_comparison_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1106,7 +1158,7 @@ bool inferer_infer_expr_binary_comparison_operator(Inferer* inferer, Expr* expr,
     return true;
 }
 
-bool inferer_infer_expr_binary_logical_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary_logical_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1141,7 +1193,7 @@ bool inferer_infer_expr_binary_logical_operator(Inferer* inferer, Expr* expr, Ty
     return true;
 }
 
-bool inferer_infer_expr_binary_equality_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary_equality_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1177,7 +1229,7 @@ bool inferer_infer_expr_binary_equality_operator(Inferer* inferer, Expr* expr, T
     return true;
 }
 
-bool inferer_infer_expr_binary_access_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary_access_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1215,7 +1267,7 @@ bool inferer_infer_expr_binary_access_operator(Inferer* inferer, Expr* expr, Typ
     return true;
 }
 
-bool inferer_infer_expr_binary_assign_operator(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary_assign_operator(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1248,7 +1300,7 @@ bool inferer_infer_expr_binary_assign_operator(Inferer* inferer, Expr* expr, Typ
     return true;
 }
 
-bool inferer_infer_expr_binary_index_operator(Inferer* inferer, Expr* expr, Type** type) 
+static bool inferer_infer_expr_binary_index_operator(Inferer* inferer, Expr* expr, Type** type) 
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1287,7 +1339,7 @@ bool inferer_infer_expr_binary_index_operator(Inferer* inferer, Expr* expr, Type
 }
 
 // TODO: Rethink think how to resolve struct access operator.
-bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1330,7 +1382,7 @@ bool inferer_infer_expr_binary(Inferer* inferer, Expr* expr, Type** type)
     UNREACHABLE;
 }
 
-bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
+static bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1380,7 +1432,7 @@ bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type)
     return true;
 }
 
-bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
+extern bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
 {
     assert(inferer != NULL);
     assert(expr    != NULL);
@@ -1397,7 +1449,7 @@ bool inferer_infer_expr(Inferer* inferer, Expr* expr, Type** type)
     UNREACHABLE;
 }
 
-void inferer_convert_type_expr_variable(Inferer* inferer, TypeExprVariable variable, Type** type)
+static void inferer_convert_type_expr_variable(Inferer* inferer, TypeExprVariable variable, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1411,7 +1463,7 @@ void inferer_convert_type_expr_variable(Inferer* inferer, TypeExprVariable varia
     }
 }
 
-void inferer_convert_type_expr_list(Inferer* inferer, TypeExprList list, Type** type)
+static void inferer_convert_type_expr_list(Inferer* inferer, TypeExprList list, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1430,7 +1482,7 @@ void inferer_convert_type_expr_list(Inferer* inferer, TypeExprList list, Type** 
     *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
 }
 
-void inferer_convert_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Type** type)
+static void inferer_convert_type_expr_struct(Inferer* inferer, TypeExprStruct structt, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1476,7 +1528,7 @@ void inferer_convert_type_expr_struct(Inferer* inferer, TypeExprStruct structt, 
     *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
 }
 
-void inferer_convert_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
+static void inferer_convert_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1501,7 +1553,7 @@ void inferer_convert_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type** type)
     *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
 }
 
-void inferer_convert_type_expr_application(Inferer* inferer, TypeExprApplication application, Type** type)
+static void inferer_convert_type_expr_application(Inferer* inferer, TypeExprApplication application, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1543,7 +1595,7 @@ void inferer_convert_type_expr_application(Inferer* inferer, TypeExprApplication
     *type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type*));
 }
 
-void inferer_conver_type_expr_alias(Inferer* inferer, TypeExprAlias alias, Type** type)
+static void inferer_conver_type_expr_alias(Inferer* inferer, TypeExprAlias alias, Type** type)
 {
     assert(inferer   != NULL);
     assert(type      != NULL);
@@ -1553,7 +1605,7 @@ void inferer_conver_type_expr_alias(Inferer* inferer, TypeExprAlias alias, Type*
     assert(*type != NULL); // Shouldn't really ever be NULL.
 }
 
-void inferer_convert_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
+extern void inferer_convert_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** type)
 {
     assert(inferer   != NULL);
     assert(type_expr != NULL);
@@ -1608,7 +1660,7 @@ void inferer_convert_type_expr(Inferer* inferer, TypeExpr* type_expr, Type** typ
     UNREACHABLE;
 }
 
-bool inferer_infer_stmt_block(Inferer* inferer, StmtBlock block)
+static bool inferer_infer_stmt_block(Inferer* inferer, StmtBlock block)
 {
     assert(inferer    != NULL);
 
@@ -1624,7 +1676,7 @@ bool inferer_infer_stmt_block(Inferer* inferer, StmtBlock block)
     return true;
 }
 
-bool inferer_infer_stmt_while(Inferer* inferer, StmtWhile whilee)
+static bool inferer_infer_stmt_while(Inferer* inferer, StmtWhile whilee)
 {
     assert(inferer    != NULL);
 
@@ -1643,7 +1695,7 @@ bool inferer_infer_stmt_while(Inferer* inferer, StmtWhile whilee)
     return true;
 }
 
-bool inferer_infer_stmt_if(Inferer* inferer, StmtIf iff)
+static bool inferer_infer_stmt_if(Inferer* inferer, StmtIf iff)
 {
     assert(inferer    != NULL);
 
@@ -1662,7 +1714,7 @@ bool inferer_infer_stmt_if(Inferer* inferer, StmtIf iff)
     return true;
 }
 
-bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
+static bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
 {
     assert(inferer    != NULL);
 
@@ -1691,7 +1743,7 @@ bool inferer_infer_stmt_return(Inferer* inferer, StmtReturn returnn)
     return true;
 }
 
-bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
+static bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
 {
     assert(inferer  != NULL);
     assert(let.expr != NULL);
@@ -1729,7 +1781,7 @@ bool inferer_infer_stmt_let(Inferer* inferer, StmtLet let)
     return true;
 }
 
-bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
+static bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
 {
     assert(inferer != NULL);
 
@@ -1761,7 +1813,7 @@ bool inferer_infer_stmt_fn(Inferer* inferer, StmtFn fn)
     return true;
 }
 
-bool inferer_infer_stmt_alias(Inferer* inferer, StmtAlias alias)
+static bool inferer_infer_stmt_alias(Inferer* inferer, StmtAlias alias)
 {
     assert(inferer != NULL);
 
@@ -1774,7 +1826,7 @@ bool inferer_infer_stmt_alias(Inferer* inferer, StmtAlias alias)
     return true;
 }
 
-bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
+static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
 {
     assert(inferer != NULL);
 
@@ -1811,7 +1863,7 @@ bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
     inferer_decl_type_set_abstraction(inferer, stmt_type.decl, abstraction);
 }
 
-bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
+static bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
 {
     assert(inferer != NULL);
 
@@ -1819,7 +1871,7 @@ bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
     UNREACHABLE;
 }
 
-bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
+extern bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
 {
     assert(inferer != NULL);
     assert(stmt    != NULL);
@@ -1844,7 +1896,7 @@ bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
     UNREACHABLE;
 }
 
-Type* inferer_create_free_type_var(Inferer* inferer)
+static Type* inferer_create_free_type_var(Inferer* inferer)
 {
     assert(inferer != NULL);
 
@@ -1859,7 +1911,7 @@ Type* inferer_create_free_type_var(Inferer* inferer)
     return type;
 }
 
-Type* inferer_create_free_list_type(Inferer* inferer)
+static Type* inferer_create_free_list_type(Inferer* inferer)
 {
     assert(inferer != NULL);
 
@@ -1874,7 +1926,7 @@ Type* inferer_create_free_list_type(Inferer* inferer)
     return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
 }
 
-Type* inferer_create_free_function_type(Inferer* inferer, int arity)
+static Type* inferer_create_free_function_type(Inferer* inferer, int arity)
 {
     assert(inferer != NULL);
 
@@ -1913,7 +1965,7 @@ Type* inferer_create_free_function_type(Inferer* inferer, int arity)
     return type;
 }
 
-Type* inferer_create_list_type(Inferer* inferer, Type* inferred_type)
+static Type* inferer_create_list_type(Inferer* inferer, Type* inferred_type)
 {
     assert(inferer != NULL);
 
@@ -1928,7 +1980,7 @@ Type* inferer_create_list_type(Inferer* inferer, Type* inferred_type)
     return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
 }
 
-TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num)
+static TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num)
 {
     assert(inferer != NULL);
     assert(type_var_num >= 0);
@@ -1945,7 +1997,7 @@ TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_
     return abstraction;
 }
 
-TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl)
+static TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -1959,7 +2011,7 @@ TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl*
     return decl->decl.type.abstraction;
 }
 
-void inferer_decl_var_begin_inferrence(Inferer* inferer, Decl* decl)
+static void inferer_decl_var_begin_inferrence(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -1967,7 +2019,7 @@ void inferer_decl_var_begin_inferrence(Inferer* inferer, Decl* decl)
     inferer_decl_var_set_type(inferer, decl, inferer_create_free_type_var(inferer));
 }
 
-Type* inferer_decl_var_get_type(Inferer* inferer, Decl* decl)
+static Type* inferer_decl_var_get_type(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -1977,7 +2029,7 @@ Type* inferer_decl_var_get_type(Inferer* inferer, Decl* decl)
     return decl->decl.var.type;
 }
 
-void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
+static void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -1986,7 +2038,7 @@ void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
     decl->decl.var.type = type;
 }
 
-Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
+static Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2004,7 +2056,7 @@ Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
     return type;
 }
 
-void inferer_decl_var_set_return_type(Inferer* inferer, Decl* decl, Type* type)
+static void inferer_decl_var_set_return_type(Inferer* inferer, Decl* decl, Type* type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2022,7 +2074,7 @@ void inferer_decl_var_set_return_type(Inferer* inferer, Decl* decl, Type* type)
     old_type->type.fn.right = type;
 }
 
-Type* inferer_decl_type_var_get_type(Inferer* inferer, Decl* decl)
+static Type* inferer_decl_type_var_get_type(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2031,7 +2083,7 @@ Type* inferer_decl_type_var_get_type(Inferer* inferer, Decl* decl)
     return decl->decl.type_var.type;
 }
 
-void inferer_decl_type_var_set_type(Inferer* inferer, Decl* decl, Type* type)
+static void inferer_decl_type_var_set_type(Inferer* inferer, Decl* decl, Type* type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2040,7 +2092,7 @@ void inferer_decl_type_var_set_type(Inferer* inferer, Decl* decl, Type* type)
     decl->decl.type_var.type = type;
 }
 
-Type* inferer_decl_alias_get_type(Inferer* inferer, Decl* decl)
+static Type* inferer_decl_alias_get_type(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2049,7 +2101,7 @@ Type* inferer_decl_alias_get_type(Inferer* inferer, Decl* decl)
     return decl->decl.alias.type;
 }
 
-void inferer_decl_alias_set_type(Inferer* inferer, Decl* decl, Type* type)
+static void inferer_decl_alias_set_type(Inferer* inferer, Decl* decl, Type* type)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2058,7 +2110,7 @@ void inferer_decl_alias_set_type(Inferer* inferer, Decl* decl, Type* type)
     decl->decl.alias.type = type;
 }
 
-void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl)
+static void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2068,7 +2120,7 @@ void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl)
     inferer_generalize(inferer, decl->decl.var.type, &decl->decl.var.scheme);
 }
 
-TypeScheme* inferer_decl_var_get_scheme(Inferer* inferer, Decl* decl)
+static TypeScheme* inferer_decl_var_get_scheme(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2078,7 +2130,7 @@ TypeScheme* inferer_decl_var_get_scheme(Inferer* inferer, Decl* decl)
     return decl->decl.var.scheme;
 }
 
-void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme* scheme)
+static void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme* scheme)
 {
     assert(inferer != NULL);
     assert(decl    != NULL);
@@ -2087,7 +2139,7 @@ void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme* schem
     decl->decl.var.scheme = scheme;
 }
 
-TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl)
+static TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
     assert(decl != NULL);
@@ -2096,7 +2148,7 @@ TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl)
     return decl->decl.type.abstraction;
 }
 
-void  inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction)
+static void  inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction)
 {
     assert(inferer != NULL);
     assert(decl != NULL);
@@ -2105,7 +2157,7 @@ void  inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstra
     decl->decl.type.abstraction = abstraction;
 }
 
-void inferer_push_type_variable(Inferer* inferer, Type* type_var)
+static void inferer_push_type_variable(Inferer* inferer, Type* type_var)
 {
     assert(inferer != NULL);
 
@@ -2113,7 +2165,7 @@ void inferer_push_type_variable(Inferer* inferer, Type* type_var)
     inferer->curr_type_env.type_variable_length++;
 }
 
-void inferer_pop_type_variable(Inferer* inferer)
+static void inferer_pop_type_variable(Inferer* inferer)
 {
     assert(inferer != NULL);
 
@@ -2121,7 +2173,7 @@ void inferer_pop_type_variable(Inferer* inferer)
     inferer->curr_type_env.type_variable_length--;
 }
 
-bool inferer_occurs_check_struct(Inferer* inferer, Type* var, TypeStruct structt)
+static bool inferer_occurs_check_struct(Inferer* inferer, Type* var, TypeStruct structt)
 {
     assert(inferer   != NULL         );
     assert(var       != NULL         );
@@ -2140,7 +2192,7 @@ bool inferer_occurs_check_struct(Inferer* inferer, Type* var, TypeStruct structt
     return true;
 }
 
-bool inferer_occurs_check_application(Inferer* inferer, Type* var, TypeApplication application)
+static bool inferer_occurs_check_application(Inferer* inferer, Type* var, TypeApplication application)
 {
     assert(inferer   != NULL         );
     assert(var       != NULL         );
@@ -2160,7 +2212,7 @@ bool inferer_occurs_check_application(Inferer* inferer, Type* var, TypeApplicati
 }
 
 // Nothing evil found - true, else - false;
-bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
+static bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
 {
     assert(inferer   != NULL         );
     assert(var       != NULL         );
@@ -2191,7 +2243,7 @@ bool inferer_occurs_check(Inferer* inferer, Type* var, Type* type)
 }
 
 // TODO: Take a look at
-bool inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type)
+static bool inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type)
 {
     assert(inferer   != NULL);
     assert(var_ref   != NULL);
@@ -2222,7 +2274,7 @@ bool inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type)
     return true;
 }
 
-void inferer_unify_apply_binds(Inferer* inferer)
+static void inferer_unify_apply_binds(Inferer* inferer)
 {
     assert(inferer != NULL);
 
@@ -2248,7 +2300,7 @@ void inferer_unify_apply_binds(Inferer* inferer)
     }
 }
 
-void inferer_unify_free_binds(Inferer* inferer)
+static void inferer_unify_free_binds(Inferer* inferer)
 {
     assert(inferer != NULL);
 
@@ -2256,14 +2308,14 @@ void inferer_unify_free_binds(Inferer* inferer)
     inferer->binds = NULL  ;
 }
 
-TypeEnv inferer_get_curr_type_env(Inferer* inferer)
+static TypeEnv inferer_get_curr_type_env(Inferer* inferer)
 {
     assert(inferer != NULL);
 
     return inferer->curr_type_env;
 }
 
-void inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env)
+static void inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env)
 {
     assert(inferer != NULL);
     assert(inferer->curr_type_env.type_variable_length - type_env.type_variable_length >= 0);
@@ -2278,7 +2330,7 @@ void inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env)
     inferer->curr_type_env = type_env;
 }
 
-bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application)
+static bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application)
 {
     assert(inferer != NULL);
 
@@ -2286,7 +2338,7 @@ bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_
         && left_application.abstraction == right_application.abstraction;
 }
 
-bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)
+static bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)
 {
     assert(inferer != NULL);
 
@@ -2304,7 +2356,7 @@ bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)
     return false;
 }
 
-Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind)
+static Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind)
 {
     assert(inferer != NULL);
 
@@ -2330,7 +2382,7 @@ Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* ty
     UNREACHABLE;
 }
 
-Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type)
+static Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type)
 {
     assert(inferer     != NULL);
     assert(argv        != NULL);
@@ -2381,7 +2433,7 @@ Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return
     return curr_type;
 }
 
-Span inferer_get_expr_span(Inferer* inferer, Expr* expr)
+static Span inferer_get_expr_span(Inferer* inferer, Expr* expr)
 {
     assert(inferer != NULL);
     assert(expr != NULL);
@@ -2395,7 +2447,7 @@ Span inferer_get_expr_span(Inferer* inferer, Expr* expr)
     };
 }
 
-void inferer_throw_err_unify_failed(Inferer* inferer, Span span, Type* left, Type* right)
+static void inferer_throw_err_unify_failed(Inferer* inferer, Span span, Type* left, Type* right)
 {
     assert(inferer != NULL);
     assert(left    != NULL);
@@ -2413,51 +2465,7 @@ void inferer_throw_err_unify_failed(Inferer* inferer, Span span, Type* left, Typ
     });
 }
 
-void inferer_throw_err_type_failed_constraint_numeric(Inferer* inferer, Span span)
-{
-    assert(inferer != NULL);
-
-    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
-    {
-        .kind = DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_NUMERIC,
-        .span = span,
-    });
-}
-
-void inferer_throw_err_type_failed_constraint_equality(Inferer* inferer, Span span)
-{
-    assert(inferer != NULL);
-
-    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
-    {
-        .kind = DIAGNOSTIC_ERR_TYPE_FAILED_CONSTRAINT_EQUALITY,
-        .span = span,
-    });
-}
-
-void inferer_throw_err_expr_binary_arithmetic_constraint_failed(Inferer* inferer, Expr* expr)
-{
-    assert(inferer != NULL);
-
-    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
-    {
-        .kind = DIAGNOSTIC_ERR_EXPR_BINARY_ARITHMETIC_CONSTRAINT_FAILED,
-        .span = inferer_get_expr_span(inferer, expr),
-    });
-}
-
-void inferer_throw_err_expr_binary_equality_constraint_failed(Inferer* inferer, Expr* expr)
-{
-    assert(inferer != NULL);
-
-    diagnostic_component_push_err(inferer->diagnostic_component, (DiagnosticErr)
-    {
-        .kind = DIAGNOSTIC_ERR_EXPR_BINARY_EQUALITY_CONSTRAINT_FAILED,
-        .span = inferer_get_expr_span(inferer, expr),
-    });
-}
-
-void inferer_throw_err_expr_binary_access_op_left_kind_not_struct(Inferer* inferer, Expr* expr)
+static void inferer_throw_err_expr_binary_access_op_left_kind_not_struct(Inferer* inferer, Expr* expr)
 {
     assert(inferer != NULL);
 
@@ -2468,7 +2476,7 @@ void inferer_throw_err_expr_binary_access_op_left_kind_not_struct(Inferer* infer
     });
 }
 
-void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field( Inferer* inferer, Expr* expr)
+static void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field( Inferer* inferer, Expr* expr)
 {
     assert(inferer != NULL);
 
@@ -2479,7 +2487,7 @@ void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field( Infe
     });
 }
 
-void inferer_throw_err_expr_fn_excessive_args(Inferer* inferer, Expr* expr)
+static void inferer_throw_err_expr_fn_excessive_args(Inferer* inferer, Expr* expr)
 {
     assert(inferer != NULL);
 
@@ -2490,7 +2498,7 @@ void inferer_throw_err_expr_fn_excessive_args(Inferer* inferer, Expr* expr)
     });
 }
 
-void inferer_throw_err_type_isnt_numeric(Inferer* inferer, Span span)
+static void inferer_throw_err_type_isnt_numeric(Inferer* inferer, Span span)
 {
     assert(inferer != NULL);
 
@@ -2501,7 +2509,7 @@ void inferer_throw_err_type_isnt_numeric(Inferer* inferer, Span span)
     });
 }
 
-void inferer_throw_err_type_isnt_equality(Inferer* inferer, Span span)
+static void inferer_throw_err_type_isnt_equality(Inferer* inferer, Span span)
 {
     assert(inferer != NULL);
 

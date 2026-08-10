@@ -44,47 +44,14 @@ struct ResolverSnapshot
     // int decl_id;
 };
 
-Resolver resolver_init(Parser* parser, Stmt* stmt);
-void resolver_free(Resolver* resolver);
+extern Resolver resolver_init(Parser* parser, Stmt* stmt);
+extern void resolver_free(Resolver* resolver);
 
 // 'true' indicates success, 'false' indicates failure.
-bool resolver_resolve_stmt     (Resolver* resolver);
-bool resolver_resolve_expr     (Resolver* resolver, Expr* expr);
-bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
-bool resolver_resolve_pattern  (Resolver* resolver, Pattern* pattern);
-bool resolver_resolve_fn_args  (Resolver* resolver, int argc, FnArg** argv, TypeExpr* return_type);
+extern bool resolver_resolve_stmt     (Resolver* resolver);
+extern bool resolver_resolve_expr     (Resolver* resolver, Expr* expr);
+extern bool resolver_resolve_type_expr(Resolver* resolver, TypeExpr* type_expr);
+extern bool resolver_resolve_pattern  (Resolver* resolver, Pattern* pattern);
+extern bool resolver_resolve_fn_args  (Resolver* resolver, int argc, FnArg** argv, TypeExpr* return_type);
 
-ResolverSnapshot resolver_get_context_snapshot    (Resolver* resolver);
-void     resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot);
-
-void resolver_push_decl_to_context(Resolver* resolver, Decl* decl);
-
-Decl* resolver_declare_variable            (Resolver* resolver, char* identifier);
-Decl* resolver_declare_type_variable       (Resolver* resolver, char* identifier);
-Decl* resolver_declare_alias               (Resolver* resolver, char* identifier);
-Decl* resolver_declare_new_type            (Resolver* resolver, char* identifier);
-Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier);
-
-char* resolver_get_existing_identifier (Resolver* resolver, char* identifier);
-Decl* resolver_get_decl_by_identifier  (Resolver* resolver, char* identifier);
-
-Span resolver_get_stmt_span      (Resolver* resolver, Stmt* stmt);
-Span resolver_get_expr_span      (Resolver* resolver, Expr* expr);
-Span resolver_get_type_expr_span (Resolver* resolver, TypeExpr* type_expr);
-Span resolver_get_pattern_span   (Resolver* resolver, Pattern* pattern);
-
-void resolver_throw_err_stmt_break_not_in_loop                 (Resolver* resolver, Stmt* stmt);
-void resolver_throw_err_stmt_continue_not_in_loop              (Resolver* resolver, Stmt* stmt);
-void resolver_throw_err_stmt_return_not_in_fn                  (Resolver* resolver, Stmt* stmt);
-void resolver_throw_err_stmt_returns_dont_match                (Resolver* resolver, Stmt* stmt);
-void resolver_throw_err_expr_failed_to_resolve_identifier      (Resolver* resolver, Expr* expr, char* identifier);
-void resolver_throw_err_type_expr_failed_to_resolve_identifier (Resolver* resolver, TypeExpr* type_expr, char* identifier);
-void resolver_throw_err_expr_failed_to_resolve_access_op       (Resolver* resolver, Expr* expr);
-void resolver_throw_err_type_expr_failed_to_find_type          (Resolver* resolver, TypeExpr* type_expr, char* identifier);
-void resolver_throw_err_pattern_failed_to_resolve_identifier   (Resolver* resolver, Pattern* pattern, const char* identifier);
-void resolver_throw_err_pattern_failed_to_find_constructor     (Resolver* resolver, Pattern* pattern, const char* identifier);
-
-// resolver_declare_type_variable
-// resolver_resolve_stmt_fn_type
-// resolver_declare_fn_params
 #endif

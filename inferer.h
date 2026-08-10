@@ -70,76 +70,25 @@ struct Inferer
     DiagnosticComponent* diagnostic_component;
 };
 
-Inferer inferer_init(Resolver* resolver);
-void    inferer_free(Inferer* inferer  );
+extern Type* builtin_type_nil   ;
+extern Type* builtin_type_bool  ;
+extern Type* builtin_type_nat   ;
+extern Type* builtin_type_int   ;
+extern Type* builtin_type_real  ;
+extern Type* builtin_type_string;
 
-bool  inferer_infer_stmt          (Inferer* inferer, Stmt* stmt)                         ;
-void  inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** type)   ;
-bool  inferer_infer_expr          (Inferer* inferer, Expr* expr, Type** type)            ;
-bool  inferer_resolve             (Inferer* inferer, Type* type, Type** resolved_type)   ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
-bool  inferer_unify_inner         (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
-bool  inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref, Span span); // Unifies the two types
-bool  inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ;
-void  inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
-void  inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
-bool  inferer_constrain_numeric   (Inferer* inferer, Type** type_ref, Span span)         ;
-bool  inferer_constrain_equality  (Inferer* inferer, Type** type_ref, Span span)         ;
+extern Inferer inferer_init(Resolver* resolver);
+extern void    inferer_free(Inferer* inferer  );
 
-void  inferer_get_free_var_substs (Inferer* inferer, Type* type, HASHMAP(Subst*)* substs);
-void  inferer_apply_subst         (Inferer* inferer, Type** type_ref, Subst subst)       ;
-void  inferer_decl_apply_subst    (Inferer* inferer, Decl* decl, Subst subst)            ;
+extern bool  inferer_resolve             (Inferer* inferer, Type* type, Type** resolved_type)   ; // Takes a type, and attempts to find the bottom-most concrete type in the type graph.
+extern bool  inferer_unify_inner         (Inferer* inferer, Type** left_ref, Type** right_ref)  ; // Unifies the two types
+extern bool  inferer_attempt_unify       (Inferer* inferer, Type** left_ref, Type** right_ref)  ;
+extern bool  inferer_unify               (Inferer* inferer, Type** left_ref, Type** right_ref, Span span); // Unifies the two types
+extern void  inferer_generalize          (Inferer* inferer, Type* type, TypeScheme** scheme)    ;
+extern void  inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, Type** type)    ;
 
-// Follows free type variables until until we find a concrete type.
-bool inferer_infer_expr_and_constrain(Inferer* inferer, Expr* expr, TypeConstraint* constraint, Type** type);
-
-Type* inferer_create_free_type_var      (Inferer* inferer);
-Type* inferer_create_free_list_type     (Inferer* inferer);
-Type* inferer_create_free_function_type (Inferer* inferer, int arity);
-Type* inferer_create_list_type          (Inferer* inferer, Type* inferred_type);
-
-void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl);
-Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
-void  inferer_decl_var_set_type            (Inferer* inferer, Decl* decl, Type* type);
-Type* inferer_decl_var_get_return_type     (Inferer* inferer, Decl* decl);
-void  inferer_decl_var_set_return_type     (Inferer* inferer, Decl* decl, Type* type);
-Type* inferer_decl_type_var_get_type       (Inferer* inferer, Decl* decl);
-void  inferer_decl_type_var_set_type       (Inferer* inferer, Decl* decl, Type* type);
-Type* inferer_decl_alias_get_type          (Inferer* inferer, Decl* decl);
-void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl, Type* type);
-void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
-TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
-void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
-TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
-TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
-TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl);
-void             inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction);
-
-void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
-void  inferer_pop_type_variable (Inferer* inferer);
-bool  inferer_occurs_check(Inferer* inferer, Type* var, Type* type);
-bool  inferer_bind_variable_to_type(Inferer* inferer, Type** var_ref, Type* type);
-void  inferer_unify_apply_binds(Inferer* inferer);
-void  inferer_unify_free_binds (Inferer* inferer);
-
-TypeEnv inferer_get_curr_type_env(Inferer* inferer);
-void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
-void  assert_generic_operator_type_is_valid(TypeKind type);
-bool  inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
-bool  inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst);
-Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind);
-Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type);
-
-Span inferer_get_expr_span(Inferer* inferer, Expr* expr);
-
-void inferer_throw_err_unify_failed                                        (Inferer* inferer, Span span, Type* left, Type* right);
-void inferer_throw_err_type_failed_constraint_numeric                      (Inferer* inferer, Span  span);
-void inferer_throw_err_type_failed_constraint_equality                     (Inferer* inferer, Span  span);
-void inferer_throw_err_expr_binary_arithmetic_constraint_failed            (Inferer* inferer, Expr* expr);
-void inferer_throw_err_expr_binary_equality_constraint_failed              (Inferer* inferer, Expr* expr);
-void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);
-void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_field (Inferer* inferer, Expr* expr);
-void inferer_throw_err_expr_fn_excessive_args                              (Inferer* inferer, Expr* expr);
-void inferer_throw_err_type_isnt_numeric                                   (Inferer* inferer, Span span);
-void inferer_throw_err_type_isnt_equality                                  (Inferer* inferer, Span span);
+extern bool  inferer_infer_expr          (Inferer* inferer, Expr* expr, Type** type)            ;
+extern void  inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** type)   ;
+extern bool  inferer_infer_stmt          (Inferer* inferer, Stmt* stmt)                         ;
 
 #endif

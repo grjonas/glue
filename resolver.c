@@ -1,7 +1,36 @@
 #include "resolver.h"
 
+static ResolverSnapshot resolver_get_context_snapshot    (Resolver* resolver);
+static void     resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot);
+static void resolver_push_decl_to_context(Resolver* resolver, Decl* decl); 
+
+static Decl* resolver_declare_variable            (Resolver* resolver, char* identifier);
+static Decl* resolver_declare_type_variable       (Resolver* resolver, char* identifier);
+static Decl* resolver_declare_alias               (Resolver* resolver, char* identifier);
+static Decl* resolver_declare_new_type            (Resolver* resolver, char* identifier);
+static Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier);
+
+static char* resolver_get_existing_identifier (Resolver* resolver, char* identifier);
+static Decl* resolver_get_decl_by_identifier  (Resolver* resolver, char* identifier);
+
+static Span resolver_get_stmt_span      (Resolver* resolver, Stmt* stmt);
+static Span resolver_get_expr_span      (Resolver* resolver, Expr* expr);
+static Span resolver_get_type_expr_span (Resolver* resolver, TypeExpr* type_expr);
+static Span resolver_get_pattern_span   (Resolver* resolver, Pattern* pattern);
+
+static void resolver_throw_err_stmt_break_not_in_loop                 (Resolver* resolver, Stmt* stmt);
+static void resolver_throw_err_stmt_continue_not_in_loop              (Resolver* resolver, Stmt* stmt);
+static void resolver_throw_err_stmt_return_not_in_fn                  (Resolver* resolver, Stmt* stmt);
+static void resolver_throw_err_stmt_returns_dont_match                (Resolver* resolver, Stmt* stmt);
+static void resolver_throw_err_expr_failed_to_resolve_identifier      (Resolver* resolver, Expr* expr, char* identifier);
+static void resolver_throw_err_type_expr_failed_to_resolve_identifier (Resolver* resolver, TypeExpr* type_expr, char* identifier);
+static void resolver_throw_err_expr_failed_to_resolve_access_op       (Resolver* resolver, Expr* expr);
+static void resolver_throw_err_type_expr_failed_to_find_type          (Resolver* resolver, TypeExpr* type_expr, char* identifier);
+static void resolver_throw_err_pattern_failed_to_resolve_identifier   (Resolver* resolver, Pattern* pattern, const char* identifier);
+static void resolver_throw_err_pattern_failed_to_find_constructor     (Resolver* resolver, Pattern* pattern, const char* identifier);
+
 // TODO: Fix init and free for the resolver, because it doesn't really free everything (the errors mainly).
-Resolver resolver_init(Parser* parser, Stmt* stmts)
+extern Resolver resolver_init(Parser* parser, Stmt* stmts)
 {
     // Parser cleanup
     diagnostic_component_free(&parser->diagnostic_component);
@@ -37,7 +66,7 @@ Resolver resolver_init(Parser* parser, Stmt* stmts)
     return resolver;
 }
 
-void resolver_free(Resolver* resolver)
+extern void resolver_free(Resolver* resolver)
 {
     free((char*)resolver->txt);
     arrfree(resolver->tokens);
@@ -66,7 +95,7 @@ void resolver_free(Resolver* resolver)
     };
 }
 
-bool resolver_resolve_stmt_block(Resolver* resolver)
+static resolver_resolve_stmt_block(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -94,7 +123,7 @@ bool resolver_resolve_stmt_block(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_let(Resolver* resolver)
+static bool resolver_resolve_stmt_let(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -135,7 +164,7 @@ bool resolver_resolve_stmt_let(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_expr(Resolver* resolver)
+static bool resolver_resolve_stmt_expr(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -151,7 +180,7 @@ bool resolver_resolve_stmt_expr(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_if(Resolver* resolver)
+static bool resolver_resolve_stmt_if(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -194,7 +223,7 @@ bool resolver_resolve_stmt_if(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_while(Resolver* resolver)
+static bool resolver_resolve_stmt_while(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -226,7 +255,7 @@ bool resolver_resolve_stmt_while(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_break(Resolver* resolver)
+static bool resolver_resolve_stmt_break(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -239,7 +268,7 @@ bool resolver_resolve_stmt_break(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_continue(Resolver* resolver)
+static bool resolver_resolve_stmt_continue(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -252,7 +281,7 @@ bool resolver_resolve_stmt_continue(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_fn(Resolver* resolver)
+static bool resolver_resolve_stmt_fn(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -295,7 +324,7 @@ bool resolver_resolve_stmt_fn(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_return(Resolver* resolver)
+static bool resolver_resolve_stmt_return(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -348,7 +377,7 @@ bool resolver_resolve_stmt_return(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_alias(Resolver* resolver)
+static bool resolver_resolve_stmt_alias(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -383,7 +412,7 @@ bool resolver_resolve_stmt_alias(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_type(Resolver* resolver)
+static bool resolver_resolve_stmt_type(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 
@@ -481,7 +510,7 @@ bool resolver_resolve_stmt_type(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_stmt_match(Resolver* resolver)
+static bool resolver_resolve_stmt_match(Resolver* resolver)
 {
     Stmt* curr_stmt = resolver->stmts;
 
@@ -522,7 +551,7 @@ bool resolver_resolve_stmt_match(Resolver* resolver)
 }
 
 // On error - stmts is set to NULL.
-bool resolver_resolve_stmt(Resolver* resolver)
+extern bool resolver_resolve_stmt(Resolver* resolver)
 {
     Stmt* curr_stmt  = NULL;
 
@@ -558,7 +587,7 @@ bool resolver_resolve_stmt(Resolver* resolver)
     return true;
 }
 
-bool resolver_resolve_expr_primary_lambda(Resolver* resolver, Expr* expr)
+static bool resolver_resolve_expr_primary_lambda(Resolver* resolver, Expr* expr)
 {
     Stmt* curr_stmt = resolver->stmts;
 
@@ -602,7 +631,7 @@ bool resolver_resolve_expr_primary_lambda(Resolver* resolver, Expr* expr)
 }
 
 // TODO: expand this later to functions, once we implement them.
-bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
+static bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
 {
     char * identifier = NULL;
     Decl * decl       = NULL;
@@ -651,7 +680,7 @@ bool resolver_resolve_expr_primary(Resolver* resolver, Expr* expr)
     return true;
 }
 
-bool resolver_resolve_expr_binary_access_operator(Resolver* resolver, Expr* expr)
+static bool resolver_resolve_expr_binary_access_operator(Resolver* resolver, Expr* expr)
 {
     assert(expr != NULL);
 
@@ -697,7 +726,7 @@ bool resolver_resolve_expr_binary_access_operator(Resolver* resolver, Expr* expr
 // 1) If type != NULL, then we bind then the type of the expression is equal to type.
 // 2) Set variable to the most recent instance of identifier.
 // TODO: Once we begin implementing inference, update this code.
-bool resolver_resolve_expr(Resolver* resolver, Expr* expr)
+extern bool resolver_resolve_expr(Resolver* resolver, Expr* expr)
 {
     assert(expr != NULL);
 
@@ -1087,7 +1116,7 @@ bool resolver_resolve_fn_args(Resolver* resolver, int argc, FnArg** argv, TypeEx
     return true;
 }
 
-ResolverSnapshot resolver_get_context_snapshot(Resolver* resolver)
+static ResolverSnapshot resolver_get_context_snapshot(Resolver* resolver)
 {
     return (ResolverSnapshot)
     {
@@ -1097,7 +1126,7 @@ ResolverSnapshot resolver_get_context_snapshot(Resolver* resolver)
     };
 }
 
-void resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot)
+static void resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snapshot)
 {
     ResolverSnapshot curr_snapshot  = (ResolverSnapshot)
     {
@@ -1118,7 +1147,7 @@ void resolver_restore_context_snapshot(Resolver* resolver, ResolverSnapshot snap
     // resolver->type_variable_id = snapshot.type_variable_id;
 }
 
-void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
+static void resolver_push_decl_to_context(Resolver* resolver, Decl* decl)
 {
     arrput(resolver->context, decl);
 }
@@ -1167,7 +1196,7 @@ Decl* resolver_get_decl_by_identifier(Resolver* resolver, char* identifier)
     return NULL;
 }
 
-Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
+static Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
 {
     Decl decl;
     Decl* decl_ptr;
@@ -1192,7 +1221,7 @@ Decl* resolver_declare_variable(Resolver* resolver, char* identifier)
     return decl_ptr;
 }
 
-Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
+static Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
 {
     Decl decl;
     Decl* decl_ptr;
@@ -1215,7 +1244,7 @@ Decl* resolver_declare_type_variable(Resolver* resolver, char* identifier)
     return decl_ptr;
 }
 
-Decl* resolver_declare_alias(Resolver* resolver, char* identifier)
+static Decl* resolver_declare_alias(Resolver* resolver, char* identifier)
 {
     Decl  decl;
     Decl* decl_ptr;
@@ -1234,7 +1263,7 @@ Decl* resolver_declare_alias(Resolver* resolver, char* identifier)
     return decl_ptr;
 }
 
-Decl* resolver_declare_new_type(Resolver* resolver, char* identifier)
+static Decl* resolver_declare_new_type(Resolver* resolver, char* identifier)
 {
     Decl decl;
     Decl* decl_ptr;
@@ -1253,7 +1282,7 @@ Decl* resolver_declare_new_type(Resolver* resolver, char* identifier)
     return decl_ptr;
 }
 
-Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier)
+static Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier)
 {
     Decl  decl;
     Decl* decl_ptr;
@@ -1272,7 +1301,7 @@ Decl* resolver_declare_new_type_constructor(Resolver* resolver, char* identifier
     return decl_ptr;
 }
 
-Span resolver_get_stmt_span(Resolver* resolver, Stmt* stmt)
+static Span resolver_get_stmt_span(Resolver* resolver, Stmt* stmt)
 {
     assert(resolver != NULL);
     assert(stmt     != NULL);
@@ -1286,7 +1315,7 @@ Span resolver_get_stmt_span(Resolver* resolver, Stmt* stmt)
     };
 }
 
-Span resolver_get_expr_span(Resolver* resolver, Expr* expr)
+static Span resolver_get_expr_span(Resolver* resolver, Expr* expr)
 {
     assert(resolver != NULL);
     assert(expr     != NULL);
@@ -1300,7 +1329,7 @@ Span resolver_get_expr_span(Resolver* resolver, Expr* expr)
     };
 }
 
-Span resolver_get_type_expr_span(Resolver* resolver, TypeExpr* type_expr)
+static Span resolver_get_type_expr_span(Resolver* resolver, TypeExpr* type_expr)
 {
     assert(resolver  != NULL);
     assert(type_expr != NULL);
@@ -1314,7 +1343,7 @@ Span resolver_get_type_expr_span(Resolver* resolver, TypeExpr* type_expr)
     };
 }
 
-Span resolver_get_pattern_span(Resolver* resolver, Pattern* pattern)
+static Span resolver_get_pattern_span(Resolver* resolver, Pattern* pattern)
 {
     assert(resolver != NULL);
     assert(pattern  != NULL);
@@ -1328,7 +1357,7 @@ Span resolver_get_pattern_span(Resolver* resolver, Pattern* pattern)
     };
 }
 
-void resolver_throw_err_stmt_break_not_in_loop(Resolver* resolver, Stmt* stmt)
+static void resolver_throw_err_stmt_break_not_in_loop(Resolver* resolver, Stmt* stmt)
 {
     assert(resolver != NULL);
     assert(stmt     != NULL);
@@ -1340,7 +1369,7 @@ void resolver_throw_err_stmt_break_not_in_loop(Resolver* resolver, Stmt* stmt)
     });
 }
 
-void resolver_throw_err_stmt_continue_not_in_loop(Resolver* resolver, Stmt* stmt)
+static void resolver_throw_err_stmt_continue_not_in_loop(Resolver* resolver, Stmt* stmt)
 {
     assert(resolver != NULL);
     assert(stmt     != NULL);
@@ -1352,7 +1381,7 @@ void resolver_throw_err_stmt_continue_not_in_loop(Resolver* resolver, Stmt* stmt
     });
 }
 
-void resolver_throw_err_stmt_return_not_in_fn(Resolver* resolver, Stmt* stmt)
+static void resolver_throw_err_stmt_return_not_in_fn(Resolver* resolver, Stmt* stmt)
 {
     assert(resolver != NULL);
     assert(stmt     != NULL);
@@ -1364,7 +1393,7 @@ void resolver_throw_err_stmt_return_not_in_fn(Resolver* resolver, Stmt* stmt)
     });
 }
 
-void resolver_throw_err_stmt_returns_dont_match(Resolver* resolver, Stmt* stmt)
+static void resolver_throw_err_stmt_returns_dont_match(Resolver* resolver, Stmt* stmt)
 {
     assert(resolver != NULL);
     assert(stmt     != NULL);
@@ -1376,7 +1405,7 @@ void resolver_throw_err_stmt_returns_dont_match(Resolver* resolver, Stmt* stmt)
     });
 }
 
-void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Expr* expr, char* identifier)
+static void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Expr* expr, char* identifier)
 {
     assert(resolver != NULL);
     assert(expr     != NULL);
@@ -1394,7 +1423,7 @@ void resolver_throw_err_expr_failed_to_resolve_identifier(Resolver* resolver, Ex
     });
 }
 
-void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolver, TypeExpr* type_expr, char* identifier)
+static void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolver, TypeExpr* type_expr, char* identifier)
 {
     assert(resolver   != NULL);
     assert(type_expr  != NULL);
@@ -1412,7 +1441,7 @@ void resolver_throw_err_type_expr_failed_to_resolve_identifier(Resolver* resolve
     });
 }
 
-void resolver_throw_err_expr_failed_to_resolve_access_op(Resolver* resolver, Expr* expr)
+static void resolver_throw_err_expr_failed_to_resolve_access_op(Resolver* resolver, Expr* expr)
 {
     assert(resolver != NULL);
     assert(expr     != NULL);
@@ -1424,7 +1453,7 @@ void resolver_throw_err_expr_failed_to_resolve_access_op(Resolver* resolver, Exp
     });
 }
 
-void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeExpr* type_expr, char* identifier)
+static void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeExpr* type_expr, char* identifier)
 {
     assert(resolver  != NULL);
     assert(type_expr != NULL);
@@ -1442,7 +1471,7 @@ void resolver_throw_err_type_expr_failed_to_find_type(Resolver* resolver, TypeEx
     });
 }
 
-void resolver_throw_err_pattern_failed_to_resolve_identifier(Resolver* resolver, Pattern* pattern, const char* identifier)
+static void resolver_throw_err_pattern_failed_to_resolve_identifier(Resolver* resolver, Pattern* pattern, const char* identifier)
 {
     assert(resolver   != NULL);
     assert(pattern    != NULL);
@@ -1460,7 +1489,7 @@ void resolver_throw_err_pattern_failed_to_resolve_identifier(Resolver* resolver,
     });
 }
 
-void resolver_throw_err_pattern_failed_to_find_constructor(Resolver* resolver, Pattern* pattern, const char* identifier)
+static void resolver_throw_err_pattern_failed_to_find_constructor(Resolver* resolver, Pattern* pattern, const char* identifier)
 {
     assert(resolver   != NULL);
     assert(pattern    != NULL);

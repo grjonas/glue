@@ -3,6 +3,7 @@
 
 #include "test_dependencies.h"
 #include "scanner.h"
+#include "inferer.h"
 
 Scanner test_scanner_init_with_str(const char* str);
 
