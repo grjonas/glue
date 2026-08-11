@@ -1,11 +1,7 @@
 #ifndef RESOLVER_H
 #define RESOLVER_H
 
-#include "dependencies.h"
 #include "parser.h"
-#include "stmt.h"
-#include "expr.h"
-#include "decl.h"
 
 typedef struct Resolver Resolver;
 typedef struct ResolverSnapshot ResolverSnapshot;

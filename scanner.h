@@ -2,8 +2,6 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 
-#include "dependencies.h"
-#include "token.h"
 #include "diagnostic.h"
 
 #define HANDLE_SCANNER_RESULT_BASE_CASE(result) \

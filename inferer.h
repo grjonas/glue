@@ -2,7 +2,6 @@
 #define INFERER_H
 
 #include "resolver.h"
-#include "type.h"
 
 // TODO: Don't forget to refactor inferer init and free after changing resolver.
 typedef struct Inferer          Inferer         ;

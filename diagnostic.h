@@ -2,12 +2,7 @@
 #define DIAGNOSTIC_H
 
 #include "dependencies.h"
-#include "token.h"
-#include "stmt.h"
-#include "expr.h"
-#include "type_expr.h"
-#include "type.h"
-#include "decl.h"
+#include "frontend_data.h"
 #include "print.h"
 
 typedef struct Span                Span               ;

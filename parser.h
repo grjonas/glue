@@ -2,9 +2,6 @@
 #define PARSER_H
 
 #include "scanner.h"
-#include "stmt.h"
-#include "type_expr.h"
-#include "expr.h"
 
 // Parser
 typedef enum
