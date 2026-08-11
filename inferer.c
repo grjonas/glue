@@ -1556,15 +1556,14 @@ static void inferer_convert_type_expr_fn(Inferer* inferer, TypeExprFn fn, Type**
 static void inferer_convert_type_expr_application(Inferer* inferer, TypeExprApplication application, Type** type)
 {
     assert(inferer   != NULL);
+    assert(application.decl != NULL);
     assert(type      != NULL);
     assert(*type     == NULL);
 
-    Type type_mem;
-    TypeAbstraction* abstraction;
+    Type  type_mem;
+    Decl* decl = application.decl;
     DYNAMIC_ARRAY(Type** argv) = NULL;
     int argc = 0;
-
-    abstraction = inferer_get_existing_new_type_from_decl(inferer, application.decl);
 
     for (int i = 0; i < application.argc; ++i)
     {
@@ -1586,7 +1585,7 @@ static void inferer_convert_type_expr_application(Inferer* inferer, TypeExprAppl
         .kind = TYPE_APPLICATION,
         .type.application = (TypeApplication)
         {
-            .abstraction = abstraction,
+            .decl = decl,
             .argv = argv,
             .argc = argc,
         }
@@ -1856,11 +1855,11 @@ static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
     //     int type_num;
     // };
 
-    Type* type = NULL;
-    TypeAbstraction* abstraction = NULL;
+    // Type* type = NULL;
+    // TypeAbstraction* abstraction = NULL;
 
-    abstraction = inferer_create_type_abstraction(inferer, stmt_type.decl);
-    inferer_decl_type_set_abstraction(inferer, stmt_type.decl, abstraction);
+    // abstraction = inferer_create_type_abstraction(inferer, stmt_type.decl);
+    // inferer_decl_type_set_abstraction(inferer, stmt_type.decl, abstraction);
 }
 
 static bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
@@ -2335,7 +2334,7 @@ static bool inferer_type_applications_are_equal(Inferer* inferer, TypeApplicatio
     assert(inferer != NULL);
 
     return left_application.argc == right_application.argc
-        && left_application.abstraction == right_application.abstraction;
+        && left_application.decl == right_application.decl;
 }
 
 static bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)

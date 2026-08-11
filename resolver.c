@@ -95,7 +95,7 @@ extern void resolver_free(Resolver* resolver)
     };
 }
 
-static resolver_resolve_stmt_block(Resolver* resolver)
+static bool resolver_resolve_stmt_block(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
 

@@ -2,7 +2,7 @@
 
 #define arrfree_and_set_null(op) do { arrfree(op); op = NULL; } while(0)
 
-Parser init_parser(Scanner* scanner)
+extern Parser init_parser(Scanner* scanner)
 {
     Parser parser =
     {
@@ -18,7 +18,7 @@ Parser init_parser(Scanner* scanner)
     return parser;
 }
 
-void parser_free(Parser* parser)
+extern void parser_free(Parser* parser)
 {
     free((char*) parser->txt);
     arrfree(parser->tokens);
@@ -38,7 +38,7 @@ void parser_free(Parser* parser)
     };
 }
 
-Token parser_peek_offset(Parser* parser, int offset)
+extern Token parser_peek_offset(Parser* parser, int offset)
 {
     const char* err = "No more tokens left.";
     if (parser->current + offset >= parser->end)
@@ -55,12 +55,12 @@ Token parser_peek_offset(Parser* parser, int offset)
     return parser->tokens[parser->current + offset];
 }
 
-Token parser_peek(Parser* parser)
+extern Token parser_peek(Parser* parser)
 {
     return parser_peek_offset(parser, 0);
 }
 
-Token parser_next(Parser* parser)
+extern Token parser_next(Parser* parser)
 {
     Token token = parser_peek(parser);
     if (token.type != TOKEN_ERROR)
@@ -68,7 +68,7 @@ Token parser_next(Parser* parser)
     return token;
 }
 
-bool parser_skip(Parser* parser, bool (*predicate)(TokenType))
+extern bool parser_skip(Parser* parser, bool (*predicate)(TokenType))
 {
     bool ret = false;
     while (true)
@@ -83,27 +83,6 @@ bool parser_skip(Parser* parser, bool (*predicate)(TokenType))
             break;
     }
     return ret;
-}
-
-char* copy_string_to_arena(Arena* arena, const char* str, int length)
-{
-    char* new_str = NULL;
-    char* tmp_ptr = NULL;
-
-    new_str = calloc(length + 1, sizeof(char));
-    if (new_str  == NULL)
-    {
-        fprintf(stderr, "[%s:%d] Failed to allocate memory.\n", __FILE__, __LINE__);
-        exit(1);
-    }
-
-    memcpy(new_str, str, (size_t) length * sizeof(char));
-
-    tmp_ptr = new_str;
-    new_str = (char*) arena_push(arena, new_str, (size_t) (length + 1) * sizeof(char));
-    free(tmp_ptr);
-
-    return new_str;
 }
 
 // Identifier
@@ -165,6 +144,27 @@ bool parser_dont_except_token(Parser* parser, TokenType type)
 
     return true;
 };
+
+extern char* copy_string_to_arena(Arena* arena, const char* str, int length)
+{
+    char* new_str = NULL;
+    char* tmp_ptr = NULL;
+
+    new_str = calloc(length + 1, sizeof(char));
+    if (new_str  == NULL)
+    {
+        fprintf(stderr, "[%s:%d] Failed to allocate memory.\n", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    memcpy(new_str, str, (size_t) length * sizeof(char));
+
+    tmp_ptr = new_str;
+    new_str = (char*) arena_push(arena, new_str, (size_t) (length + 1) * sizeof(char));
+    free(tmp_ptr);
+
+    return new_str;
+}
 
 Span parser_get_token_span(Parser* parser, Token token)
 {
@@ -286,4 +286,42 @@ void parser_throw_err_unexpected_pattern(Parser* parser, Span span)
         .kind = DIAGNOSTIC_ERR_UNEXPECTED_PATTERN,
         .span = span,
     });
+}
+
+extern FnArg* parser_parse_fn_arg(Parser* parser)
+{
+    FnArg  fn_arg;
+
+    Token token;
+    char* identifier = NULL;
+    TypeExpr* type   = NULL;
+
+    fn_arg = (FnArg)
+    {
+        .identifier = NULL,
+        .decl       = NULL,
+        .type       = NULL,
+    };
+
+    identifier = parser_parse_identifier(parser);
+    if (identifier == NULL)
+    {
+        return NULL;
+    }
+    fn_arg.identifier = identifier;
+
+    token = parser_peek(parser);
+    if (token.type == TOKEN_COLON)
+    {
+        parser_next(parser);
+
+        type = parser_parse_type_expr(parser);
+        if (type == NULL)
+        {
+            return NULL;
+        }
+        fn_arg.type = type;
+    }
+
+    return (FnArg*) arena_push(&parser->arena, &fn_arg, sizeof(FnArg));
 }

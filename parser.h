@@ -6,18 +6,16 @@
 #include "type_expr.h"
 #include "expr.h"
 
-typedef struct Parser       Parser      ;
-typedef enum   ParserState  ParserState ;
-
 // Parser
-enum ParserState
+typedef enum
 {
     PARSER_STATE_UNPARSED,
     PARSER_STATE_PARSED  ,
     PARSER_STATE_FREED   ,
-};
+}
+ParserState;
 
-struct Parser
+typedef struct
 {
     // Input
     const char* filename;
@@ -32,32 +30,43 @@ struct Parser
     // Output
     Arena arena;
     DiagnosticComponent* diagnostic_component;
-};
+}
+Parser;
 
-Parser init_parser(Scanner* scanner);
-void parser_free(Parser* parser);
+// Parsing building blocks:
 
-Token parser_peek_offset(Parser* parser, int offset);
-Token parser_peek(Parser* parser);
-Token parser_next(Parser* parser);
+extern Parser init_parser(Scanner* scanner);
+extern void parser_free(Parser* parser);
 
-bool  parser_skip(Parser* parser, bool (*predicate)(TokenType));
+extern Token parser_peek_offset(Parser* parser, int offset);
+extern Token parser_peek(Parser* parser);
+extern Token parser_next(Parser* parser);
+extern bool  parser_skip(Parser* parser, bool (*predicate)(TokenType));
+extern char* parser_parse_identifier (Parser* parser);
+extern bool  parser_accept_token(Parser* parser, TokenType type);
+extern bool  parser_expect_token(Parser* parser, TokenType type);
+extern bool  parser_dont_except_token(Parser* parser, TokenType type);
 
-char* copy_string_to_arena(Arena* arena, const char* str, int length);
-char* parser_parse_identifier (Parser* parser);
-bool  parser_accept_token(Parser* parser, TokenType type);
-bool  parser_expect_token(Parser* parser, TokenType type);
-bool  parser_dont_except_token(Parser* parser, TokenType type);
+extern char* copy_string_to_arena(Arena* arena, const char* str, int length);
 
-Span  parser_get_token_span(Parser* parser, Token token);
-bool  is_newline(TokenType type);
-Span  parser_combine_spans(Parser* parser, Span start, Span end);
+extern Span  parser_get_token_span(Parser* parser, Token token);
+extern bool  is_newline(TokenType type);
+extern Span  parser_combine_spans(Parser* parser, Span start, Span end);
 
-void parser_throw_err_generic                     (Parser* parser, Token token, const char* file, int line);
-void parser_throw_err_unexpected_token            (Parser* parser, Token token, TokenType expected[], int expected_count);
-void parser_throw_err_expected_token              (Parser* parser, Token token, TokenType expected[], int expected_count);
-void parser_throw_err_unexpected_prefix_operator  (Parser* parser, Token token);
-void parser_throw_err_struct_duplicate_identifier (Parser* parser, Token identifier_token);
-void parser_throw_err_unexpected_pattern          (Parser* parser, Span span);
+extern void parser_throw_err_generic                     (Parser* parser, Token token, const char* file, int line);
+extern void parser_throw_err_unexpected_token            (Parser* parser, Token token, TokenType expected[], int expected_count);
+extern void parser_throw_err_expected_token              (Parser* parser, Token token, TokenType expected[], int expected_count);
+extern void parser_throw_err_unexpected_prefix_operator  (Parser* parser, Token token);
+extern void parser_throw_err_struct_duplicate_identifier (Parser* parser, Token identifier_token);
+extern void parser_throw_err_unexpected_pattern          (Parser* parser, Span span);
+
+// Major parsers:
+
+extern Stmt * parser_parse_stmts(Parser* parser);
+extern Stmt* parser_parse_stmt(Parser* parser);
+extern Expr* parser_parse_expr(Parser* parser);
+extern TypeExpr* parser_parse_type_expr(Parser* parser);
+extern bool parser_parse_pattern  (Parser* parser, Pattern** pattern_ref);
+extern FnArg* parser_parse_fn_arg(Parser* parser);
 
 #endif

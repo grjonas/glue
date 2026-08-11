@@ -1,4 +1,7 @@
-#include "parser_pattern.h"
+#include "parser.h"
+
+static bool parser_attempt_parse_pattern(Parser* parser, Span* span_ref, Pattern** pattern_ref);
+static const char* copy_literal_to_const_c_str(Arena* arena, int length, const char* str);
 
 void parser_attempt_parse_pattern_wildcard(Parser* parser, Pattern** pattern_ref)
 {

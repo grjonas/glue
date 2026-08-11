@@ -1,9 +1,19 @@
-#include "parser_expr.h"
+#include "parser.h"
+
+static Expr* parser_parse_expr_inner  (Parser* parser, int min_bp);
+static Expr* parser_parse_expr_primary(Parser* parser);
+static Expr* parser_parse_expr_parens (Parser* parser);
+static Expr* parser_parse_expr_prefix (Parser* parser);
+static Expr* parser_parse_expr_index  (Parser* parser);
+static Expr* parser_parse_expr_fn     (Parser* parser);
+static Expr* parser_parse_expr_list   (Parser* parser);
+static Expr* parser_parse_expr_struct (Parser* parser);
+static Expr* parser_parse_expr_lambda (Parser* parser);
 
 // Expr parsing
 // Pratt parser
 // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'binding power'
+static Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'binding power'
 {
     Expr* lhs = NULL;
     Expr* rhs = NULL;
@@ -162,12 +172,12 @@ Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands for 'bi
     return lhs;
 }
 
-Expr* parser_parse_expr(Parser* parser)
+extern Expr* parser_parse_expr(Parser* parser)
 {
     return parser_parse_expr_inner(parser, 0);
 }
 
-Expr* parser_parse_expr_prefix(Parser* parser)
+static Expr* parser_parse_expr_prefix(Parser* parser)
 {
     Expr  lhs;
     Expr* rhs;
@@ -207,7 +217,7 @@ Expr* parser_parse_expr_prefix(Parser* parser)
 // On failure, returns NULL, doesn't change parser state.
 // Possible to make the code smaller, but I'm going to refactor this later,
 // so I don't want any difficult to anticipate behaviour.
-Expr* parser_parse_expr_primary(Parser* parser)
+static Expr* parser_parse_expr_primary(Parser* parser)
 {
     Expr* expr_ptr = NULL;
     Expr  expr;
@@ -330,7 +340,7 @@ Expr* parser_parse_expr_primary(Parser* parser)
     return expr_ptr;
 }
 
-Expr* parser_parse_expr_list(Parser* parser)
+static Expr* parser_parse_expr_list(Parser* parser)
 {
     Expr expr;
 
@@ -407,7 +417,7 @@ Expr* parser_parse_expr_list(Parser* parser)
     return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
 }
 
-Expr* parser_parse_expr_struct(Parser* parser)
+static Expr* parser_parse_expr_struct(Parser* parser)
 {
     Expr expr;
 
@@ -527,7 +537,7 @@ Expr* parser_parse_expr_struct(Parser* parser)
     return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
 }
 
-Expr* parser_parse_expr_lambda(Parser* parser)
+static Expr* parser_parse_expr_lambda(Parser* parser)
 {
     Expr expr;
 
@@ -637,7 +647,7 @@ Expr* parser_parse_expr_lambda(Parser* parser)
     return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
 }
 
-Expr* parser_parse_expr_parens(Parser* parser)
+static Expr* parser_parse_expr_parens(Parser* parser)
 {
     Token token = parser_peek(parser);
 
@@ -661,7 +671,7 @@ Expr* parser_parse_expr_parens(Parser* parser)
     return expr;
 }
 
-Expr* parser_parse_expr_index(Parser* parser)
+static Expr* parser_parse_expr_index(Parser* parser)
 {
     Expr  expr;
     Expr* rhs      = NULL;
@@ -699,7 +709,7 @@ Expr* parser_parse_expr_index(Parser* parser)
     return (Expr*) arena_push(&parser->arena, &expr, sizeof(Expr));
 }
 
-Expr* parser_parse_expr_fn(Parser* parser)
+static Expr* parser_parse_expr_fn(Parser* parser)
 {
     Token token;
     int argc = 0;

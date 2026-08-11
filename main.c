@@ -9,9 +9,6 @@
 #include "print.h"
 #include "scanner.h"
 #include "parser.h"
-#include "parser_stmt.h"
-#include "parser_type_expr.h"
-#include "parser_expr.h"
 #include "resolver.h"
 #include "inferer.h"
 

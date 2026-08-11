@@ -1,6 +1,22 @@
-#include "parser_stmt.h"
+#include "parser.h"
 
-Stmt* parser_parse_stmts(Parser* parser)
+static Stmt * parser_parse_stmt_block    (Parser* parser);
+static Stmt * parser_parse_stmt_let      (Parser* parser);
+static Stmt * parser_parse_stmt_if       (Parser* parser, TokenType type);
+static Stmt * parser_parse_stmt_while    (Parser* parser);
+static Stmt * parser_parse_stmt_fn       (Parser* parser);
+static Stmt * parser_parse_stmt_expr     (Parser* parser);
+static Stmt * parser_parse_stmt_break    (Parser* parser);
+static Stmt * parser_parse_stmt_continue (Parser* parser);
+static Stmt * parser_parse_stmt_return   (Parser* parser);
+static Stmt * parser_parse_stmt_alias    (Parser* parser);
+static StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser);
+static Stmt * parser_parse_stmt_type     (Parser* parser);
+static Stmt * parser_parse_stmt_match    (Parser* parser);
+
+static bool parser_attempt_peek_stmt_end (Parser* parser);
+
+extern Stmt* parser_parse_stmts(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
@@ -62,7 +78,7 @@ Stmt* parser_parse_stmts(Parser* parser)
 
 // Stmt
 // TODO: Implement length calculations when parsing.
-Stmt* parser_parse_stmt(Parser* parser)
+extern Stmt* parser_parse_stmt(Parser* parser)
 {
     Token token;
 
@@ -111,7 +127,7 @@ Stmt* parser_parse_stmt(Parser* parser)
     }
 }
 
-Stmt* parser_parse_stmt_block(Parser* parser)
+static Stmt* parser_parse_stmt_block(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
@@ -207,7 +223,7 @@ Stmt* parser_parse_stmt_block(Parser* parser)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_let(Parser* parser)
+static Stmt* parser_parse_stmt_let(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
@@ -281,7 +297,7 @@ Stmt* parser_parse_stmt_let(Parser* parser)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
+static Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
 {
     assert(type == TOKEN_IF || type == TOKEN_ELIF || type == TOKEN_ELSE);
 
@@ -364,7 +380,7 @@ Stmt* parser_parse_stmt_if(Parser* parser, TokenType type)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_while(Parser* parser)
+static Stmt* parser_parse_stmt_while(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
@@ -418,7 +434,7 @@ Stmt* parser_parse_stmt_while(Parser* parser)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_break(Parser* parser)
+static Stmt* parser_parse_stmt_break(Parser* parser)
 {
     Stmt stmt;
     Token token;
@@ -444,7 +460,7 @@ Stmt* parser_parse_stmt_break(Parser* parser)
 }
 
 
-Stmt* parser_parse_stmt_continue(Parser* parser)
+static Stmt* parser_parse_stmt_continue(Parser* parser)
 {
     Stmt stmt;
     Token token;
@@ -469,7 +485,7 @@ Stmt* parser_parse_stmt_continue(Parser* parser)
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
-Stmt* parser_parse_stmt_return(Parser* parser)
+static Stmt* parser_parse_stmt_return(Parser* parser)
 {
     Stmt stmt;
     Expr* expr = NULL;
@@ -506,7 +522,7 @@ Stmt* parser_parse_stmt_return(Parser* parser)
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
-Stmt* parser_parse_stmt_fn(Parser* parser)
+static Stmt* parser_parse_stmt_fn(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt  stmt;
@@ -648,7 +664,7 @@ Stmt* parser_parse_stmt_fn(Parser* parser)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_expr(Parser* parser)
+static Stmt* parser_parse_stmt_expr(Parser* parser)
 {
     Stmt* stmt_ptr = NULL;
     Stmt stmt;
@@ -671,7 +687,7 @@ Stmt* parser_parse_stmt_expr(Parser* parser)
     return stmt_ptr;
 }
 
-Stmt* parser_parse_stmt_alias(Parser* parser)
+static Stmt* parser_parse_stmt_alias(Parser* parser)
 {
     Stmt stmt;
     char* identifier = NULL;
@@ -721,7 +737,7 @@ Stmt* parser_parse_stmt_alias(Parser* parser)
 // | EnumTwo(Int, Nil)
 // end
 // ```
-StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
+static StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
 {
     StmtTypeConstructor constructor;
 
@@ -791,7 +807,7 @@ StmtTypeConstructor* parser_parse_stmt_type_constructor(Parser* parser)
     return (StmtTypeConstructor*) arena_push(&parser->arena, &constructor, sizeof(StmtTypeConstructor));
 }
 
-Stmt* parser_parse_stmt_type(Parser* parser)
+static Stmt* parser_parse_stmt_type(Parser* parser)
 {
     Stmt stmt;
 
@@ -953,7 +969,7 @@ StmtCase* parser_parse_stmt_match_case(Parser* parser)
     end
     end
  */
-Stmt* parser_parse_stmt_match(Parser* parser)
+static Stmt* parser_parse_stmt_match(Parser* parser)
 {
     Stmt stmt;
     Token token;
@@ -1048,7 +1064,7 @@ Stmt* parser_parse_stmt_match(Parser* parser)
     return (Stmt*) arena_push(&parser->arena, &stmt, sizeof(Stmt));
 }
 
-bool parser_attempt_peek_stmt_end(Parser* parser)
+static bool parser_attempt_peek_stmt_end(Parser* parser)
 {
     Token token;
 

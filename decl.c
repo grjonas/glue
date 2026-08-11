@@ -1,38 +1,38 @@
 #include "decl.h"
 
-bool decl_is_variable(Decl decl)
+extern bool decl_is_variable(Decl decl)
 {
     return decl.kind == DECL_VAR;
 }
 
-bool decl_is_type_variable(Decl decl)
+extern bool decl_is_type_variable(Decl decl)
 {
     return decl.kind == DECL_TYPE_VAR;
 }
 
-bool decl_is_alias(Decl decl)
+extern bool decl_is_alias(Decl decl)
 {
     return decl.kind == DECL_ALIAS;
 }
 
-bool decl_is_new_type(Decl decl)
+extern bool decl_is_new_type(Decl decl)
 {
     return decl.kind == DECL_TYPE;
 }
 
-int  decl_get_new_type_parameter_num(Decl decl)
+extern int decl_get_new_type_parameter_num(Decl decl)
 {
     assert(decl.kind == DECL_TYPE);
 
     return decl.decl.type.type_var_num;
 }
 
-bool decl_is_type_constructor(Decl decl)
+extern bool decl_is_type_constructor(Decl decl)
 {
     return decl.kind == DECL_TYPE_CONSTRUCTOR;
 }
 
-int decl_get_type_constructor_parameter_num(Decl decl)
+extern int decl_get_type_constructor_parameter_num(Decl decl)
 {
     assert(decl.kind == DECL_TYPE_CONSTRUCTOR);
 

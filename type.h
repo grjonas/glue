@@ -2,6 +2,7 @@
 #define TYPE_H
 
 #include "dependencies.h"
+#include "decl_definition.h"
 
 typedef struct Type            Type           ;
 typedef enum   TypeKind        TypeKind       ;
@@ -85,9 +86,9 @@ struct TypeAbstraction
 
 struct TypeApplication
 {
-    TypeAbstraction* abstraction;
+    Decl*  decl; // Points to a type declaration
     Type** argv;
-    int    argc; // should be the same as the lenght of abstraction->type.abstraction.argc
+    int    argc; // should be the same number of arguments as DeclType in decl.
 };
 
 struct TypeConstructor

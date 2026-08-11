@@ -1,7 +1,12 @@
-#include "parser_type_expr.h"
+#include "parser.h"
+
+static TypeExpr* parser_parse_type_expr_primitive(Parser* parser);
+static TypeExpr* parser_parse_type_expr_list     (Parser* parser);
+static TypeExpr* parser_parse_type_expr_struct   (Parser* parser);
+static TypeExpr* parser_parse_type_expr_instance (Parser* parser);
 
 // 'bp' stands for binding power
-TypeExpr* parser_parse_type_expr_inner(Parser* parser, int min_bp)
+extern TypeExpr* parser_parse_type_expr_inner(Parser* parser, int min_bp)
 {
     TypeExpr type_expr;
 
@@ -105,12 +110,12 @@ TypeExpr* parser_parse_type_expr_inner(Parser* parser, int min_bp)
     return lhs;
 }
 
-TypeExpr* parser_parse_type_expr(Parser* parser)
+extern TypeExpr* parser_parse_type_expr(Parser* parser)
 {
     return parser_parse_type_expr_inner(parser, 0);
 }
 
-TypeExpr* parser_parse_type_expr_list(Parser* parser)
+static TypeExpr* parser_parse_type_expr_list(Parser* parser)
 {
     TypeExpr  type_expr ;
     TypeExpr* type_inner = NULL;
@@ -139,7 +144,7 @@ TypeExpr* parser_parse_type_expr_list(Parser* parser)
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
 
-TypeExpr* parser_parse_type_expr_struct(Parser* parser)
+static TypeExpr* parser_parse_type_expr_struct(Parser* parser)
 {
     TypeExpr type_expr;
 
@@ -250,7 +255,7 @@ TypeExpr* parser_parse_type_expr_struct(Parser* parser)
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
 
-TypeExpr* parser_parse_type_expr_instance(Parser* parser)
+static TypeExpr* parser_parse_type_expr_instance(Parser* parser)
 {
     int argc = 0;
     TypeExpr** argv = NULL;
@@ -334,7 +339,7 @@ TypeExpr* parser_parse_type_expr_instance(Parser* parser)
 
 // Type
 // TODO: Implement parentheses parsing.
-TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
+static TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
 {
     TypeExpr type_expr;
 
@@ -399,28 +404,3 @@ TypeExpr* parser_parse_type_expr_primitive(Parser* parser)
 
     return (TypeExpr*) arena_push(&parser->arena, &type_expr, sizeof(TypeExpr));
 }
-
-TypeExpr* construct_primitive_type_expr(Arena* arena, TypeExprKind kind)
-{
-    switch (kind)
-    {
-        case TYPE_EXPR_NIL       : break;
-        case TYPE_EXPR_BOOL      : break;
-        case TYPE_EXPR_NAT       : break;
-        case TYPE_EXPR_INT       : break;
-        case TYPE_EXPR_REAL      : break;
-        case TYPE_EXPR_STRING    : break;
-        default:
-            fprintf(stderr, "Type expression contruction: Given type kind is not primitive.\n");
-            exit(1);
-    }
-
-    TypeExpr type_expr = (TypeExpr)
-    {
-        .kind           = kind,
-        .type_expr.none = NULL,
-    };
-
-    return (TypeExpr*) arena_push(arena, &type_expr, sizeof(TypeExpr));
-}
-

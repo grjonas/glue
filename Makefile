@@ -13,7 +13,6 @@ build:
 		print.c \
 		scanner.c \
 		parser.c \
-		parser_definitions.c \
 		parser_pattern.c \
 		parser_type_expr.c \
 		parser_expr.c \
