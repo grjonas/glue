@@ -78,9 +78,7 @@ DeclInferredType;
 
 typedef struct
 {
-    Decl* decl_type;
-    Type** types;
-    int type_num;
+    TypeScheme* scheme;
 }
 DeclInferredTypeConstructor;
 

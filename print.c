@@ -648,7 +648,20 @@ void type_print(FILE* file, Type* type)
         //     return;
 
         case TYPE_APPLICATION:
-            fprintf(file, "[T_APPLICATION]");
+            //fprintf(file, "[T_APPLICATION]");
+            decl_print(file, type->type.application.decl);
+            fprintf(file, "(");
+            for (int i = 0; i < type->type.application.argc; ++i)
+            {
+                Type* t = type->type.application.argv[i];
+                type_print(file, t);
+
+                if (i + 1 < type->type.application.argc)
+                {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, ")");
             fprintf(file, "]");
             return;
 
@@ -813,7 +826,7 @@ void decl_print(FILE* file, Decl* decl)
                     Type** types2 = decl->decl.inferred_type.types;
                     type_num = decl->decl.inferred_type.type_num;
 
-                    fprintf(file, "inferred-constructor");
+                    fprintf(file, "inferred-type");
                     decl_print_top_level(file, decl);
                     fprintf(file, "; %p", decl);
 
@@ -833,25 +846,12 @@ void decl_print(FILE* file, Decl* decl)
 
             case DECL_INFERRED_TYPE_CONSTRUCTOR:
             {
-                Decl* decl_type = decl->decl.inferred_constructor.decl_type;
-                Type** types2   = decl->decl.inferred_constructor.types    ;
-                type_num        = decl->decl.inferred_constructor.type_num ;
+                TypeScheme* scheme = decl->decl.inferred_constructor.scheme;
 
-                fprintf(file, "inferred-constructor");
+                fprintf(file, "inferred-constructor ");
                 decl_print_top_level(file, decl);
-                // fprintf(file, " ");
-                decl_print(file, decl_type);
-                fprintf(file, "(");
-                for (int i = 0; i < type_num; ++i)
-                {
-                    type_print(file, types2[i]);
-                    if (i + 1 < type_num)
-                    {
-                        fprintf(file, ", ");
-                    }
-                }
-                fprintf(file, ")");
-                fprintf(file, "@%d", type_num);
+                fprintf(file, " ");
+                type_scheme_print(file, scheme);
                 break;
             }
         }

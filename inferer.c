@@ -14,10 +14,11 @@ static void  inferer_get_free_var_substs (Inferer* inferer, Type* type, HASHMAP(
 static void  inferer_apply_subst         (Inferer* inferer, Type** type_ref, Subst subst)       ;
 static void  inferer_decl_apply_subst    (Inferer* inferer, Decl* decl, Subst subst)            ;
 
-static Type* inferer_create_free_type_var      (Inferer* inferer);
-static Type* inferer_create_free_list_type     (Inferer* inferer);
-static Type* inferer_create_free_function_type (Inferer* inferer, int arity);
-static Type* inferer_create_list_type          (Inferer* inferer, Type* inferred_type);
+static Type* inferer_create_free_type_var                (Inferer* inferer);
+static Type* inferer_create_free_list_type               (Inferer* inferer);
+static Type* inferer_create_free_function_type           (Inferer* inferer, int arity);
+static Type* inferer_create_list_type                    (Inferer* inferer, Type* inferred_type);
+static Type* inferer_create_type_from_decl_inferred_type (Inferer* inferer, Decl* decl);
 
 static void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl);
 static Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
@@ -974,73 +975,17 @@ static void inferer_infer_expr_primary_decl_var
     UNREACHABLE;
 }
 
-static Type* inferer_create_type_from_decl_inferred_type
-    (Inferer* inferer, Decl* decl)
-{
-    assert(inferer != NULL);
-    assert(decl    != NULL);
-    assert(decl->kind == DECL_INFERRED_TYPE);
-
-    Type type_mem;
-
-    type_mem = (Type)
-    {
-        .kind = TYPE_APPLICATION,
-        .type.application = (TypeApplication)
-        {
-            .decl = decl,
-            .argv = decl->decl.inferred_type.types   ,
-            .argc = decl->decl.inferred_type.type_num,
-        }
-    };
-
-    return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
-}
-
-static void inferer_infer_expr_primary_decl_inferred_type_constructor
-    (Inferer* inferer, Decl* decl, Type** type_ref)
-{
-    assert(inferer != NULL);
-    assert(decl    != NULL);
-    assert(decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR);
-    assert(type_ref  != NULL);
-    assert(*type_ref == NULL);
-
-    Decl* decl_type = decl->decl.inferred_constructor.decl_type;
-    Type**    types = decl->decl.inferred_constructor.types    ;
-    int    type_num = decl->decl.inferred_constructor.type_num ;
-
-    Type type_mem;
-    Type* type = NULL;
-
-    type_mem = (Type)
-    {
-        .kind = TYPE_FN,
-        .type.fn = (TypeFn)
-        {
-            .left  = type_num == 0 ? NULL : types[type_num - 1],
-            .right = inferer_create_type_from_decl_inferred_type
-                (inferer, decl_type)
-        }
-    };
-    type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
-
-    for (int i = type_num - 2; i >= 0; --i)
-    {
-        type_mem = (Type)
-        {
-            .kind = TYPE_FN,
-            .type.fn = (TypeFn)
-            {
-                .left  = types[i],
-                .right = type,
-            }
-        };
-        type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
-    }
-
-    *type_ref = type;
-}
+// static void inferer_infer_expr_primary_decl_inferred_type_constructor
+//     (Inferer* inferer, Decl* decl, Type** type_ref)
+// {
+//     assert(inferer != NULL);
+//     assert(decl    != NULL);
+//     assert(decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR);
+//     assert(type_ref  != NULL);
+//     assert(*type_ref == NULL);
+// 
+//     inferer_instantiate(decl->decl.inferred_constructor.scheme, type_ref);
+// }
 
 static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type_ref)
 {
@@ -1056,7 +1001,8 @@ static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type**
     }
     else if (decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR)
     {
-        inferer_infer_expr_primary_decl_inferred_type_constructor(inferer, decl, type_ref);
+        // inferer_infer_expr_primary_decl_inferred_type_constructor(inferer, decl, type_ref);
+        inferer_instantiate(inferer, decl->decl.inferred_constructor.scheme, type_ref);
         return;
     }
     UNREACHABLE;
@@ -1914,35 +1860,60 @@ static bool inferer_infer_stmt_alias(Inferer* inferer, StmtAlias alias)
     return true;
 }
 
-static void inferer_infer_decl_type_constructor(Inferer* inferer, Decl* constructor, Decl* decl_type)
+static void inferer_infer_decl_type_constructor
+    (Inferer* inferer, Decl* constructor, Decl* decl_type)
 {
     assert(inferer != NULL);
     assert(constructor != NULL);
     assert(constructor->kind == DECL_TYPE_CONSTRUCTOR);
+    assert(decl_type->kind == DECL_INFERRED_TYPE);
 
-    DYNAMIC_ARRAY(Type**) types = NULL;
-    int type_num = 0;
+    Type type_mem;
+    Type* type = NULL;
+    TypeScheme* scheme = NULL;
 
-    for (int i = 0; i < constructor->decl.constructor.type_num; ++i)
+    TypeExpr** types = constructor->decl.constructor.types   ;
+    int     type_num = constructor->decl.constructor.type_num;
+    Type* converted_type = NULL;
+
+    if (type_num > 0)
     {
-        TypeExpr* type_expr = constructor->decl.constructor.types[i];
-        Type* type = NULL;
-
-        inferer_convert_type_expr(inferer, type_expr, &type);
-        arrput(types, type);
+        inferer_convert_type_expr(inferer, types[type_num - 1], &converted_type);
     }
 
-    type_num = arrlen(types);
-    Type** tmp = types;
-    types = (Type**) arena_push(&inferer->type_arena, types, sizeof(Type*) * type_num);
-    arrfree(tmp);
+    type_mem = (Type)
+    {
+        .kind = TYPE_FN,
+        .type.fn = (TypeFn)
+        {
+            .left  = converted_type,
+            .right = inferer_create_type_from_decl_inferred_type
+                (inferer, decl_type)
+        }
+    };
+    type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+
+    for (int i = type_num - 2; i >= 0; --i)
+    {
+        inferer_convert_type_expr(inferer, types[i], &converted_type);
+        type_mem = (Type)
+        {
+            .kind = TYPE_FN,
+            .type.fn = (TypeFn)
+            {
+                .left  = converted_type,
+                .right = type,
+            }
+        };
+        type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+    }
+
+    inferer_generalize(inferer, type, &scheme);
 
     constructor->kind = DECL_INFERRED_TYPE_CONSTRUCTOR;
     constructor->decl.inferred_constructor = (DeclInferredTypeConstructor)
     {
-        .decl_type = decl_type,
-        .types     = types    ,
-        .type_num  = type_num ,
+        .scheme = scheme
     };
 }
 
@@ -1953,12 +1924,7 @@ static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
     assert(stmt_type.decl->kind == DECL_TYPE);
 
     Decl* decl = stmt_type.decl;
-
-    for (int i = 0; i < decl->decl.type.constructor_num; ++i)
-    {
-        Decl* constructor = decl->decl.type.constructors[i];
-        inferer_infer_decl_type_constructor(inferer, constructor, decl);
-    }
+    DeclType old_decl_type = decl->decl.type;
 
     DYNAMIC_ARRAY(Type**) types = NULL;
     int type_num = 0;
@@ -1970,9 +1936,12 @@ static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
         assert(type_var != NULL);
         assert(type_var->kind == DECL_TYPE_VAR);
 
-        Type* type = type_var->decl.type_var.type;
+        // Type* type = type_var->decl.type_var.type;
+        // assert(type != NULL && type->kind == TYPE_FREE_VAR);
 
-        assert(type != NULL && type->kind == TYPE_FREE_VAR);
+        Type* type = inferer_create_free_type_var(inferer);
+        inferer_decl_type_var_set_type(inferer, type_var, type);
+
         arrput(types, type);
     }
 
@@ -1987,6 +1956,13 @@ static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
         .types    = types   ,
         .type_num = type_num,
     };
+
+    for (int i = 0; i < old_decl_type.constructor_num; ++i)
+    {
+        Decl* constructor = old_decl_type.constructors[i];
+        inferer_infer_decl_type_constructor(inferer, constructor, decl);
+    }
+
     return true;
 }
 
@@ -2102,6 +2078,29 @@ static Type* inferer_create_list_type(Inferer* inferer, Type* inferred_type)
     {
         .kind = TYPE_LIST,
         .type.list = (TypeList) { .type = inferred_type },
+    };
+
+    return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
+}
+
+static Type* inferer_create_type_from_decl_inferred_type
+    (Inferer* inferer, Decl* decl)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_INFERRED_TYPE);
+
+    Type type_mem;
+
+    type_mem = (Type)
+    {
+        .kind = TYPE_APPLICATION,
+        .type.application = (TypeApplication)
+        {
+            .decl = decl,
+            .argv = decl->decl.inferred_type.types   ,
+            .argc = decl->decl.inferred_type.type_num,
+        }
     };
 
     return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
