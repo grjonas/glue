@@ -2,7 +2,8 @@
 #define PATTERN_H
 
 #include "dependencies.h"
-#include "decl_definition.h"
+#include "ast_definitions.h"
+#include "type.h"
 
 typedef enum   PatternKind         PatternKind       ;
 typedef enum   PatternLiteralKind  PatternLiteralKind;
@@ -102,6 +103,7 @@ struct Pattern
     pattern;
 };
 
-Pattern* create_pattern(Arena* arena);
+extern Pattern* create_pattern(Arena* arena);
+extern Type* pattern_get_literal_type(PatternLiteral literal);
 
 #endif

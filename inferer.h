@@ -69,13 +69,6 @@ struct Inferer
     DiagnosticComponent* diagnostic_component;
 };
 
-extern Type* builtin_type_nil   ;
-extern Type* builtin_type_bool  ;
-extern Type* builtin_type_nat   ;
-extern Type* builtin_type_int   ;
-extern Type* builtin_type_real  ;
-extern Type* builtin_type_string;
-
 extern Inferer inferer_init(Resolver* resolver);
 extern void    inferer_free(Inferer* inferer  );
 
@@ -88,6 +81,7 @@ extern void  inferer_instantiate         (Inferer* inferer, TypeScheme* scheme, 
 
 extern bool  inferer_infer_expr          (Inferer* inferer, Expr* expr, Type** type)            ;
 extern void  inferer_convert_type_expr   (Inferer* inferer, TypeExpr* type_expr, Type** type)   ;
+extern bool  inferer_infer_pattern       (Inferer* inferer, Pattern* pattern, Type* type)       ;
 extern bool  inferer_infer_stmt          (Inferer* inferer, Stmt* stmt)                         ;
 
 #endif

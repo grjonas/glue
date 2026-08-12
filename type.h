@@ -116,8 +116,17 @@ struct Type
     type;
 };
 
+extern Type* builtin_type_nil   ;
+extern Type* builtin_type_bool  ;
+extern Type* builtin_type_nat   ;
+extern Type* builtin_type_int   ;
+extern Type* builtin_type_real  ;
+extern Type* builtin_type_string;
+
 TypeStructField* type_struct_find_key(TypeStruct structt, char* key);
 bool type_kind_is_numeric (TypeKind kind);
 bool type_kind_is_equality(TypeKind kind);
+int get_type_fn_arg_num(Type* type);
+Type* get_type_fn_return_type(Type* type);
 
 #endif

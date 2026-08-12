@@ -1,12 +1,5 @@
 #include "inferer.h"
 
-static Type private_builtin_type_nil     = (Type) { .kind = TYPE_NIL     };
-static Type private_builtin_type_bool    = (Type) { .kind = TYPE_BOOL    };
-static Type private_builtin_type_nat     = (Type) { .kind = TYPE_NAT     };
-static Type private_builtin_type_int     = (Type) { .kind = TYPE_INT     };
-static Type private_builtin_type_real    = (Type) { .kind = TYPE_REAL    };
-static Type private_builtin_type_string  = (Type) { .kind = TYPE_STRING  };
-
 static bool  inferer_constrain_numeric   (Inferer* inferer, Type** type_ref, Span span)         ;
 static bool  inferer_constrain_equality  (Inferer* inferer, Type** type_ref, Span span)         ;
 
@@ -32,6 +25,7 @@ static void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl,
 static void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
 static TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
 static void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
+static TypeScheme* inferer_decl_inferred_type_constructor_get_scheme (Inferer* inferer, Decl* decl);
 
 static void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
 static void  inferer_pop_type_variable (Inferer* inferer);
@@ -47,7 +41,8 @@ static bool  inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst);
 static Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind);
 static Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type);
 
-static Span inferer_get_expr_span(Inferer* inferer, Expr* expr);
+static Span inferer_get_expr_span    (Inferer* inferer, Expr* expr);
+static Span inferer_get_pattern_span (Inferer* inferer, Pattern* pattern);
 
 static void inferer_throw_err_unify_failed                                        (Inferer* inferer, Span span, Type* left, Type* right);
 static void inferer_throw_err_expr_binary_access_op_left_kind_not_struct          (Inferer* inferer, Expr* expr);
@@ -55,13 +50,6 @@ static void inferer_throw_err_expr_binary_access_op_struct_does_not_contain_fiel
 static void inferer_throw_err_expr_fn_excessive_args                              (Inferer* inferer, Expr* expr);
 static void inferer_throw_err_type_isnt_numeric                                   (Inferer* inferer, Span span);
 static void inferer_throw_err_type_isnt_equality                                  (Inferer* inferer, Span span);
-
-Type* builtin_type_nil     = &private_builtin_type_nil    ;
-Type* builtin_type_bool    = &private_builtin_type_bool   ;
-Type* builtin_type_nat     = &private_builtin_type_nat    ;
-Type* builtin_type_int     = &private_builtin_type_int    ;
-Type* builtin_type_real    = &private_builtin_type_real   ;
-Type* builtin_type_string  = &private_builtin_type_string ;
 
 extern Inferer inferer_init(Resolver* resolver)
 {
@@ -1694,6 +1682,107 @@ extern void inferer_convert_type_expr(Inferer* inferer, TypeExpr* type_expr, Typ
     UNREACHABLE;
 }
 
+static bool inferer_infer_pattern_literal
+    (Inferer* inferer, Pattern* pattern, Type* type)
+{
+    assert(inferer != NULL);
+    assert(pattern != NULL);
+    assert(pattern->kind == PATTERN_LITERAL);
+    assert(type    != NULL);
+
+    Type* literal_type = pattern_get_literal_type(pattern->pattern.literal);
+
+    if (!inferer_unify(inferer, &type, &literal_type,
+            inferer_get_pattern_span(inferer, pattern)))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+extern bool inferer_infer_pattern_resolved_var
+    (Inferer* inferer, Pattern* pattern, Type* type)
+{
+    assert(inferer != NULL);
+    assert(pattern != NULL);
+    assert(type    != NULL);
+
+    Decl* decl = pattern->pattern.resolved_var.decl;
+    Type* var_type = inferer_decl_var_get_type(inferer, decl);
+
+    if (!inferer_unify(inferer, &type, &var_type, 
+            inferer_get_pattern_span(inferer, pattern)))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+static bool inferer_infer_pattern_application(Inferer* inferer, Pattern* pattern, Type* type)
+{
+    assert(inferer != NULL);
+    assert(pattern != NULL);
+    assert(type    != NULL);
+
+    Decl    * decl = pattern->pattern.application.decl;
+    Pattern** argv = pattern->pattern.application.argv;
+    int       argc = pattern->pattern.application.argc;
+
+    TypeScheme* scheme = NULL;
+    Type* instantiated = NULL;
+    Type* return_type  = NULL;
+    Type* curr_branch  = NULL;
+
+    scheme = inferer_decl_inferred_type_constructor_get_scheme(inferer, decl);
+    inferer_instantiate(inferer, scheme, &instantiated);
+    assert(get_type_fn_arg_num(instantiated) == argc);
+
+    return_type = get_type_fn_return_type(instantiated);
+    if (!inferer_unify(inferer, &return_type, &instantiated,
+            inferer_get_pattern_span(inferer, pattern)))
+    {
+        return false;
+    }
+
+    curr_branch = instantiated;
+    for (int i = 0; i < argc; ++i)
+    {
+        assert(curr_branch->kind == TYPE_FN);
+
+        Pattern* arg = argv[i];
+        Type* t = curr_branch->type.fn.left;
+        curr_branch = curr_branch->type.fn.right;
+
+        if (!inferer_infer_pattern(inferer, arg, t))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+extern bool inferer_infer_pattern(Inferer* inferer, Pattern* pattern, Type* type)
+{
+    assert(inferer != NULL);
+    assert(pattern != NULL);
+    assert(type    != NULL);
+
+    switch (pattern->kind)
+    {
+        case PATTERN_WILDCARD    : return true;
+        case PATTERN_LITERAL     : return inferer_infer_pattern_literal      (inferer, pattern, type);
+        case PATTERN_RESOLVED_VAR: return inferer_infer_pattern_resolved_var (inferer, pattern, type);
+        case PATTERN_APPLICATION : return inferer_infer_pattern_application  (inferer, pattern, type);
+
+        case PATTERN_VAR         : UNREACHABLE;
+        case PATTERN_CONSTRUCTOR : UNREACHABLE;
+    }
+    UNREACHABLE;
+}
+
 static bool inferer_infer_stmt_block(Inferer* inferer, StmtBlock block)
 {
     assert(inferer    != NULL);
@@ -1970,8 +2059,30 @@ static bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
 {
     assert(inferer != NULL);
 
-    // IMPLEMENT:
-    UNREACHABLE;
+    Type* scrutinee_type = NULL;
+
+    if (inferer_infer_expr(inferer, match.scrutinee, &scrutinee_type))
+    {
+        return false;
+    }
+
+    for (int i = 0; i < match.case_num; ++i)
+    {
+        Pattern * pattern = match.cases[i]->pattern ;
+        Stmt    * stmt    = match.cases[i]->stmt    ;
+
+        if (!inferer_infer_pattern(inferer, pattern, scrutinee_type))
+        {
+            return false;
+        }
+
+        if (!inferer_infer_stmt(inferer, stmt))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 extern bool inferer_infer_stmt(Inferer* inferer, Stmt* stmt)
@@ -2232,6 +2343,16 @@ static void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme
     assert(decl->kind == DECL_VAR);
 
     decl->decl.var.scheme = scheme;
+}
+
+static TypeScheme* inferer_decl_inferred_type_constructor_get_scheme
+    (Inferer* inferer, Decl* decl)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR);
+
+    return decl->decl.inferred_constructor.scheme;
 }
 
 static void inferer_push_type_variable(Inferer* inferer, Type* type_var)
@@ -2521,6 +2642,20 @@ static Span inferer_get_expr_span(Inferer* inferer, Expr* expr)
         .line     = expr->line       ,
         .column   = expr->column     ,
         .length   = expr->length     ,
+    };
+}
+
+static Span inferer_get_pattern_span(Inferer* inferer, Pattern* pattern)
+{
+    assert(inferer != NULL);
+    assert(pattern != NULL);
+
+    return (Span)
+    {
+        .filename = inferer->filename,
+        .line     = pattern->line       ,
+        .column   = pattern->column     ,
+        .length   = pattern->length     ,
     };
 }
 
