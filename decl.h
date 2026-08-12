@@ -6,25 +6,17 @@
 #include "type_expr.h"
 #include "type.h"
 
-typedef enum   DeclKind            DeclKind           ;
-
-typedef struct DeclVar             DeclVar            ;
-typedef struct DeclTypeVar         DeclTypeVar        ;
-typedef struct DeclAlias           DeclAlias          ;
-typedef struct DeclType            DeclType           ;
-typedef struct DeclTypeConstructor DeclTypeConstructor;
-
-typedef struct DeclInferredType    DeclInferredType   ;
-typedef struct DeclInferredTypeConstructor DeclInferredTypeConstructor;
-
-enum DeclKind
+typedef enum
 {
     DECL_VAR             ,
     DECL_TYPE_VAR        ,
     DECL_ALIAS           ,
     DECL_TYPE            ,
     DECL_TYPE_CONSTRUCTOR,
-};
+    DECL_INFERRED_TYPE   ,
+    DECL_INFERRED_TYPE_CONSTRUCTOR,
+}
+DeclKind;
 
 typedef enum
 {
@@ -34,49 +26,56 @@ typedef enum
 }
 DeclVarReturnKind;
 
-struct DeclVar
+typedef struct
 {
     Type*         type;
     TypeScheme* scheme;
     DeclVarReturnKind return_kind;  // This field does nothing if the declaration is not a function.
-};
+}
+DeclVar;
 
-struct DeclTypeVar
+typedef struct
 {
     Type* type;
-};
+}
+DeclTypeVar;
 
-struct DeclAlias
+typedef struct
 {
     Type* type      ;
     TypeExpr* type_expr;
-};
+}
+DeclAlias;
 
-struct DeclType
+typedef struct
 {
     TypeAbstraction* abstraction;
     Decl** type_vars;
     Decl** constructors;
     int type_var_num;
     int constructor_num;
-};
+}
+DeclType;
 
-struct DeclTypeConstructor
+typedef struct
 {
     TypeExpr** types;
     int type_num;
-};
+}
+DeclTypeConstructor;
 
-struct DeclInferredType
+typedef struct
 {
-};
+}
+DeclInferredType;
 
-struct DeclInferredTypeConstructor
+typedef struct
 {
     Decl* decl_type;
     Type** types;
     int type_num;
-};
+}
+DeclInferredTypeConstructor;
 
 struct Decl
 {
@@ -97,7 +96,7 @@ struct Decl
 
         // * Exist after inferrence step:
         DeclInferredType    inferred_type;
-        DeclInferredTypeConstructor inferred_type_constructor;
+        DeclInferredTypeConstructor inferred_constructor;
 
         // The reasons for this seperation is as follows:
         // after the resolution step, we have an incomplete

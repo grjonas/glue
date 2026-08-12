@@ -805,8 +805,34 @@ void decl_print(FILE* file, Decl* decl)
                 }
                 break;
 
-            default:
-                fprintf(file, "[DECL]");
+            case DECL_INFERRED_TYPE:
+                fprintf(file, "inferred-constructor");
+                decl_print_top_level(file, decl);
+                fprintf(file, "; %p", decl);
+                break;
+
+            case DECL_INFERRED_TYPE_CONSTRUCTOR:
+            {
+                Decl* decl_type = decl->decl.inferred_constructor.decl_type;
+                Type** types2   = decl->decl.inferred_constructor.types    ;
+                type_num        = decl->decl.inferred_constructor.type_num ;
+
+                fprintf(file, "inferred-constructor");
+                decl_print_top_level(file, decl);
+                // fprintf(file, " ");
+                decl_print(file, decl_type);
+                fprintf(file, "(");
+                for (int i = 0; i < type_num; ++i)
+                {
+                    type_print(file, types2[i]);
+                    if (i + 1 < type_num)
+                    {
+                        fprintf(file, ", ");
+                    }
+                }
+                fprintf(file, ")");
+                break;
+            }
         }
     }
 

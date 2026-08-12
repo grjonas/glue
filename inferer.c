@@ -1825,41 +1825,56 @@ static bool inferer_infer_stmt_alias(Inferer* inferer, StmtAlias alias)
     return true;
 }
 
+static void inferer_infer_decl_type_constructor(Inferer* inferer, Decl* constructor, Decl* decl_type)
+{
+    assert(inferer != NULL);
+    assert(constructor != NULL);
+    assert(constructor->kind == DECL_TYPE_CONSTRUCTOR);
+
+    DYNAMIC_ARRAY(Type**) types = NULL;
+    int type_num = 0;
+
+    for (int i = 0; i < constructor->decl.constructor.type_num; ++i)
+    {
+        TypeExpr* type_expr = constructor->decl.constructor.types[i];
+        Type* type = NULL;
+
+        inferer_convert_type_expr(inferer, type_expr, &type);
+    }
+
+    type_num = arrlen(types);
+    Type** tmp = types;
+    types = (Type**) arena_push(&inferer->type_arena, types, sizeof(Type*) * type_num);
+    arrfree(tmp);
+
+    constructor->kind = DECL_INFERRED_TYPE_CONSTRUCTOR;
+    constructor->decl.inferred_constructor = (DeclInferredTypeConstructor)
+    {
+        .decl_type = decl_type,
+        .types     = types    ,
+        .type_num  = type_num ,
+    };
+}
+
 static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
 {
     assert(inferer != NULL);
+    assert(stmt_type.decl != NULL);
+    assert(stmt_type.decl->kind == DECL_TYPE);
 
-    // IMPLEMENT:
-    UNREACHABLE;
+    Decl* decl = stmt_type.decl;
+    DeclInferredType inferred_type = (DeclInferredType) {};
 
-    // struct TypeApplication
-    // {
-    //     TypeAbstraction* abstraction;
-    //     Type** argv;
-    //     int    argc;
-    //     // should be the same as the lenght of abstraction->type.abstraction.argc
-    // };
+    for (int i = 0; i < decl->decl.type.constructor_num; ++i)
+    {
+        Decl* constructor = decl->decl.type.constructors[i];
+        inferer_infer_decl_type_constructor(inferer, constructor, decl);
+    }
 
-    // struct DeclType
-    // {
-    //     TypeAbstraction* abstraction;
-    //     Decl** type_vars;
-    //     Decl** constructors;
-    //     int type_var_num;
-    //     int constructor_num;
-    // };
+    decl->kind = DECL_INFERRED_TYPE;
+    decl->decl.inferred_type = inferred_type;
 
-    // struct DeclTypeConstructor
-    // {
-    //     TypeExpr** types;
-    //     int type_num;
-    // };
-
-    // Type* type = NULL;
-    // TypeAbstraction* abstraction = NULL;
-
-    // abstraction = inferer_create_type_abstraction(inferer, stmt_type.decl);
-    // inferer_decl_type_set_abstraction(inferer, stmt_type.decl, abstraction);
+    return true;
 }
 
 static bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)

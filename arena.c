@@ -193,13 +193,15 @@ void* arena_push(Arena* arena, void* obj, size_t size)
     }
     if (obj == NULL)
     {
-        fprintf(stderr, "[%s:%d] Cannot push empty object to arena.\n", __FILE__, __LINE__);
-        exit(1);
+        // fprintf(stderr, "[%s:%d] Cannot push empty object to arena.\n", __FILE__, __LINE__);
+        // exit(1);
+        return NULL;
     }
     if (size == 0)
     {
-        fprintf(stderr, "[%s:%d] Cannot push objects of size 0 to arena.\n", __FILE__, __LINE__);
-        exit(1);
+        // fprintf(stderr, "[%s:%d] Cannot push objects of size 0 to arena.\n", __FILE__, __LINE__);
+        // exit(1);
+        return NULL;
     }
 
     arena_make_sure_block_list_is_initialized(arena);

@@ -679,6 +679,25 @@ ScannerResult scanner_scan_token(Scanner* scanner, Token* token_ref)
     UNREACHABLE;
 }
 
+void scanner_remove_comments(Scanner* scanner)
+{
+    assert(scanner != NULL);
+    assert(scanner->token_list != NULL);
+
+    Token* tokens = scanner->token_list;
+
+    for (int i = 0; i < arrlen(tokens); ++i)
+    {
+        Token token = tokens[i];
+
+        if (token.type == TOKEN_COMMENT)
+        {
+            arrdel(tokens, i);
+            --i;
+        }
+    }
+}
+
 bool scanner_scan_tokens(Scanner* scanner)
 {
     assert(scanner != NULL);
@@ -721,6 +740,7 @@ bool scanner_scan_tokens(Scanner* scanner)
     // token = scanner_create_init_token(scanner, TOKEN_EOF);
     // scanner_add_token(scanner, token);
 
+    scanner_remove_comments(scanner);
     return !error_found;
 }
 
