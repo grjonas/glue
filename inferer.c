@@ -31,10 +31,6 @@ static void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl,
 static void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
 static TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
 static void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
-static TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num);
-static TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl);
-static TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl);
-static void             inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction);
 
 static void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
 static void  inferer_pop_type_variable (Inferer* inferer);
@@ -79,7 +75,7 @@ extern Inferer inferer_init(Resolver* resolver)
         .declarations   = resolver->declarations,
         .identifiers    = resolver->identifiers ,
         .arena          = resolver->arena,
-        .type_arena     = NULL,
+        .type_arena     = { 0 },
         .type_variables = NULL,
         .binds          = NULL,
         .diagnostic_component = diagnostic_component_init(),
@@ -94,7 +90,7 @@ extern Inferer inferer_init(Resolver* resolver)
         .txt              = NULL ,
         .tokens           = NULL ,
         .stmts            = NULL ,
-        .arena            = NULL ,
+        .arena            = { 0 } ,
         .decl_id          = 0    ,
         .type_variable_id = 0    ,
         .loop_depth       = 0    ,
@@ -130,8 +126,8 @@ extern void inferer_free(Inferer* inferer)
         .stmts          = NULL,
         .declarations   = NULL,
         .identifiers    = NULL,
-        .arena          = NULL,
-        .type_arena     = NULL,
+        .arena          = { 0 },
+        .type_arena     = { 0 },
         .type_variables = NULL,
         .binds          = NULL,
         .diagnostic_component = NULL,
@@ -796,8 +792,12 @@ static void inferer_decl_apply_subst(Inferer* inferer, Decl* decl, Subst subst)
         // Probably doesn't need that, since a type is supposed to be self_contained.
         // Same goes for the type constructor.
         case DECL_ALIAS           : return;
-        case DECL_TYPE            : return;
-        case DECL_TYPE_CONSTRUCTOR: return;
+        case DECL_INFERRED_TYPE            : return;
+        case DECL_INFERRED_TYPE_CONSTRUCTOR: return;
+
+        // Shouldn't appear at this stage.
+        case DECL_TYPE            : UNREACHABLE;
+        case DECL_TYPE_CONSTRUCTOR: UNREACHABLE;
     }
     UNREACHABLE;
 }
@@ -1994,37 +1994,6 @@ static Type* inferer_create_list_type(Inferer* inferer, Type* inferred_type)
     return (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
 }
 
-static TypeAbstraction* inferer_create_type_abstraction(Inferer* inferer, int type_var_num)
-{
-    assert(inferer != NULL);
-    assert(type_var_num >= 0);
-
-    TypeAbstraction  abstraction_mem;
-    TypeAbstraction* abstraction = NULL;
-
-    abstraction_mem = (TypeAbstraction)
-    {
-        .argc = type_var_num,
-    };
-
-    abstraction = (TypeAbstraction*) arena_push(&inferer->type_arena, &abstraction_mem, sizeof(TypeAbstraction));
-    return abstraction;
-}
-
-static TypeAbstraction* inferer_get_existing_new_type_from_decl(Inferer* inferer, Decl* decl)
-{
-    assert(inferer != NULL);
-    assert(decl    != NULL);
-    assert(decl->kind == DECL_TYPE);
-
-    if (decl->decl.type.abstraction == NULL)
-    {
-        decl->decl.type.abstraction = inferer_create_type_abstraction(inferer, decl->decl.type.type_var_num);
-    }
-
-    return decl->decl.type.abstraction;
-}
-
 static void inferer_decl_var_begin_inferrence(Inferer* inferer, Decl* decl)
 {
     assert(inferer != NULL);
@@ -2151,24 +2120,6 @@ static void inferer_decl_var_set_scheme(Inferer* inferer, Decl* decl, TypeScheme
     assert(decl->kind == DECL_VAR);
 
     decl->decl.var.scheme = scheme;
-}
-
-static TypeAbstraction* inferer_decl_type_get_abstraction(Inferer* inferer, Decl* decl)
-{
-    assert(inferer != NULL);
-    assert(decl != NULL);
-    assert(decl->kind == DECL_TYPE);
-
-    return decl->decl.type.abstraction;
-}
-
-static void  inferer_decl_type_set_abstraction(Inferer* inferer, Decl* decl, TypeAbstraction* abstraction)
-{
-    assert(inferer != NULL);
-    assert(decl != NULL);
-    assert(decl->kind == DECL_TYPE);
-
-    decl->decl.type.abstraction = abstraction;
 }
 
 static void inferer_push_type_variable(Inferer* inferer, Type* type_var)

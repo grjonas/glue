@@ -49,7 +49,6 @@ DeclAlias;
 
 typedef struct
 {
-    TypeAbstraction* abstraction;
     Decl** type_vars;
     Decl** constructors;
     int type_var_num;

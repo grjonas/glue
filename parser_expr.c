@@ -19,7 +19,6 @@ static Expr* parser_parse_expr_inner(Parser* parser, int min_bp) // 'bp' stands 
     Expr* rhs = NULL;
 
     Expr expr;
-    ExprUnaryKind  unary_kind ;
     ExprBinaryKind binary_kind;
 
     int left_bp = -1, right_bp = -1; // 'bp' stands for 'binding power'
@@ -223,7 +222,6 @@ static Expr* parser_parse_expr_primary(Parser* parser)
     Expr  expr;
     ExprPrimary expr_primary;
 
-    bool  boolean_value = true;
     char* buffer = NULL;
 
     Token token = parser_peek(parser);
@@ -256,15 +254,23 @@ static Expr* parser_parse_expr_primary(Parser* parser)
 
         // TODO: Make the boolean value parsing a little less fragile.
         case TOKEN_FALSE     :
-            boolean_value = false;
-        case TOKEN_TRUE      :
             parser_next(parser);
 
-            // 'boolean_value = true;' by default
             expr_primary = (ExprPrimary)
             {
                 .kind            = EXPR_PRIMARY_BOOLEAN,
-                .primary.boolean = boolean_value       ,
+                .primary.boolean = false,
+            };
+
+            break;
+
+        case TOKEN_TRUE      :
+            parser_next(parser);
+
+            expr_primary = (ExprPrimary)
+            {
+                .kind            = EXPR_PRIMARY_BOOLEAN,
+                .primary.boolean = true,
             };
 
             break;
