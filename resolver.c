@@ -412,6 +412,58 @@ static bool resolver_resolve_stmt_alias(Resolver* resolver)
     return true;
 }
 
+static void resolver_declare_type_constructors_for_type
+    (Resolver* resolver, int constructor_num, StmtTypeConstructor** constructors,
+        DYNAMIC_ARRAY(Decl**)* type_constructors_ref)
+{
+    for (int i = 0; i < constructor_num; ++i)
+    {
+        StmtTypeConstructor* stmt_type_constructor = constructors[i];
+        Decl* type_constructor =
+            resolver_declare_new_type_constructor
+                (resolver, stmt_type_constructor->identifier);
+        resolver_push_decl_to_context(resolver, type_constructor);
+
+        type_constructor->decl.constructor = (DeclTypeConstructor)
+        {
+            .types    = stmt_type_constructor->types   ,
+            .type_num = stmt_type_constructor->type_num,
+        };
+
+        arrput(*type_constructors_ref, type_constructor);
+    }
+}
+
+static void resolver_declare_type_variables_for_type
+    (Resolver* resolver, int argc, char** argv, DYNAMIC_ARRAY(Decl**)* type_vars_ref)
+{
+    for (int i = 0; i < argc; ++i)
+    {
+        Decl* type_var = resolver_declare_type_variable(resolver, argv[i]);
+        resolver_push_decl_to_context(resolver, type_var);
+
+        arrput(*type_vars_ref,  type_var);
+    }
+}
+
+static bool resolver_resolve_stmt_type_constructors
+    (Resolver* resolver, int constructor_num, StmtTypeConstructor** constructors)
+{
+    for (int i = 0; i < constructor_num; ++i)
+    {
+        StmtTypeConstructor* stmt_type_constructor = constructors[i];
+        for (int j = 0; j < stmt_type_constructor->type_num; ++j)
+        {
+            if (!resolver_resolve_type_expr(resolver, stmt_type_constructor->types[j]))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 static bool resolver_resolve_stmt_type(Resolver* resolver)
 {
     Stmt* curr_stmt  = resolver->stmts;
@@ -445,22 +497,8 @@ static bool resolver_resolve_stmt_type(Resolver* resolver)
     // before taking the snapshot -
     // otherwise they will only be valid withing scope of type declaration.
     // Actual resolution of them is done later - after declaring variables
-    for (int i = 0; i < constructor_num; ++i)
-    {
-        StmtTypeConstructor* stmt_type_constructor = constructors[i];
-        Decl* type_constructor =
-            resolver_declare_new_type_constructor
-                (resolver, stmt_type_constructor->identifier);
-        resolver_push_decl_to_context(resolver, type_constructor);
-
-        type_constructor->decl.constructor = (DeclTypeConstructor)
-        {
-            .types    = stmt_type_constructor->types   ,
-            .type_num = stmt_type_constructor->type_num,
-        };
-
-        arrput(type_constructors, type_constructor);
-    }
+    resolver_declare_type_constructors_for_type
+        (resolver, constructor_num, constructors, &type_constructors);
 
     Decl** tmp_cons = type_constructors;
     type_constructors = (Decl**) arena_push(&resolver->arena, type_constructors, constructor_num * sizeof(Decl*));
@@ -470,29 +508,17 @@ static bool resolver_resolve_stmt_type(Resolver* resolver)
 
     // Variable declaration - done after taking the snapshot,
     // such that they are not valid outside the scope of the type statement.
-    for (int i = 0; i < argc; ++i)
-    {
-        Decl* type_var = resolver_declare_type_variable(resolver, argv[i]);
-        resolver_push_decl_to_context(resolver, type_var);
-
-        arrput(type_vars,  type_var);
-    }
+    resolver_declare_type_variables_for_type
+        (resolver, argc, argv, &type_vars);
 
     Decl** tmp_vars = type_vars;
     type_vars = (Decl**) arena_push(&resolver->arena, type_vars, argc * sizeof(Decl*));
     arrfree(tmp_vars);
 
     // Type constructor resolution
-    for (int i = 0; i < constructor_num; ++i)
+    if (!resolver_resolve_stmt_type_constructors(resolver, constructor_num, constructors))
     {
-        StmtTypeConstructor* stmt_type_constructor = constructors[i];
-        for (int j = 0; j < stmt_type_constructor->type_num; ++j)
-        {
-            if (!resolver_resolve_type_expr(resolver, stmt_type_constructor->types[j]))
-            {
-                return false;
-            }
-        }
+        return false;
     }
 
     resolver_restore_context_snapshot(resolver, snapshot);

@@ -4,24 +4,9 @@
 #include "dependencies.h"
 #include "decl_definition.h"
 
-typedef struct Type            Type           ;
-typedef enum   TypeKind        TypeKind       ;
+typedef struct Type Type;
 
-typedef struct TypeFreeVar     TypeFreeVar    ;
-typedef struct TypeBoundedVar  TypeBoundedVar ;
-typedef struct TypeList        TypeList       ;
-typedef struct TypeStruct      TypeStruct     ;
-typedef struct TypeStructField TypeStructField;
-typedef struct TypeFn          TypeFn         ;
-typedef struct TypeScheme      TypeScheme     ;
-typedef struct TypeAbstraction TypeAbstraction;
-typedef struct TypeApplication TypeApplication;
-typedef struct TypeConstructor TypeConstructor;
-typedef struct TypeAlias       TypeAlias      ;
-
-// typedef struct TypeAlias       TypeAlias      ;
-
-enum TypeKind
+typedef enum
 {
     // Primitive types
     TYPE_NIL        ,
@@ -45,68 +30,74 @@ enum TypeKind
 
     TYPE_ALIAS      , // a type representing an alias to an existing type.
     // TYPE_SCHEME     ,
-};
+}
+TypeKind;
 
-struct TypeFreeVar
+typedef struct
 {
-};
+}
+TypeFreeVar;
 
-struct TypeBoundedVar
+typedef struct
 {
     int id;
-};
+}
+TypeBoundedVar;
 
-struct TypeList
+typedef struct
 {
     Type* type;
-};
+}
+TypeList;
 
-struct TypeStructField
+typedef struct
 {
     char* key  ;
     Type* value;
-};
+}
+TypeStructField;
 
-struct TypeStruct
+typedef struct
 {
     int field_num;
     TypeStructField** fields;
-};
+}
+TypeStruct;
 
-struct TypeFn
+typedef struct
 {
     Type* left ;
     Type* right;
-};
+}
+TypeFn;
 
-struct TypeAbstraction
-{
-    int argc;
-};
-
-struct TypeApplication
+typedef struct
 {
     Decl*  decl; // Points to a type declaration
     Type** argv;
     int    argc; // should be the same number of arguments as DeclType in decl.
-};
+}
+TypeApplication;
 
-struct TypeConstructor
+typedef struct
 {
     Type* left ;
     Type* right;
-};
+}
+TypeConstructor;
 
-struct TypeAlias
+typedef struct
 {
     Type* type;
-};
+}
+TypeAlias;
 
-struct TypeScheme
+typedef struct
 {
     int quantified_count;
     Type* type;
-};
+}
+TypeScheme;
 
 struct Type
 {

@@ -18,6 +18,12 @@ typedef enum
 }
 DeclKind;
 
+// The way or functions work - they must always have a return type, but
+// deducing what that type is isn't easy.
+// This enum exists for such purpose.
+// During the resolution step, the resolver checks the return value of each return
+// statement in a function. If it's a simple return with no value, then it's a NULL
+// return, else it's a not_null return. Conflicts result in diagnostic errors.
 typedef enum
 {
     DECL_VAR_RETURN_NONE,
@@ -65,6 +71,8 @@ DeclTypeConstructor;
 
 typedef struct
 {
+    Type** types;
+    int type_num;
 }
 DeclInferredType;
 
@@ -97,7 +105,7 @@ struct Decl
         DeclInferredType    inferred_type;
         DeclInferredTypeConstructor inferred_constructor;
 
-        // The reasons for this seperation is as follows:
+        // The reasons for the seperation are as follows:
         // after the resolution step, we have an incomplete
         // model of the declaration, since the inferrence step hasn't
         // started yet, so we simply can't model the types yet.

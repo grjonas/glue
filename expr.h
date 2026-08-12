@@ -10,30 +10,16 @@
 // TODO: Refactor 'expr.h' and 'expr.c' to make it cleaner.
 // Also, replace the 'parser_throw_err_generic' functions as part of a larger rewrite.
 
-typedef struct ExprPrimary     ExprPrimary    ;
-typedef struct ExprUnary       ExprUnary      ;
-typedef struct ExprBinary      ExprBinary     ;
-typedef struct ExprFn          ExprFn         ;
-
-typedef enum   ExprKind        ExprKind       ;
-typedef enum   ExprPrimaryKind ExprPrimaryKind;
-typedef enum   ExprUnaryKind   ExprUnaryKind  ;
-typedef enum   ExprBinaryKind  ExprBinaryKind ;
-
-typedef struct ExprPrimaryList        ExprPrimaryList       ;
-typedef struct ExprPrimaryStructField ExprPrimaryStructField;
-typedef struct ExprPrimaryStruct      ExprPrimaryStruct     ;
-typedef struct ExprPrimaryLambda      ExprPrimaryLambda     ;
-
-enum ExprKind
+typedef enum
 {
     EXPR_PRIMARY,
     EXPR_UNARY  ,
     EXPR_BINARY ,
     EXPR_FN     ,
-};
+}
+ExprKind;
 
-enum ExprPrimaryKind
+typedef enum
 {
     EXPR_PRIMARY_UNKNOWN   ,
     EXPR_PRIMARY_NIL       ,
@@ -48,9 +34,10 @@ enum ExprPrimaryKind
     EXPR_PRIMARY_IDENTIFIER,
     EXPR_PRIMARY_DECL      ,
     // EXPR_PRIMARY_VARIABLE  ,
-};
+}
+ExprPrimaryKind;
 
-enum ExprUnaryKind
+typedef enum
 {
     EXPR_UNARY_UNKNOWN       ,
     // EXPR_UNARY_PRE_INCREMENT ,
@@ -59,9 +46,10 @@ enum ExprUnaryKind
     // EXPR_UNARY_POST_DECREMENT,
     EXPR_UNARY_NOT           ,
     EXPR_UNARY_NEGATE        ,
-};
+}
+ExprUnaryKind;
 
-enum ExprBinaryKind
+typedef enum
 {
     EXPR_BINARY_UNKNOWN      ,
     EXPR_BINARY_ADD          ,
@@ -82,37 +70,42 @@ enum ExprBinaryKind
     EXPR_BINARY_ASSIGN       ,
     EXPR_BINARY_INDEX        ,
     // TODO: Add more types of assignment
-};
+}
+ExprBinaryKind;
 
-struct ExprPrimaryStructField
+typedef struct
 {
     char    * key  ;
     TypeExpr* type ;
     Expr    * value;
-};
+}
+ExprPrimaryStructField;
 
-struct ExprPrimaryList
+typedef struct
 {
     int    length;
     Expr** list;
-};
+}
+ExprPrimaryList;
 
-struct ExprPrimaryStruct
+typedef struct
 {
     int argc;
     ExprPrimaryStructField** argv;
-};
+}
+ExprPrimaryStruct;
 
-struct ExprPrimaryLambda
+typedef struct
 {
     Decl      * decl       ;
     TypeExpr  * return_type;
     Stmt      * body       ;
     FnArg    ** argv       ;
     int         argc       ;
-};
+}
+ExprPrimaryLambda;
 
-struct ExprPrimary
+typedef struct
 {
     ExprPrimaryKind kind;
     union
@@ -132,27 +125,31 @@ struct ExprPrimary
         Decl* decl               ;
     }
     primary;
-};
+}
+ExprPrimary;
 
-struct ExprUnary
+typedef struct
 {
     ExprUnaryKind kind;
     Expr* unary;
-};
+}
+ExprUnary;
 
-struct ExprBinary
+typedef struct
 {
     ExprBinaryKind kind;
     Expr* left ;
     Expr* right;
-};
+}
+ExprBinary;
 
-struct ExprFn
+typedef struct
 {
     int    argc  ;
     Expr*  caller;
     Expr** argv  ;
-};
+}
+ExprFn;
 
 struct Expr
 {
