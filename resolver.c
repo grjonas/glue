@@ -1188,9 +1188,12 @@ char* resolver_get_existing_identifier(Resolver* resolver, char* identifier)
         char* id = resolver->identifiers[i];
         if (strlen(id) == id_len && memcmp(id, identifier, id_len) == 0)
         {
+            LOG(LOG_DEBUG, "Reusing existing identifier: \"%s\"", id);
             return id;
         }
     }
+
+    LOG(LOG_DEBUG, "Allocating new identifier  : \"%s\"", identifier);
 
     new_id = (char*) arena_push_empty(&resolver->arena, (id_len + 1) * sizeof(char));
     arrput(resolver->identifiers, new_id);

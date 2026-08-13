@@ -74,3 +74,16 @@ bool are_strs_equal(const char* str_a, int length_a, const char* str_b, int leng
 
     return true;
 }
+
+const char* log_kind_show(LogKind kind)
+{
+    switch (kind)
+    {
+        case LOG_DEBUG: return "LOG_DEBUG";
+        case LOG_INFO : return "LOG_INFO" ;
+        case LOG_WARN : return "LOG_WARN" ;
+        case LOG_ERROR: return "LOG_ERROR";
+        case LOG_FATAL: return "LOG_FATAL";
+    }
+    UNREACHABLE;
+}

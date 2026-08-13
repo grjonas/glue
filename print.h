@@ -14,6 +14,7 @@ void expr_print(FILE* file, Expr* expr);
 void type_expr_print(FILE* file, TypeExpr* type_expr);
 void decl_print(FILE* file, Decl* decl);
 void type_print(FILE* file, Type* type);
+void type_scheme_print(FILE* file, TypeScheme* scheme);
 void pattern_print(FILE* file, Pattern* pattern);
 
 #endif

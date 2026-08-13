@@ -13,18 +13,19 @@ static Type* inferer_create_free_function_type           (Inferer* inferer, int 
 static Type* inferer_create_list_type                    (Inferer* inferer, Type* inferred_type);
 static Type* inferer_create_type_from_decl_inferred_type (Inferer* inferer, Decl* decl);
 
-static void  inferer_decl_var_begin_inferrence    (Inferer* inferer, Decl* decl);
-static Type* inferer_decl_var_get_type            (Inferer* inferer, Decl* decl);
-static void  inferer_decl_var_set_type            (Inferer* inferer, Decl* decl, Type* type);
-static Type* inferer_decl_var_get_return_type     (Inferer* inferer, Decl* decl);
-static void  inferer_decl_var_set_return_type     (Inferer* inferer, Decl* decl, Type* type);
-static Type* inferer_decl_type_var_get_type       (Inferer* inferer, Decl* decl);
-static void  inferer_decl_type_var_set_type       (Inferer* inferer, Decl* decl, Type* type);
-static Type* inferer_decl_alias_get_type          (Inferer* inferer, Decl* decl);
-static void  inferer_decl_alias_set_type          (Inferer* inferer, Decl* decl, Type* type);
-static void  inferer_decl_var_generalize_inferred (Inferer* inferer, Decl* decl);
-static TypeScheme* inferer_decl_var_get_scheme    (Inferer* inferer, Decl* decl);
-static void        inferer_decl_var_set_scheme    (Inferer* inferer, Decl* decl, TypeScheme* scheme);
+static void  inferer_decl_var_begin_inferrence      (Inferer* inferer, Decl* decl);
+static Type* inferer_decl_var_get_type              (Inferer* inferer, Decl* decl);
+static void  inferer_decl_var_set_type              (Inferer* inferer, Decl* decl, Type* type);
+static Type* inferer_decl_var_get_instantiated_type (Inferer* inferer, Decl* decl);
+static Type* inferer_decl_var_get_return_type       (Inferer* inferer, Decl* decl);
+static void  inferer_decl_var_set_return_type       (Inferer* inferer, Decl* decl, Type* type);
+static Type* inferer_decl_type_var_get_type         (Inferer* inferer, Decl* decl);
+static void  inferer_decl_type_var_set_type         (Inferer* inferer, Decl* decl, Type* type);
+static Type* inferer_decl_alias_get_type            (Inferer* inferer, Decl* decl);
+static void  inferer_decl_alias_set_type            (Inferer* inferer, Decl* decl, Type* type);
+static void  inferer_decl_var_generalize_inferred   (Inferer* inferer, Decl* decl);
+static TypeScheme* inferer_decl_var_get_scheme      (Inferer* inferer, Decl* decl);
+static void        inferer_decl_var_set_scheme      (Inferer* inferer, Decl* decl, TypeScheme* scheme);
 static TypeScheme* inferer_decl_inferred_type_constructor_get_scheme (Inferer* inferer, Decl* decl);
 
 static void  inferer_push_type_variable(Inferer* inferer, Type* type_var);
@@ -38,6 +39,7 @@ static TypeEnv inferer_get_curr_type_env(Inferer* inferer);
 static void    inferer_set_curr_type_env(Inferer* inferer, TypeEnv type_env);
 static bool  inferer_type_applications_are_equal(Inferer* inferer, TypeApplication left_application, TypeApplication right_application);
 static bool  inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst);
+static bool  inferer_decl_var_is_initialized(Inferer* inferer, Decl* decl);
 static Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind);
 static Type* inferer_get_fn_type(Inferer* inferer, int argc, FnArg** argv, Type* return_type);
 
@@ -440,10 +442,12 @@ extern void inferer_generalize(Inferer* inferer, Type* type, TypeScheme** scheme
     TypeScheme scheme_mem;
     HASHMAP(Subst*) substs = NULL;
     int quantified_count = 0;
+    int subst_num = 0;
 
     inferer_get_free_var_substs(inferer, type, &substs);
 
-    for (int i = 0; i < hmlen(substs); ++i)
+    subst_num = hmlen(substs);
+    for (int i = 0; i < subst_num; ++i)
     {
         Subst subst = substs[i];
         if (inferer_subst_is_free_in_type_env(inferer, subst))
@@ -742,9 +746,11 @@ static void inferer_apply_subst(Inferer* inferer, Type** type_ref, Subst subst)
         case TYPE_APPLICATION:
             for (int i = 0; i < type->type.application.argc; ++i)
             {
-                Type* arg = type->type.application.argv[i];
+                Type** arg = type->type.application.argv + i;
+                inferer_apply_subst(inferer, arg, subst);
 
-                inferer_apply_subst(inferer, &arg, subst);
+                // Type* arg = type->type.application.argv[i];
+                // inferer_apply_subst(inferer, &arg, subst);
             }
             return;
 
@@ -935,46 +941,6 @@ static bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type
     return true;
 }
 
-static void inferer_infer_expr_primary_decl_var
-    (Inferer* inferer, Decl* decl, Type** type_ref)
-{
-    assert(inferer != NULL);
-    assert(decl    != NULL);
-    assert(decl->kind == DECL_VAR);
-    assert(type_ref  != NULL);
-    assert(*type_ref == NULL);
-
-    TypeScheme* scheme = NULL;
-
-    if (decl->decl.var.scheme != NULL)
-    {
-        scheme = inferer_decl_var_get_scheme(inferer, decl);
-        assert(scheme != NULL);
-        inferer_instantiate(inferer, scheme, type_ref);
-        return;
-    }
-
-    if (decl->decl.var.type != NULL)
-    {
-        *type_ref = inferer_decl_var_get_type(inferer, decl);
-        return;
-    }
-
-    UNREACHABLE;
-}
-
-// static void inferer_infer_expr_primary_decl_inferred_type_constructor
-//     (Inferer* inferer, Decl* decl, Type** type_ref)
-// {
-//     assert(inferer != NULL);
-//     assert(decl    != NULL);
-//     assert(decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR);
-//     assert(type_ref  != NULL);
-//     assert(*type_ref == NULL);
-// 
-//     inferer_instantiate(decl->decl.inferred_constructor.scheme, type_ref);
-// }
-
 static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type** type_ref)
 {
     assert(inferer != NULL);
@@ -984,13 +950,19 @@ static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type**
 
     if (decl->kind == DECL_VAR)
     {
-        inferer_infer_expr_primary_decl_var(inferer, decl, type_ref);
+        *type_ref = inferer_decl_var_get_instantiated_type(inferer, decl);
         return;
     }
     else if (decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR)
     {
         // inferer_infer_expr_primary_decl_inferred_type_constructor(inferer, decl, type_ref);
+        LOG(LOG_DEBUG, "Scheme:");
+        type_scheme_print(stdout, decl->decl.inferred_constructor.scheme);
+        fprintf(stdout, "\n");
         inferer_instantiate(inferer, decl->decl.inferred_constructor.scheme, type_ref);
+        LOG(LOG_DEBUG, "Scheme:");
+        type_scheme_print(stdout, decl->decl.inferred_constructor.scheme);
+        fprintf(stdout, "\n");
         return;
     }
     UNREACHABLE;
@@ -1709,12 +1681,31 @@ extern bool inferer_infer_pattern_resolved_var
     assert(type    != NULL);
 
     Decl* decl = pattern->pattern.resolved_var.decl;
-    Type* var_type = inferer_decl_var_get_type(inferer, decl);
+    Type* var_type = NULL;
 
-    if (!inferer_unify(inferer, &type, &var_type, 
-            inferer_get_pattern_span(inferer, pattern)))
+    assert(decl->kind == DECL_VAR);
+
+    if (!inferer_decl_var_is_initialized(inferer, decl))
     {
-        return false;
+        var_type = inferer_create_free_type_var(inferer);
+
+        if (!inferer_unify(inferer, &type, &var_type, 
+                inferer_get_pattern_span(inferer, pattern)))
+        {
+            return false;
+        }
+        inferer_decl_var_set_type(inferer, decl, var_type);
+        inferer_decl_var_generalize_inferred(inferer, decl);
+    }
+    else
+    {
+        var_type = inferer_decl_var_get_instantiated_type(inferer, decl);
+
+        if (!inferer_unify(inferer, &type, &var_type, 
+                inferer_get_pattern_span(inferer, pattern)))
+        {
+            return false;
+        }
     }
 
     return true;
@@ -1740,7 +1731,7 @@ static bool inferer_infer_pattern_application(Inferer* inferer, Pattern* pattern
     assert(get_type_fn_arg_num(instantiated) == argc);
 
     return_type = get_type_fn_return_type(instantiated);
-    if (!inferer_unify(inferer, &return_type, &instantiated,
+    if (!inferer_unify(inferer, &return_type, &type,
             inferer_get_pattern_span(inferer, pattern)))
     {
         return false;
@@ -1972,8 +1963,8 @@ static void inferer_infer_decl_type_constructor
 
     type_mem = (Type)
     {
-        .kind = TYPE_FN,
-        .type.fn = (TypeFn)
+        .kind = TYPE_CONSTRUCTOR,
+        .type.constructor= (TypeConstructor)
         {
             .left  = converted_type,
             .right = inferer_create_type_from_decl_inferred_type
@@ -1987,8 +1978,8 @@ static void inferer_infer_decl_type_constructor
         inferer_convert_type_expr(inferer, types[i], &converted_type);
         type_mem = (Type)
         {
-            .kind = TYPE_FN,
-            .type.fn = (TypeFn)
+            .kind = TYPE_CONSTRUCTOR,
+            .type.constructor = (TypeConstructor)
             {
                 .left  = converted_type,
                 .right = type,
@@ -1997,7 +1988,32 @@ static void inferer_infer_decl_type_constructor
         type = (Type*) arena_push(&inferer->type_arena, &type_mem, sizeof(Type));
     }
 
+    TypeEnv type_env = inferer_get_curr_type_env(inferer);
+
+    type_print(stdout, type);
+    fprintf(stdout, "\n");
+
+    // We replace the free variables within the type
+    for (int i = 0; i < decl_type->decl.inferred_type.type_num; ++i)
+    {
+        Subst subst = (Subst)
+        {
+            .key   = decl_type->decl.inferred_type.types[i],
+            .value = inferer_create_free_type_var(inferer)
+        };
+        inferer_push_type_variable(inferer, subst.value);
+        inferer_apply_subst(inferer, &type, subst);
+    }
+
+    type_print(stdout, type);
+    fprintf(stdout, "\n");
+
+    // Then generalize
     inferer_generalize(inferer, type, &scheme);
+    inferer_set_curr_type_env(inferer, type_env);
+
+    type_scheme_print(stdout, scheme);
+    fprintf(stdout, "\n");
 
     constructor->kind = DECL_INFERRED_TYPE_CONSTRUCTOR;
     constructor->decl.inferred_constructor = (DeclInferredTypeConstructor)
@@ -2024,9 +2040,6 @@ static bool inferer_infer_stmt_type(Inferer* inferer, StmtType stmt_type)
 
         assert(type_var != NULL);
         assert(type_var->kind == DECL_TYPE_VAR);
-
-        // Type* type = type_var->decl.type_var.type;
-        // assert(type != NULL && type->kind == TYPE_FREE_VAR);
 
         Type* type = inferer_create_free_type_var(inferer);
         inferer_decl_type_var_set_type(inferer, type_var, type);
@@ -2061,15 +2074,15 @@ static bool inferer_infer_stmt_match(Inferer* inferer, StmtMatch match)
 
     Type* scrutinee_type = NULL;
 
-    if (inferer_infer_expr(inferer, match.scrutinee, &scrutinee_type))
+    if (!inferer_infer_expr(inferer, match.scrutinee, &scrutinee_type))
     {
         return false;
     }
 
     for (int i = 0; i < match.case_num; ++i)
     {
-        Pattern * pattern = match.cases[i]->pattern ;
-        Stmt    * stmt    = match.cases[i]->stmt    ;
+        Pattern * pattern = match.cases[i]->pattern;
+        Stmt    * stmt    = match.cases[i]->stmt   ;
 
         if (!inferer_infer_pattern(inferer, pattern, scrutinee_type))
         {
@@ -2202,6 +2215,16 @@ static Type* inferer_create_type_from_decl_inferred_type
     assert(decl->kind == DECL_INFERRED_TYPE);
 
     Type type_mem;
+    int    argc = decl->decl.inferred_type.type_num;
+    Type** argv = (Type**) arena_push
+        (&inferer->type_arena, decl->decl.inferred_type.types, sizeof(Type*) * argc);
+
+    // for (int i = 0; i < argc; ++i)
+    // {
+    //     Type* arg = argv[i];
+    //     argv[i] = (Type*) arena_push
+    //         (&inferer->type_arena, argv[i], sizeof(Type));
+    // }
 
     type_mem = (Type)
     {
@@ -2209,8 +2232,8 @@ static Type* inferer_create_type_from_decl_inferred_type
         .type.application = (TypeApplication)
         {
             .decl = decl,
-            .argv = decl->decl.inferred_type.types   ,
-            .argc = decl->decl.inferred_type.type_num,
+            .argv = argv,
+            .argc = argc,
         }
     };
 
@@ -2242,6 +2265,31 @@ static void inferer_decl_var_set_type(Inferer* inferer, Decl* decl, Type* type)
     assert(decl->kind == DECL_VAR);
 
     decl->decl.var.type = type;
+}
+
+static Type* inferer_decl_var_get_instantiated_type(Inferer* inferer, Decl* decl)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_VAR);
+
+    TypeScheme* scheme = NULL;
+    Type* type = NULL;
+
+    if (decl->decl.var.scheme != NULL)
+    {
+        scheme = inferer_decl_var_get_scheme(inferer, decl);
+        assert(scheme != NULL);
+        inferer_instantiate(inferer, scheme, &type);
+        return type;
+    }
+
+    if (decl->decl.var.type != NULL)
+    {
+        return inferer_decl_var_get_type(inferer, decl);
+    }
+
+    UNREACHABLE;
 }
 
 static Type* inferer_decl_var_get_return_type(Inferer* inferer, Decl* decl)
@@ -2552,6 +2600,16 @@ static bool inferer_subst_is_free_in_type_env(Inferer* inferer, Subst subst)
     }
 
     return false;
+}
+
+static bool inferer_decl_var_is_initialized(Inferer* inferer, Decl* decl)
+{
+    assert(inferer != NULL);
+    assert(decl    != NULL);
+    assert(decl->kind == DECL_VAR);
+
+    return decl->decl.var.type != NULL
+        || decl->decl.var.scheme != NULL;
 }
 
 static Type* inferer_convert_return_kind_to_default_type(Inferer* inferer, TypeExpr* type_expr, DeclVarReturnKind return_kind)
