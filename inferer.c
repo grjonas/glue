@@ -916,7 +916,7 @@ static bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type
     assert(*type   == NULL);
     assert(expr->expr.primary.primary.lambda.decl->kind == DECL_VAR);
 
-    TypeEnv type_env;
+    // TypeEnv type_env;
     ExprPrimaryLambda lambda = expr->expr.primary.primary.lambda;
     Type* lambda_type = NULL;
     Type* return_type = NULL;
@@ -925,7 +925,7 @@ static bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type
     // We need it go inside, and resolve the individual arguments.
     // We also need to resolve all instances of return type.
 
-    type_env = inferer_get_curr_type_env(inferer);
+    // type_env = inferer_get_curr_type_env(inferer);
     inferer_decl_var_begin_inferrence(inferer, lambda.decl);
 
     return_type =
@@ -939,9 +939,10 @@ static bool inferer_infer_expr_primary_lambda(Inferer* inferer, Expr* expr, Type
     {
         return false;
     }
+
     // I think this is not needed.
-    // inferer_decl_var_generalize_inferred(inferer, fn.decl);
-    inferer_set_curr_type_env(inferer, type_env);
+    // inferer_decl_var_generalize_inferred(inferer, lambda.decl);
+    // inferer_set_curr_type_env(inferer, type_env);
 
     *type = lambda_type;
     return true;
@@ -962,15 +963,7 @@ static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type**
     else if (decl->kind == DECL_INFERRED_TYPE_CONSTRUCTOR)
     {
         // inferer_infer_expr_primary_decl_inferred_type_constructor(inferer, decl, type_ref);
-        LOG(LOG_DEBUG, "Scheme:");
-        type_scheme_print(stdout, decl->decl.inferred_constructor.scheme);
-        fprintf(stdout, "\n");
-
         inferer_instantiate(inferer, decl->decl.inferred_constructor.scheme, type_ref);
-
-        LOG(LOG_DEBUG, "Scheme:");
-        type_scheme_print(stdout, decl->decl.inferred_constructor.scheme);
-        fprintf(stdout, "\n");
         return;
     }
     UNREACHABLE;
