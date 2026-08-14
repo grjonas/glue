@@ -490,8 +490,7 @@ static Type* inferer_instantiate_type(Inferer* inferer, Type* type, DYNAMIC_ARRA
             return type;
 
         case TYPE_FREE_VAR:
-            copy = *type;
-            break;
+            return type;
 
         case TYPE_BOUNDED_VAR:
             return quantified[type->type.bounded_var.id];
@@ -552,11 +551,16 @@ static Type* inferer_instantiate_type(Inferer* inferer, Type* type, DYNAMIC_ARRA
             copy.kind = TYPE_APPLICATION;
             copy.type.application = type->type.application;
 
-            for (int i = 0; i < copy.type.application.argc; ++i)
+            int argc = copy.type.application.argc;
+            Type** argv = (Type**) arena_push
+                (&inferer->type_arena, copy.type.application.argv, sizeof(Type*) * argc);
+
+            for (int i = 0; i < argc; ++i)
             {
-                copy.type.application.argv[i] = inferer_instantiate_type
-                    (inferer, copy.type.application.argv[i], quantified);
+                argv[i] = inferer_instantiate_type
+                    (inferer, argv[i], quantified);
             }
+            copy.type.application.argv = argv;
 
             break;
         }
@@ -598,6 +602,8 @@ extern void inferer_instantiate(Inferer* inferer, TypeScheme* scheme, Type** typ
         arrput(quantified, inferer_create_free_type_var(inferer));
     }
 
+    int qlen = arrlen(quantified);
+    assert(qlen > 0);
     *type = inferer_instantiate_type
         (inferer, scheme->type, quantified);
 
@@ -959,7 +965,9 @@ static void inferer_infer_expr_primary_decl(Inferer* inferer, Decl* decl, Type**
         LOG(LOG_DEBUG, "Scheme:");
         type_scheme_print(stdout, decl->decl.inferred_constructor.scheme);
         fprintf(stdout, "\n");
+
         inferer_instantiate(inferer, decl->decl.inferred_constructor.scheme, type_ref);
+
         LOG(LOG_DEBUG, "Scheme:");
         type_scheme_print(stdout, decl->decl.inferred_constructor.scheme);
         fprintf(stdout, "\n");
@@ -1399,7 +1407,8 @@ static bool inferer_infer_expr_fn(Inferer* inferer, Expr* expr, Type** type_ref)
     for (int i = 0; i < fn.argc; ++i)
     {
         assert(curr_caller_branch_type != NULL);
-        if (curr_caller_branch_type->kind != TYPE_FN)
+        if (   curr_caller_branch_type->kind != TYPE_FN
+            && curr_caller_branch_type->kind != TYPE_CONSTRUCTOR )
         {
             inferer_throw_err_expr_fn_excessive_args(inferer, expr);
             return false;
@@ -1727,10 +1736,11 @@ static bool inferer_infer_pattern_application(Inferer* inferer, Pattern* pattern
     Type* curr_branch  = NULL;
 
     scheme = inferer_decl_inferred_type_constructor_get_scheme(inferer, decl);
-    inferer_instantiate(inferer, scheme, &instantiated);
-    assert(get_type_fn_arg_num(instantiated) == argc);
 
-    return_type = get_type_fn_return_type(instantiated);
+    inferer_instantiate(inferer, scheme, &instantiated);
+    assert(get_type_constructor_arg_num(instantiated) == argc);
+
+    return_type = get_type_constructor_return_type(instantiated);
     if (!inferer_unify(inferer, &return_type, &type,
             inferer_get_pattern_span(inferer, pattern)))
     {
@@ -1740,11 +1750,11 @@ static bool inferer_infer_pattern_application(Inferer* inferer, Pattern* pattern
     curr_branch = instantiated;
     for (int i = 0; i < argc; ++i)
     {
-        assert(curr_branch->kind == TYPE_FN);
+        assert(curr_branch->kind == TYPE_CONSTRUCTOR);
 
         Pattern* arg = argv[i];
-        Type* t = curr_branch->type.fn.left;
-        curr_branch = curr_branch->type.fn.right;
+        Type* t = curr_branch->type.constructor.left;
+        curr_branch = curr_branch->type.constructor.right;
 
         if (!inferer_infer_pattern(inferer, arg, t))
         {
@@ -1990,9 +2000,6 @@ static void inferer_infer_decl_type_constructor
 
     TypeEnv type_env = inferer_get_curr_type_env(inferer);
 
-    type_print(stdout, type);
-    fprintf(stdout, "\n");
-
     // We replace the free variables within the type
     for (int i = 0; i < decl_type->decl.inferred_type.type_num; ++i)
     {
@@ -2005,15 +2012,9 @@ static void inferer_infer_decl_type_constructor
         inferer_apply_subst(inferer, &type, subst);
     }
 
-    type_print(stdout, type);
-    fprintf(stdout, "\n");
-
     // Then generalize
     inferer_generalize(inferer, type, &scheme);
     inferer_set_curr_type_env(inferer, type_env);
-
-    type_scheme_print(stdout, scheme);
-    fprintf(stdout, "\n");
 
     constructor->kind = DECL_INFERRED_TYPE_CONSTRUCTOR;
     constructor->decl.inferred_constructor = (DeclInferredTypeConstructor)

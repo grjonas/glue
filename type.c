@@ -97,3 +97,43 @@ Type* get_type_fn_return_type(Type* type)
         return right;
     }
 }
+
+// TODO: Not efficient in an imperative language, rewrite this later.
+int get_type_constructor_arg_num(Type* type)
+{
+    assert(type != NULL);
+    assert(type->kind == TYPE_CONSTRUCTOR);
+    assert(type->type.fn.right != NULL);
+
+    Type* left  = type->type.fn.left ;
+    Type* right = type->type.fn.right;
+
+    if (right->kind == TYPE_CONSTRUCTOR)
+    {
+        assert(left != NULL);
+
+        return 1 + get_type_constructor_arg_num(right);
+    }
+    else
+    {
+        return left == NULL ? 0 : 1;
+    }
+}
+
+Type* get_type_constructor_return_type(Type* type)
+{
+    assert(type != NULL);
+    assert(type->kind == TYPE_CONSTRUCTOR);
+    assert(type->type.fn.right != NULL);
+
+    Type* right = type->type.fn.right;
+
+    if (right->kind == TYPE_CONSTRUCTOR)
+    {
+        return get_type_constructor_return_type(right);
+    }
+    else
+    {
+        return right;
+    }
+}

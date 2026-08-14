@@ -666,7 +666,12 @@ void type_print(FILE* file, Type* type)
             return;
 
         case TYPE_CONSTRUCTOR:
-            fprintf(file, "[T_CONSTRUCTOR]");
+            TypeConstructor type_constructor = type->type.constructor;
+            if (type_constructor.left->kind == TYPE_CONSTRUCTOR) fprintf(file, "(");
+            type_print(file, type_constructor.left);
+            if (type_constructor.left->kind == TYPE_CONSTRUCTOR) fprintf(file, ")");
+            fprintf(file, " -> ");
+            type_print(file, type_constructor.right);
             fprintf(file, "]");
             return;
 

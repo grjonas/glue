@@ -128,5 +128,7 @@ bool type_kind_is_numeric (TypeKind kind);
 bool type_kind_is_equality(TypeKind kind);
 int get_type_fn_arg_num(Type* type);
 Type* get_type_fn_return_type(Type* type);
+int get_type_constructor_arg_num(Type* type);
+Type* get_type_constructor_return_type(Type* type);
 
 #endif
