@@ -19,6 +19,8 @@ build:
 		parser_stmt.c \
 		resolver.c \
 		inferer.c \
+		encoder.c \
+		runtime.c \
 		main.c \
 	-o main -g \
 		-Wall \

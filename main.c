@@ -11,6 +11,7 @@
 #include "parser.h"
 #include "resolver.h"
 #include "inferer.h"
+#include "encoder.h"
 
 // Returns a null-terminated string that has the file's contents.
 // Needs to be freed.
