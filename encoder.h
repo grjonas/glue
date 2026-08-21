@@ -69,6 +69,8 @@ typedef enum
 
     OBJ_FN     ,
     OBJ_CLOSURE,
+
+    OBJ_DUMMY  , // Obj that exists as a placeholder
 }
 ObjKind;
 
@@ -147,15 +149,23 @@ ObjTypeConstructor;
 
 typedef struct
 {
-    Obj**  objs;
-    ObjFn* code;
+    Stmt * stmts       ;
+    Decl** declarations;
+    char** identifiers ;
+    Arena  arena       ;
+    Arena  type_arena  ;
+    Obj**  objs        ;
+    Obj *  main_fn_obj ;
+    DiagnosticComponent* diagnostic_component;
 }
 Encoder;
 
+extern Obj* dummy_obj;
 extern Encoder encoder_init(Inferer* inferer);
 extern void    encoder_free(Encoder* encoder);
 
 extern void encoder_encode_expr(Encoder* encoder, Expr* expr, DYNAMIC_ARRAY(Byte*)* code_ref);
-extern void encoder_encode_stmt(Encoder* encoder, Stmt* stmt);
+extern void encoder_encode_stmt(Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byte*)* code_ref);
+extern void encoder_encode_stmts(Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byte*)* code_ref);
 
 #endif

@@ -1,5 +1,86 @@
 #include "encoder.h"
 
+static void encoder_push_instr      (Encoder* encoder, DYNAMIC_ARRAY(Byte*)* code_ref, OpCode op_code);
+static void encoder_push_instr_push (Encoder* encoder, DYNAMIC_ARRAY(Byte*)* code_ref, Obj* obj);
+static void encoder_push_instr_nil  (Encoder* encoder, DYNAMIC_ARRAY(Byte*)* code_ref);
+static Obj* encoder_str_to_obj_nat  (Encoder* encoder, const char*  str);
+static Obj* encoder_str_to_obj_int  (Encoder* encoder, const char*  str);
+static Obj* encoder_str_to_obj_real (Encoder* encoder, const char*  str);
+static Obj* encoder_str_to_obj_str  (Encoder* encoder, const char*  str);
+static Obj* encoder_uint_to_obj_nat (Encoder* encoder, unsigned int nat);
+
+static void objs_free_all(Obj** objs);
+static void obj_free(Obj* obj);
+
+static Obj private_dummy_obj = (Obj)
+{
+    .kind = OBJ_DUMMY,
+    .size =  0 ,
+    .data = {0},
+};
+Obj* dummy_obj = &private_dummy_obj; 
+
+extern Encoder encoder_init(Inferer* inferer)
+{
+    assert(inferer != NULL);
+
+    Encoder encoder = (Encoder)
+    {
+        .stmts          = inferer->stmts         ,
+        .declarations   = inferer->declarations  ,
+        .identifiers    = inferer->identifiers   ,
+        .arena          = inferer->arena         ,
+        .type_arena     = inferer->type_arena    ,
+
+        .objs           = NULL                   ,
+        .main_fn_obj    = NULL                   ,
+
+        .diagnostic_component = diagnostic_component_init()
+    };
+
+    free((char*)inferer->txt);
+    arrfree(inferer->tokens);
+    arrfree(inferer->type_variables);
+    arrfree(inferer->binds);
+    diagnostic_component_free(&inferer->diagnostic_component);
+
+    *inferer = (Inferer)
+    {
+        .txt            = NULL,
+        .tokens         = NULL,
+        .stmts          = NULL,
+        .declarations   = NULL,
+        .identifiers    = NULL,
+        .arena          = { 0 },
+        .type_arena     = { 0 },
+        .type_variables = NULL,
+        .binds          = NULL,
+        .diagnostic_component = NULL,
+    };
+
+    return encoder;
+}
+
+extern void encoder_free(Encoder* encoder)
+{
+    arena_free(&encoder->arena);
+    arena_free(&encoder->type_arena);
+    objs_free_all(encoder->objs);
+    diagnostic_component_free(&encoder->diagnostic_component);
+
+    *encoder = (Encoder)
+    {
+        .stmts          = NULL,
+        .declarations   = NULL,
+        .identifiers    = NULL,
+        .arena          = { 0 },
+        .type_arena     = { 0 },
+        .objs           = NULL,
+        .main_fn_obj    = NULL,
+        .diagnostic_component = NULL
+    };
+}
+
 static void encoder_encode_expr_primary
     (Encoder* encoder, Expr* expr, DYNAMIC_ARRAY(Byte*)* code_ref)
 {
@@ -30,7 +111,7 @@ static void encoder_encode_expr_primary
         case EXPR_PRIMARY_NATURAL   :
         {
             Obj* obj = encoder_str_to_obj_nat(encoder, primary.primary.string);
-            encoder_push_instr_push(encoder_code_ref, obj);
+            encoder_push_instr_push(encoder, code_ref, obj);
             return;
         }
 
@@ -94,9 +175,9 @@ static void encoder_encode_expr_primary
 
         case EXPR_PRIMARY_DECL      :
         {
-            Obj* obj = encoder_get_decl_nat_pos_in_stack(encoder, primary.decl);
+            Obj* obj = encoder_get_decl_nat_pos_in_stack(encoder, primary.primary.decl);
             encoder_push_instr_push (encoder, code_ref, obj);
-            encoder_push_instr      (encoder, OP_CODE_LOAD);
+            encoder_push_instr      (encoder, code_ref, OP_CODE_LOAD);
             return;
         }
     }
@@ -111,7 +192,7 @@ static void encoder_encode_expr_unary_helper
     assert(expr->kind == EXPR_UNARY);
     assert(op_code_is_unary(unary_op_code));
 
-    encoder_encode_expr (encoder, unary.unary, code_ref);
+    encoder_encode_expr (encoder, expr->expr.unary.unary, code_ref);
     encoder_push_instr  (encoder, code_ref, unary_op_code);
 }
 
@@ -127,8 +208,8 @@ static void encoder_encode_expr_unary
     switch (unary.kind)
     {
         case EXPR_UNARY_UNKNOWN: UNREACHABLE;
-        case EXPR_UNARY_NOT    : encoder_encode_expr_unary_helper(encoder, expr, code_ref, OP_CODE_NOT);
-        case EXPR_UNARY_NEGATE : encoder_encode_expr_unary_helper(encoder, expr, code_ref, OP_CODE_NEG);
+        case EXPR_UNARY_NOT    : encoder_encode_expr_unary_helper(encoder, expr, code_ref, OP_CODE_NOT); return;
+        case EXPR_UNARY_NEGATE : encoder_encode_expr_unary_helper(encoder, expr, code_ref, OP_CODE_NEG); return;
     }
     UNREACHABLE;
 }
@@ -155,41 +236,35 @@ static void encoder_encode_expr_binary
     assert(expr    != NULL);
     assert(expr->kind == EXPR_BINARY);
 
-    // IMPLEMENT:
-    UNREACHABLE;
-
     ExprBinary binary = expr->expr.binary;
 
     switch (binary.kind)
     {
         case EXPR_BINARY_UNKNOWN      : UNREACHABLE;
-        case EXPR_BINARY_ADD          : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_ADD);
-        case EXPR_BINARY_SUBTRACT     : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_SUB);
-        case EXPR_BINARY_MULTIPLY     : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_MUL);
-        case EXPR_BINARY_DIVIDE       : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_DIV);
-        case EXPR_BINARY_MODULO       : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_MOD);
-        case EXPR_BINARY_AND          : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_AND);
-        case EXPR_BINARY_OR           : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_OR );
-        case EXPR_BINARY_EQUAL        : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_EQL);
-        case EXPR_BINARY_NOT_EQUAL    : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_NEQ);
-        case EXPR_BINARY_LESS_EQUAL   : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_LSE);
-        case EXPR_BINARY_LESS         : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_LS );
-        case EXPR_BINARY_GREATER_EQUAL: encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_GRE);
-        case EXPR_BINARY_GREATER      : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_GR );
+        case EXPR_BINARY_ADD          : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_ADD); return;
+        case EXPR_BINARY_SUBTRACT     : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_SUB); return;
+        case EXPR_BINARY_MULTIPLY     : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_MUL); return;
+        case EXPR_BINARY_DIVIDE       : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_DIV); return;
+        case EXPR_BINARY_MODULO       : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_MOD); return;
+        case EXPR_BINARY_AND          : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_AND); return;
+        case EXPR_BINARY_OR           : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_OR ); return;
+        case EXPR_BINARY_EQUAL        : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_EQL); return;
+        case EXPR_BINARY_NOT_EQUAL    : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_NEQ); return;
+        case EXPR_BINARY_LESS_EQUAL   : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_LSE); return;
+        case EXPR_BINARY_LESS         : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_LS ); return;
+        case EXPR_BINARY_GREATER_EQUAL: encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_GRE); return;
+        case EXPR_BINARY_GREATER      : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_GR ); return;
         case EXPR_BINARY_CHAIN        : UNREACHABLE;
         case EXPR_BINARY_ACCESS       : UNREACHABLE; // IMPLEMENT:
         case EXPR_BINARY_ASSIGN       :
         {
-            UNREACHABLE; // IMPLEMENT:
-
-            encoder_encode_expr     (encoder, binary.right, code_ref);
-            encoder_encode_rvalue   (encoder, binary.left , code_ref);
-            encoder_push_instr_push (encoder, code_ref, obj);
-            encoder_push_instr      (encoder, code_ref, OP_CODE_STORE);
+            encoder_encode_expr   (encoder, binary.right, code_ref);
+            encoder_encode_rvalue (encoder, binary.left , code_ref);
+            encoder_push_instr    (encoder, code_ref, OP_CODE_STORE);
             return;
         }
 
-        case EXPR_BINARY_INDEX        : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_ACCESS);
+        case EXPR_BINARY_INDEX        : encoder_encode_expr_binary_helper (encoder, expr, code_ref, OP_CODE_ACCESS); return;
     }
     UNREACHABLE;
 }
@@ -241,7 +316,7 @@ extern void encoder_encode_expr(Encoder* encoder, Expr* expr, DYNAMIC_ARRAY(Byte
     UNREACHABLE;
 }
 
-static void encoder_encode_stmt_block(Encoder* encoder, Stmt* stmt)
+static void encoder_encode_stmt_block(Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byte*)* code_ref)
 {
     assert(encoder != NULL);
     assert(stmt    != NULL);
@@ -256,7 +331,7 @@ static void encoder_encode_stmt_block(Encoder* encoder, Stmt* stmt)
     encoder_set_new_block(encoder, stmt);
     for (int i = 0; i < size; ++i)
     {
-        encoder_encode_stmt(encoder, body[i]);
+        encoder_encode_stmt(encoder, body[i], code_ref);
     }
     encoder_restore_old_block(encoder);
 }
@@ -355,8 +430,6 @@ static void encoder_encode_stmt_if
             (encoder, code_ref, unresolved_jmp_location, obj);
     }
     arrfree(unresolved_jmp_locations);
-
-    encoder_encode_stmt_if(encoder, iff.next, code_ref);
 }
 
 static void encoder_encode_stmt_while
@@ -371,6 +444,7 @@ static void encoder_encode_stmt_while
     Obj* obj = NULL;
     DYNAMIC_ARRAY(unsigned int*) old_breaks = NULL;
     DYNAMIC_ARRAY(unsigned int*) new_breaks = NULL;
+    DYNAMIC_ARRAY(Byte*) inner_code = NULL;
     unsigned int init_code_length = arrlen(*code_ref);
     unsigned int unresolved_jmp_location = 0;
 
@@ -378,7 +452,7 @@ static void encoder_encode_stmt_while
     encoder_set_unresolved_breaks(new_breaks);
     old_continue = encoder_get_curr_continue(encoder);
 
-    encoder_encode_stmt(encoder, curr_if.body, &inner_code);
+    encoder_encode_stmt(encoder, whilee.body, &inner_code);
     obj = encoder_uint_to_obj_nat(encoder, init_code_length);
     encoder_push_instr_push(encoder, &inner_code, obj);
     encoder_push_instr(encoder, &inner_code, OP_CODE_UGOTO);
@@ -389,18 +463,18 @@ static void encoder_encode_stmt_while
     // Append jump past inner body in conditional.
     // Previously saved location has to be updated accordingly.
     // Append inner_code to *code_ref, and then free inner_code.
-    if (curr_if.condition != NULL)
+    if (whilee.condition != NULL)
     {
-        encoder_encode_expr(encoder, curr_if.condition, code_ref);
+        encoder_encode_expr(encoder, whilee.condition, code_ref);
         encoder_push_instr (encoder, code_ref, OP_CODE_NOT);
         unresolved_jmp_location = arrlen(inner_code);
-        encoder_push_instr_nil(encoder);
+        encoder_push_instr_nil(encoder, &inner_code);
         encoder_push_instr (encoder, code_ref, OP_CODE_GOTO);
     }
     else
     {
         unresolved_jmp_location = arrlen(inner_code);
-        encoder_push_instr_nil(encoder);
+        encoder_push_instr_nil(encoder, &inner_code);
         encoder_push_instr(encoder, code_ref, OP_CODE_UGOTO);
     }
     append_list_to_list(*code_ref, inner_code);
@@ -434,15 +508,15 @@ static void encoder_encode_stmt_break
     assert(stmt->kind == STMT_BREAK);
 
     unsigned int unresolved_break = 0;
-
     unresolved_break = arrlen(*code_ref);
-    encoder_push_instr_push(encoder, code_ref, obj);
+    encoder_push_instr_nil(encoder, code_ref);
     encoder_push_instr (encoder, code_ref, OP_CODE_GOTO);
 
     encoder_append_break(encoder, unresolved_break);
 }
 
-static void encoder_encode_stmt_continue(Encoder* encoder, Stmt* stmt)
+static void encoder_encode_stmt_continue
+    (Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byte*)* code_ref)
 {
     assert(encoder != NULL);
     assert(stmt    != NULL);
@@ -517,7 +591,7 @@ static void encoder_encode_stmt_type(Encoder* encoder, Stmt* stmt)
     UNREACHABLE;
 }
 
-static void encoder_encode_stmt_match(Encoder* encoder, Stmt* stmt)
+static void encoder_encode_stmt_match(Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byte*)* code_ref)
 {
     assert(encoder != NULL);
     assert(stmt    != NULL);
@@ -526,25 +600,25 @@ static void encoder_encode_stmt_match(Encoder* encoder, Stmt* stmt)
     UNREACHABLE;
 }
 
-extern void encoder_encode_stmt(Encoder* encoder, Stmt* stmt)
+extern void encoder_encode_stmt(Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byte*)* code_ref)
 {
     assert(encoder != NULL);
     assert(stmt    != NULL);
 
     switch (stmt->kind)
     {
-        case STMT_BLOCK   : encoder_encode_stmt_block    (encoder, stmt); return;
-        case STMT_LET     : encoder_encode_stmt_let      (encoder, stmt); return;
-        case STMT_EXPR    : encoder_encode_stmt_expr     (encoder, stmt); return;
-        case STMT_IF      : encoder_encode_stmt_if       (encoder, stmt); return;
-        case STMT_WHILE   : encoder_encode_stmt_while    (encoder, stmt); return;
-        case STMT_BREAK   : encoder_encode_stmt_break    (encoder, stmt); return;
-        case STMT_CONTINUE: encoder_encode_stmt_continue (encoder, stmt); return;
+        case STMT_BLOCK   : encoder_encode_stmt_block    (encoder, stmt, code_ref); return;
+        case STMT_LET     : encoder_encode_stmt_let      (encoder, stmt, code_ref); return;
+        case STMT_EXPR    : encoder_encode_stmt_expr     (encoder, stmt, code_ref); return;
+        case STMT_IF      : encoder_encode_stmt_if       (encoder, stmt, code_ref); return;
+        case STMT_WHILE   : encoder_encode_stmt_while    (encoder, stmt, code_ref); return;
+        case STMT_BREAK   : encoder_encode_stmt_break    (encoder, stmt, code_ref); return;
+        case STMT_CONTINUE: encoder_encode_stmt_continue (encoder, stmt, code_ref); return;
         case STMT_FN      : encoder_encode_stmt_fn       (encoder, stmt); return;
-        case STMT_RETURN  : encoder_encode_stmt_return   (encoder, stmt); return;
+        case STMT_RETURN  : encoder_encode_stmt_return   (encoder, stmt, code_ref); return;
         case STMT_ALIAS   : encoder_encode_stmt_alias    (encoder, stmt); return;
         case STMT_TYPE    : encoder_encode_stmt_type     (encoder, stmt); return;
-        case STMT_MATCH   : encoder_encode_stmt_match    (encoder, stmt); return;
+        case STMT_MATCH   : encoder_encode_stmt_match    (encoder, stmt, code_ref); return;
     }
     UNREACHABLE;
 }
@@ -554,6 +628,95 @@ extern void encoder_encode_stmts(Encoder* encoder, Stmt* stmt, DYNAMIC_ARRAY(Byt
     assert(encoder != NULL);
     assert(stmt    != NULL);
 
-    encoder_encode_stmt(Encoder* encoder, stmt, code_ref);
+    encoder_encode_stmt(encoder, stmt, code_ref);
     encoder_reset_state(encoder);
+}
+
+static void encoder_push_instr(Encoder* encoder, DYNAMIC_ARRAY(Byte*)* code_ref, OpCode op_code)
+{
+    assert(encoder  != NULL);
+    assert(code_ref != NULL);
+
+    arrput(*code_ref, (Byte) op_code);
+}
+
+static void encoder_push_instr_push(Encoder* encoder, DYNAMIC_ARRAY(Byte*)* code_ref, Obj* obj)
+{
+    assert(encoder  != NULL);
+    assert(code_ref != NULL);
+
+    Byte serialized[sizeof(obj)];
+
+    memcpy(serialized, &obj, sizeof(obj));
+
+    arrput(*code_ref, OP_CODE_PUSH);
+    for (size_t i = 0; i < sizeof(serialized); ++i)
+    {
+        arrput(*code_ref, serialized[i]);
+    }
+}
+
+static void encoder_push_instr_nil(Encoder* encoder, DYNAMIC_ARRAY(Byte*)* code_ref)
+{
+    assert(encoder  != NULL);
+    assert(code_ref != NULL);
+
+    Obj* obj = encoder_create_obj_nil(encoder);
+    encoder_push_instr_push(encoder, code_ref, obj);
+}
+
+static Obj* encoder_str_to_obj_nat(Encoder* encoder, const char* str)
+{
+    assert(encoder != NULL);
+    assert(str     != NULL);
+
+    return dummy_obj;
+}
+
+static Obj* encoder_str_to_obj_int(Encoder* encoder, const char* str)
+{
+    assert(encoder != NULL);
+    assert(str     != NULL);
+
+    return dummy_obj;
+}
+
+static Obj* encoder_str_to_obj_real(Encoder* encoder, const char* str)
+{
+    assert(encoder != NULL);
+    assert(str     != NULL);
+
+    return dummy_obj;
+}
+
+static Obj* encoder_str_to_obj_str(Encoder* encoder, const char* str)
+{
+    assert(encoder != NULL);
+    assert(str     != NULL);
+
+    return dummy_obj;
+}
+
+static Obj* encoder_uint_to_obj_nat(Encoder* encoder, unsigned int nat)
+{
+    assert(encoder != NULL);
+
+    return dummy_obj;
+}
+
+static void objs_free_all(DYNAMIC_ARRAY(Obj**) objs)
+{
+    assert(objs != NULL);
+
+    int length = arrlen(objs);
+    for (int i = 0; i < length; ++i)
+    {
+        obj_free(objs[i]);
+    }
+}
+
+static void obj_free(Obj* obj)
+{
+    assert(obj != NULL);
+    free(obj);
 }
