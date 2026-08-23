@@ -3,12 +3,4 @@
 
 #include "encoder.h"
 
-typedef struct
-{
-    Obj** objs ;
-    Obj** stack;
-    ObjFn* code;
-}
-Runtime;
-
 #endif
